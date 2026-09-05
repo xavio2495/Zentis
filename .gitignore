@@ -56,6 +56,10 @@ states/
 /contracts/cache/
 /contracts/broadcast/*/31337/
 
+# Python
+__pycache__/
+*.pyc
+
 # Doc files are not committed except README.md
 *.md
 !/README.md
