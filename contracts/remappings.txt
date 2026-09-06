@@ -1,0 +1,10 @@
+@1inch/aqua/=lib/aqua/
+@1inch/solidity-utils/=lib/solidity-utils/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+aqua/=lib/aqua/src/
+chainlink-interfaces/=lib/chainlink-interfaces/src/
+cre-receiver/=lib/cre-receiver/src/
+forge-std/=lib/forge-std/src/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+solidity-utils/=lib/solidity-utils/contracts/
+swap-vm/=lib/swap-vm/src/
