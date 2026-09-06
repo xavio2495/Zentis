@@ -3,9 +3,12 @@ pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 
+import {XYCSwap} from "swap-vm/instructions/XYCSwap.sol";
+
 import {ZentisRef} from "../../src/ref/IZentisRef.sol";
 import {ZentisSkew} from "../../src/instructions/ZentisSkew.sol";
 import {MockZentisRef, ZentisSkewHarness} from "../fixtures/ZentisSkewHarness.sol";
+import {ZentisProgramHarness} from "../fixtures/ZentisProgramHarness.sol";
 
 contract ZentisSkewTest is Test {
     ZentisSkewHarness internal harness;
@@ -180,6 +183,49 @@ contract ZentisSkewTest is Test {
         _setRef(0, 0, uint128(BALANCE_A), 0);
         vm.expectRevert(abi.encodeWithSelector(ZentisSkew.ZentisEmptyPosition.selector, 0, BALANCE_B));
         harness.skewBalanceIn(0, BALANCE_B, TOKEN_A, TOKEN_B, _argsOnly(0, 0));
+    }
+
+    // ---------------------------------------------------------------------
+    // 3.3 — consecutive same-direction fills must get monotonically worse
+    // ---------------------------------------------------------------------
+
+    /// @dev The test that catches a wrong `dTiltPerA` sign. The taker keeps paying A and taking B, so
+    ///      the maker keeps accumulating A — increasingly over-weight, and increasingly unwilling to
+    ///      buy more of it. With the sign right, each successive fill pays out less. With it flipped,
+    ///      accumulating A would *discount* A-for-B and the book would pay a splitter to keep going.
+    function testFuzz_SequentialFillsAreNeverCheaper(uint256 amountIn, uint8 fills) public {
+        amountIn = bound(amountIn, 1e18, 5_000e18);
+        fills = uint8(bound(fills, 2, 6));
+
+        // tilt starts at 0 and grows as balanceA does: 1 bp per 1e18 units of A accumulated.
+        _setRef(0, 1, uint128(BALANCE_A), 1_000);
+
+        ZentisProgramHarness programHarness = new ZentisProgramHarness();
+        bytes memory program = bytes.concat(
+            ZentisSkew.build(address(ref), POSITION_ID, MAX_STALENESS, MAX_TILT_BPS, 0, 0),
+            XYCSwap.build()
+        );
+
+        uint256 balanceA = BALANCE_A;
+        uint256 balanceB = BALANCE_B;
+        uint256 previousOut = type(uint256).max;
+
+        for (uint256 i = 0; i < fills; i++) {
+            ZentisProgramHarness.Setup memory s;
+            s.balanceIn = balanceA;
+            s.balanceOut = balanceB;
+            s.amount = amountIn;
+            s.isExactIn = true;
+            s.tokenIn = TOKEN_A;
+            s.tokenOut = TOKEN_B;
+
+            (, uint256 amountOut) = programHarness.run(program, s);
+            assertLe(amountOut, previousOut, "a later same-direction fill must never be cheaper");
+
+            previousOut = amountOut;
+            balanceA += amountIn; // the maker took in A
+            balanceB -= amountOut; // and paid out B
+        }
     }
 
     function test_BuildRejectsZeroStaleness() public {
