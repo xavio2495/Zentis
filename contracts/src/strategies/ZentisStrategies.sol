@@ -77,13 +77,81 @@ library ZentisStrategies {
         }
     }
 
+    /// @notice Builds the vetted Zentis program. Byte order IS nesting, outermost first:
+    ///
+    ///     Deadline(t)
+    ///     FeeProtocol(feeBps, receiver)                     <- accrues on final amounts
+    ///       ZentisBand(ref, positionId, tolBps, maxTilt)
+    ///         ZentisSpread(ref, positionId, floors, maxW)   <- shrinks amountIn BEFORE pricing
+    ///           ZentisSkew(ref, positionId, ...)            <- mutates balanceIn
+    ///           XYCSwap()                                   <- prices
+    ///     Salt(positionId || chainSalt)
+    ///
+    /// @dev `ZentisBand` sits OUTSIDE `ZentisSpread` deliberately. Inside, it would measure the curve
+    ///      rate net of the spread — but the spread stays with the maker, so that understates the
+    ///      maker's outcome. Outside, it measures the taker-facing rate, which is what the maker
+    ///      actually realises. It sits inside `FeeProtocol`, so it is gross of the protocol fee.
+    ///
+    ///      `ZentisSpread` must precede the curve in byte order or it wraps nothing — the general form
+    ///      of the `FeeFlatIn`-after-curve trap.
     function buildZentisPosition(bytes[] calldata prefix, ZentisPosition calldata args)
         internal
         pure
-        returns (bytes memory)
+        returns (bytes memory program)
     {
-        prefix;
-        args;
-        return "";
+        bytes memory salt = abi.encodePacked(args.positionId, args.chainSalt);
+
+        FeeProtocol.ReceiverConfig[] memory receivers;
+        FeeProtocol.ProviderConfig[] memory providers;
+        uint256 feeSize;
+        if (args.feeBps != 0) {
+            receivers = new FeeProtocol.ReceiverConfig[](1);
+            receivers[0] = FeeProtocol.ReceiverConfig({
+                receiver: args.feeReceiver,
+                feeBps: args.feeBps,
+                surplusBps: 0
+            });
+            providers = new FeeProtocol.ProviderConfig[](0);
+            feeSize = FeeProtocol.sizeOf(args.feeOnTokenIn, receivers, providers, 0);
+        }
+
+        MemoryPtr ptr = MemoryPtrLib.alloc(
+            _checkPrefix(prefix) +
+            Deadline.sizeOf(args.deadline) +
+            feeSize +
+            ZentisBand.sizeOf() +
+            ZentisSpread.sizeOf() +
+            ZentisSkew.sizeOf() +
+            XYCSwap.sizeOf() +
+            Salt.sizeOf(salt)
+        );
+
+        for (uint256 i; i < prefix.length; i++) ptr = ptr.push(prefix[i]);
+
+        ptr = Deadline.build(ptr, args.deadline);
+        if (args.feeBps != 0) {
+            ptr = FeeProtocol.build(ptr, args.feeOnTokenIn, receivers, providers, 0);
+        }
+        ptr = ZentisBand.build(ptr, args.ref, args.positionId, args.bandTolBps, args.maxTiltBps);
+        ptr = ZentisSpread.build(
+            ptr, args.ref, args.positionId, args.floorOutA, args.floorOutB, args.spreadMaxWidenBps
+        );
+        ptr = ZentisSkew.build(
+            ptr,
+            args.ref,
+            args.positionId,
+            args.maxStaleness,
+            args.maxTiltBps, // the SAME field the band above was given
+            args.widenBpsPerMinute,
+            args.skewMaxWidenBps
+        );
+        ptr = XYCSwap.build(ptr);
+        ptr = Salt.build(ptr, salt);
+
+        // resolveShrink, not resolve: FeeProtocol.sizeOf always reserves 27 bytes for a surplus
+        // estimate that build() only emits when a receiver takes a surplus fee, so the allocation is
+        // deliberately loose. A strict resolve() reverts on the unfilled tail — and the pinned
+        // Strategies.sol never hits this because neither of its two recipes uses FeeProtocol.
+        (program, ) = ptr.resolveShrink();
     }
 }
