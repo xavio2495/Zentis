@@ -74,6 +74,10 @@ contract ZentisRefRegistry is IZentisRef, ReceiverTemplate {
 
     function _write(bytes32 id, ZentisRef memory r) private {
         ZentisRef memory prev = _refs[id];
+        // A zero mid is never a legitimate reference, and with the oracle band disabled nothing else
+        // would catch it. ZentisBand derives its bound by scaling mid, so a stored zero collapses the
+        // bound to zero: one direction would then admit every fill and the other reject every fill.
+        require(r.mid != 0, ZentisRefZeroMid());
         require(r.seq > prev.seq, ZentisRefStaleSeq(r.seq, prev.seq));
         require(r.updatedAt <= block.timestamp && r.updatedAt >= prev.updatedAt, ZentisRefBadTimestamp(r.updatedAt));
 
@@ -103,6 +107,11 @@ contract ZentisRefRegistry is IZentisRef, ReceiverTemplate {
         if (answer <= 0) return false;
 
         uint256 feedMid = (uint256(answer) * FEED_SCALE) / 1e18;
+        // Truncation can zero this out even for a positive answer, and dividing by it below would
+        // panic — which _write's whole no-revert design exists to avoid, since a panic propagating
+        // out of _processReport is what makes the DON retry one bad report forever.
+        if (feedMid == 0) return false;
+
         uint256 diff = mid > feedMid ? mid - feedMid : feedMid - mid;
         uint256 bandBps = (diff * uint256(BPS)) / feedMid;
         return bandBps <= FEED_BAND_BPS;
