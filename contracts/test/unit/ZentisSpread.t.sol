@@ -44,6 +44,18 @@ contract ZentisSpreadTest is Test {
         );
     }
 
+    /// @dev The direction-aware shape the floor needs: one floor per side of the pair. Until
+    ///      ZentisSpread carries both, this drops floorOutB on the floor — which is exactly the bug
+    ///      the two tests below are here to fail on.
+    function _program(uint128 floorOutA, uint128 floorOutB, uint16 maxWidenBps)
+        private
+        view
+        returns (bytes memory)
+    {
+        floorOutB;
+        return _program(floorOutA, maxWidenBps);
+    }
+
     function _setup(bool isExactIn, uint256 amount)
         private
         pure
@@ -130,6 +142,62 @@ contract ZentisSpreadTest is Test {
         (, uint256 withFloorZero) = harness.run(_program(0, 500), _setup(true, AMOUNT_IN));
         (, uint256 withFloorFar) = harness.run(_program(uint128(BALANCE_B / 4), 500), _setup(true, AMOUNT_IN));
         assertEq(withFloorZero, withFloorFar, "floor 0 disables the ramp, same as being far from it");
+    }
+
+    // ---------------------------------------------------------------------
+    // the soft bound must be direction-aware: the pair's two sides have different decimals
+    // ---------------------------------------------------------------------
+
+    // WETH/USDC, the pair V4 settled on: 18dp against 6dp. Every other test in this file uses
+    // BALANCE_A == BALANCE_B, which makes a single floor look workable in both directions. It is not.
+    uint256 internal constant BAL_WETH = 1_000e18; // tokenA (lower-addressed), 18 decimals
+    uint256 internal constant BAL_USDC = 4_500_000e6; // tokenB, 6 decimals
+    uint128 internal constant FLOOR_WETH = 400e18; // a floor that means something on the WETH side
+    uint128 internal constant FLOOR_USDC = 1_800_000e6; // ...and its counterpart on the USDC side
+
+    function _setupPair(bool wethIsIn, uint256 amount)
+        private
+        pure
+        returns (ZentisProgramHarness.Setup memory s)
+    {
+        s.balanceIn = wethIsIn ? BAL_WETH : BAL_USDC;
+        s.balanceOut = wethIsIn ? BAL_USDC : BAL_WETH;
+        s.amount = amount;
+        s.isExactIn = true;
+        s.tokenIn = wethIsIn ? TOKEN_A : TOKEN_B;
+        s.tokenOut = wethIsIn ? TOKEN_B : TOKEN_A;
+    }
+
+    /// @dev The bug a symmetric-balance test cannot see. `floorOut` is compared against
+    ///      `ctx.swap.balanceOut`, which is WETH one way and USDC the other. A single floor sized in
+    ///      WETH (4e20) sits five orders of magnitude above the entire USDC balance (4.5e12), so the
+    ///      ramp reads "at the floor" and pins the spread at max on every USDC-out fill, forever —
+    ///      while the WETH side, the one it was sized for, behaves correctly. Sizing it the other way
+    ///      just moves the failure to the other side.
+    function test_SoftBound_FloorDoesNotLeakAcrossDirections() public {
+        _setRef(10, 0);
+
+        (, uint256 ramped) = harness.run(_program(FLOOR_WETH, FLOOR_USDC, 500), _setupPair(true, 1e18));
+        (, uint256 unramped) = harness.run(_program(0, 0, 500), _setupPair(true, 1e18));
+
+        assertEq(
+            ramped,
+            unramped,
+            "a USDC-out fill must be measured against the USDC floor, not the WETH one"
+        );
+    }
+
+    /// @dev ...and the direction the floor *does* apply to must still ramp, so the fix above cannot be
+    ///      "ignore the floor".
+    function test_SoftBound_StillRampsOnTheDirectionItSizes() public {
+        _setRef(10, 0);
+
+        // Taker pays USDC, receives WETH: balanceOut is WETH, and FLOOR_WETH is 40% of it, so a
+        // near-floor variant must widen relative to a far-floor one.
+        (, uint256 far) = harness.run(_program(uint128(BAL_WETH / 4), 0, 500), _setupPair(false, 1_000e6));
+        (, uint256 near) = harness.run(_program(uint128(BAL_WETH * 9 / 10), 0, 500), _setupPair(false, 1_000e6));
+
+        assertLt(near, far, "approaching the WETH floor must still widen a WETH-out fill");
     }
 
     // ---------------------------------------------------------------------
