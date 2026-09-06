@@ -228,6 +228,107 @@ contract ZentisSkewTest is Test {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // the recompute guard
+    // ---------------------------------------------------------------------
+
+    function _programHarness() private returns (ZentisProgramHarness) {
+        return new ZentisProgramHarness();
+    }
+
+    function _skewInstruction() private view returns (bytes memory) {
+        return ZentisSkew.build(address(ref), POSITION_ID, MAX_STALENESS, MAX_TILT_BPS, 0, 0);
+    }
+
+    function _programSetup() private pure returns (ZentisProgramHarness.Setup memory s) {
+        s.balanceIn = BALANCE_A;
+        s.balanceOut = BALANCE_B;
+        s.amount = 1_000e18;
+        s.isExactIn = true;
+        s.tokenIn = TOKEN_A;
+        s.tokenOut = TOKEN_B;
+    }
+
+    /// @dev The guard's real job: ZentisSkew shifts balanceIn to move the price, so it is only
+    ///      meaningful before the curve prices. Reached afterwards, both amount registers are already
+    ///      populated and the shift would be applied to an already-computed quote.
+    function test_RecomputeGuard_RevertsWhenSkewRunsAfterTheCurve() public {
+        _setRef(300, 0, uint128(BALANCE_A), 1_000);
+        ZentisProgramHarness h = _programHarness();
+
+        vm.expectRevert(ZentisSkew.ZentisRecomputeDetected.selector);
+        h.run(bytes.concat(XYCSwap.build(), _skewInstruction()), _programSetup());
+    }
+
+    function test_RecomputeGuard_RevertsWhenSkewStraddlesTheCurve() public {
+        _setRef(300, 0, uint128(BALANCE_A), 1_000);
+        ZentisProgramHarness h = _programHarness();
+
+        vm.expectRevert(ZentisSkew.ZentisRecomputeDetected.selector);
+        h.run(bytes.concat(_skewInstruction(), XYCSwap.build(), _skewInstruction()), _programSetup());
+    }
+
+    /// @dev Documents a real limit of the guard, contra the tech spec's "running ZentisSkew twice
+    ///      reverts": two skews *before* the curve both see an unpopulated amountOut, so the guard
+    ///      passes and their multipliers compound. It is a maker footgun (the maker authors and ships
+    ///      their own immutable program), not a taker attack, and ZentisBand catches the resulting
+    ///      quote at execution time — see ZentisBand.t.sol's test_BandCatchesCompoundedDoubleSkew.
+    function test_RecomputeGuard_DoesNotCatchDoubleSkewBeforeTheCurve() public {
+        _setRef(300, 0, uint128(BALANCE_A), 1_000);
+        ZentisProgramHarness h = _programHarness();
+
+        (, uint256 doubleSkewed) =
+            h.run(bytes.concat(_skewInstruction(), _skewInstruction(), XYCSwap.build()), _programSetup());
+        (, uint256 singleSkewed) =
+            h.run(bytes.concat(_skewInstruction(), XYCSwap.build()), _programSetup());
+
+        assertTrue(doubleSkewed != singleSkewed, "two skews compound rather than reverting");
+    }
+
+    // ---------------------------------------------------------------------
+    // the optional seq pin
+    // ---------------------------------------------------------------------
+
+    function test_SeqPin_AbsentPasses() public {
+        _setRef(0, 0, uint128(BALANCE_A), 0);
+        ZentisProgramHarness h = _programHarness();
+        h.runWithTakerArgs(
+            bytes.concat(_skewInstruction(), XYCSwap.build()), "", _programSetup()
+        ); // must not revert
+    }
+
+    function test_SeqPin_ZeroPasses() public {
+        _setRef(0, 0, uint128(BALANCE_A), 0);
+        ZentisProgramHarness h = _programHarness();
+        h.runWithTakerArgs(
+            bytes.concat(_skewInstruction(), XYCSwap.build()),
+            abi.encodePacked(uint32(0)),
+            _programSetup()
+        ); // must not revert
+    }
+
+    function test_SeqPin_MatchingPasses() public {
+        _setRef(0, 0, uint128(BALANCE_A), 0); // _setRef writes seq = 1
+        ZentisProgramHarness h = _programHarness();
+        h.runWithTakerArgs(
+            bytes.concat(_skewInstruction(), XYCSwap.build()),
+            abi.encodePacked(uint32(1)),
+            _programSetup()
+        ); // must not revert
+    }
+
+    function test_SeqPin_StaleReverts() public {
+        _setRef(0, 0, uint128(BALANCE_A), 0); // seq = 1
+        ZentisProgramHarness h = _programHarness();
+
+        vm.expectRevert(abi.encodeWithSelector(ZentisSkew.ZentisSeqMismatch.selector, uint32(99), uint32(1)));
+        h.runWithTakerArgs(
+            bytes.concat(_skewInstruction(), XYCSwap.build()),
+            abi.encodePacked(uint32(99)),
+            _programSetup()
+        );
+    }
+
     function test_BuildRejectsZeroStaleness() public {
         vm.expectRevert(ZentisSkew.ZentisStalenessDisabled.selector);
         this.buildWithZeroStaleness();

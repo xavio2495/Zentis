@@ -141,6 +141,25 @@ contract ZentisBandTest is Test {
         harness.run(program, _setup(true, amountIn, true)); // must not revert
     }
 
+    /// @dev The backstop for the recompute guard's blind spot: two ZentisSkew instructions before the
+    ///      curve compound their multipliers without tripping that guard (see
+    ///      ZentisSkew.t.sol's test_RecomputeGuard_DoesNotCatchDoubleSkewBeforeTheCurve), but the band
+    ///      is computed from a *single* effective tilt, so the compounded quote falls outside it.
+    function test_BandCatchesCompoundedDoubleSkew() public {
+        uint256 realised = _bareRealised();
+        _setRef(uint128(realised), 10, -300, 0, uint128(BALANCE_A));
+
+        bytes memory band = ZentisBand.build(address(ref), POSITION_ID, 50, MAX_TILT_BPS);
+        bytes memory skew = ZentisSkew.build(address(ref), POSITION_ID, MAX_STALENESS, MAX_TILT_BPS, 0, 0);
+
+        // One skew: inside the band.
+        harness.run(bytes.concat(band, skew, XYCSwap.build()), _setup(true, AMOUNT_IN, true));
+
+        // Two: the shift compounds past what a single effective tilt admits.
+        vm.expectRevert();
+        harness.run(bytes.concat(band, skew, skew, XYCSwap.build()), _setup(true, AMOUNT_IN, true));
+    }
+
     // ---------------------------------------------------------------------
     // guards
     // ---------------------------------------------------------------------

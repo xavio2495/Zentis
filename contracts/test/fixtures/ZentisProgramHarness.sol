@@ -28,8 +28,24 @@ contract ZentisProgramHarness is ZentisOpcodes {
         external
         returns (uint256 amountIn, uint256 amountOut)
     {
+        return _run(program, msg.data[0:0], s);
+    }
+
+    /// @notice Same, but with taker-supplied instruction args — where the optional seq pin lives.
+    function runWithTakerArgs(bytes calldata program, bytes calldata takerArgs, Setup memory s)
+        external
+        returns (uint256 amountIn, uint256 amountOut)
+    {
+        return _run(program, takerArgs, s);
+    }
+
+    function _run(bytes calldata program, bytes calldata takerArgs, Setup memory s)
+        private
+        returns (uint256 amountIn, uint256 amountOut)
+    {
         Context memory ctx;
         ctx.vm.programPtr = CalldataPtrLib.from(program);
+        ctx.vm.takerArgsPtr = CalldataPtrLib.from(takerArgs);
         ctx.vm.dispatch = _runOpcode;
 
         ctx.query.tokenIn = s.tokenIn;
