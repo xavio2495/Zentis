@@ -38,22 +38,21 @@ contract ZentisSpreadTest is Test {
     }
 
     /// @dev [ZentisSpread(...)] wrapping [XYCSwap] — the wrapper runs, then runLoop reaches the curve.
-    function _program(uint128 floorOut, uint16 maxWidenBps) private view returns (bytes memory) {
-        return bytes.concat(
-            ZentisSpread.build(address(ref), POSITION_ID, floorOut, maxWidenBps), XYCSwap.build()
-        );
-    }
-
-    /// @dev The direction-aware shape the floor needs: one floor per side of the pair. Until
-    ///      ZentisSpread carries both, this drops floorOutB on the floor — which is exactly the bug
-    ///      the two tests below are here to fail on.
     function _program(uint128 floorOutA, uint128 floorOutB, uint16 maxWidenBps)
         private
         view
         returns (bytes memory)
     {
-        floorOutB;
-        return _program(floorOutA, maxWidenBps);
+        return bytes.concat(
+            ZentisSpread.build(address(ref), POSITION_ID, floorOutA, floorOutB, maxWidenBps),
+            XYCSwap.build()
+        );
+    }
+
+    /// @dev The same floor on both sides — only sound because these tests run on a symmetric,
+    ///      same-decimals pair. The direction-aware tests below use the two-floor form.
+    function _program(uint128 floorOut, uint16 maxWidenBps) private view returns (bytes memory) {
+        return _program(floorOut, floorOut, maxWidenBps);
     }
 
     function _setup(bool isExactIn, uint256 amount)
