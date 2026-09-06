@@ -1,0 +1,17 @@
+{
+  "name": "@zentis/reference-pools-subgraph",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "codegen:base-sepolia": "graph codegen subgraph.base-sepolia.yaml",
+    "build:base-sepolia": "graph build subgraph.base-sepolia.yaml",
+    "deploy:base-sepolia": "graph deploy zentis-reference-pool-base-sepolia subgraph.base-sepolia.yaml --node https://api.studio.thegraph.com/deploy/ --ipfs https://api.studio.thegraph.com/ipfs/",
+    "codegen:arbitrum-sepolia": "graph codegen subgraph.arbitrum-sepolia.yaml",
+    "build:arbitrum-sepolia": "graph build subgraph.arbitrum-sepolia.yaml",
+    "deploy:arbitrum-sepolia": "graph deploy zentis-reference-pool-arbitrum-sepolia subgraph.arbitrum-sepolia.yaml --node https://api.studio.thegraph.com/deploy/ --ipfs https://api.studio.thegraph.com/ipfs/"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.98.1",
+    "@graphprotocol/graph-ts": "^0.38.2"
+  }
+}

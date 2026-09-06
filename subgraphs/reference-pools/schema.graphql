@@ -1,0 +1,34 @@
+"""
+One Uniswap v3 pool being tracked as Zentis's live price/reserve reference on a given testnet.
+Standardized shape: mid follows cg1/PRODUCT_TECH_SPEC.md §1 exactly (raw tokenB per 1e18 raw
+tokenA, tokenA = the lower-addressed token) so downstream code never re-derives it.
+"""
+type Pool @entity(immutable: false) {
+  id: ID! # pool address
+  tokenA: Bytes! # lower-addressed token
+  tokenB: Bytes! # higher-addressed token
+  sqrtPriceX96: BigInt!
+  tick: BigInt!
+  liquidity: BigInt!
+  mid: BigInt! # raw tokenB per 1e18 raw tokenA, derived from sqrtPriceX96
+  reserveA: BigInt! # tokenA.balanceOf(pool) as of the last indexed swap
+  reserveB: BigInt! # tokenB.balanceOf(pool) as of the last indexed swap
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+  swaps: [Swap!]! @derivedFrom(field: "pool")
+}
+
+"""One indexed Swap event on a tracked pool — the append-only history behind Pool's running state."""
+type Swap @entity(immutable: true) {
+  id: ID! # tx hash : log index
+  pool: Pool!
+  sender: Bytes!
+  recipient: Bytes!
+  amount0: BigInt!
+  amount1: BigInt!
+  sqrtPriceX96: BigInt!
+  liquidity: BigInt!
+  tick: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}

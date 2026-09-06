@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules
 /.pnp
 .pnp.js
 
@@ -60,6 +61,10 @@ states/
 # Python
 __pycache__/
 *.pyc
+
+# Subgraph build artifacts (graph codegen / graph build)
+/subgraphs/*/generated/
+/subgraphs/*/build/
 
 # Doc files are not committed except README.md
 *.md

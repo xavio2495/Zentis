@@ -1,0 +1,36 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Pool
+    network: arbitrum-sepolia
+    source:
+      address: "0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf"
+      abi: UniswapV3Pool
+      startBlock: 305835360
+    context:
+      tokenA:
+        type: Bytes
+        data: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
+      tokenB:
+        type: Bytes
+        data: "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73"
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Swap
+      abis:
+        - name: UniswapV3Pool
+          file: ./abis/UniswapV3Pool.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
+          handler: handleSwap
+      file: ./src/mapping.ts
