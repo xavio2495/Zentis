@@ -14,6 +14,7 @@ contract ZentisRefRegistry is IZentisRef, ReceiverTemplate {
     error ZentisRefBadTimestamp(uint40 updatedAt);
     error ZentisRefNotOwner();
     error ZentisRefCreIsLive();
+    error ZentisRefZeroMid();
 
     event ZentisRefUpdated(bytes32 indexed positionId, uint128 mid, int16 tiltBps, uint40 updatedAt, uint32 seq);
     event ZentisRefRejected(bytes32 indexed positionId, string reason); // loud, never silent

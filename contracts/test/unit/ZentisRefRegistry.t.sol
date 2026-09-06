@@ -114,6 +114,16 @@ contract ZentisRefRegistryTest is Test {
         registryNoFeed.pokeRef(POSITION_ID, _ref(1e18, 3, t0));
     }
 
+    /// @dev A ref with mid == 0 must never be storable. With the oracle band disabled — the shipped
+    ///      configuration on both testnets, and the deploy script's default — nothing else rejects it,
+    ///      and ZentisBand then computes `floor = mulDiv(0, ...) == 0`, so `realised >= floor` holds
+    ///      for every conceivable fill: the maker-sells-A direction loses its boundary entirely.
+    function test_PokeRef_RevertsOnZeroMid() public {
+        ZentisRef memory r = _ref(0, 1, uint40(block.timestamp));
+        vm.expectRevert(ZentisRefRegistry.ZentisRefZeroMid.selector);
+        registryNoFeed.pokeRef(POSITION_ID, r);
+    }
+
     // ---------------------------------------------------------------------
     // oracle band
     // ---------------------------------------------------------------------
