@@ -36,6 +36,17 @@ contract ZentisBandTest is Test {
     function _setRef(uint128 mid, uint16 spreadBps, int16 tiltBps, int64 dTiltPerA, uint128 refBalanceA)
         private
     {
+        _setRef(mid, spreadBps, tiltBps, dTiltPerA, refBalanceA, MAX_TILT_BPS);
+    }
+
+    function _setRef(
+        uint128 mid,
+        uint16 spreadBps,
+        int16 tiltBps,
+        int64 dTiltPerA,
+        uint128 refBalanceA,
+        uint16 bandEdgeBps
+    ) private {
         ZentisRef memory r;
         r.mid = mid;
         r.spreadBps = spreadBps;
@@ -45,7 +56,7 @@ contract ZentisBandTest is Test {
         r.refBalanceA = refBalanceA;
         r.dTiltPerA = dTiltPerA;
         r.maxExtrapBps = 1_000;
-        r.bandEdgeBps = MAX_TILT_BPS;
+        r.bandEdgeBps = bandEdgeBps;
         ref.set(r);
     }
 
@@ -100,6 +111,52 @@ contract ZentisBandTest is Test {
         _setRef(uint128(realised * 2), 0, 0, 0, uint128(BALANCE_A));
         vm.expectRevert();
         harness.run(_bandProgram(0), _setup(true, AMOUNT_IN, false));
+    }
+
+    // ---------------------------------------------------------------------
+    // bandEdgeBps: the slow workflow's published boundary, able to TIGHTEN only
+    // ---------------------------------------------------------------------
+
+    /// @dev The published boundary is the reason the slow workflow exists, and until now nothing read
+    ///      it. It is applied as `min(immediate maxTiltBps, r.bandEdgeBps)`, never as a replacement:
+    ///      the maker signed a cap and a later publisher must not be able to widen it. Tightening is
+    ///      safe in the other direction — it only ever refuses more fills.
+    ///
+    ///      Setup: raw tilt is at the full immediate cap, and the realised rate sits inside the band
+    ///      that cap earns but outside the band a tightened cap earns.
+    function test_BandEdgeTightensTheCap() public {
+        uint256 realised = _bareRealised();
+        uint128 mid = uint128(realised * 10_000 / 10_300); // realised ~3% above mid
+
+        // Full cap: band = |tilt| 500bps = 5% > 3% => admitted.
+        _setRef(mid, 0, int16(int256(uint256(MAX_TILT_BPS))), 0, uint128(BALANCE_A), MAX_TILT_BPS);
+        harness.run(_bandProgram(0), _setup(true, AMOUNT_IN, true));
+
+        // Tightened to 100bps: band = 1% < 3% => the same fill must now be refused.
+        _setRef(mid, 0, int16(int256(uint256(MAX_TILT_BPS))), 0, uint128(BALANCE_A), 100);
+        vm.expectRevert();
+        harness.run(_bandProgram(0), _setup(true, AMOUNT_IN, true));
+    }
+
+    /// @dev The security property: a published edge WIDER than the maker's immediate is ignored.
+    function test_BandEdgeCannotLoosenTheCap() public {
+        uint256 realised = _bareRealised();
+        uint128 mid = uint128(realised * 10_000 / 10_600); // realised ~6% above mid, outside a 5% cap
+
+        _setRef(mid, 0, int16(int256(uint256(MAX_TILT_BPS))), 0, uint128(BALANCE_A), 9_000);
+        vm.expectRevert();
+        harness.run(_bandProgram(0), _setup(true, AMOUNT_IN, true));
+    }
+
+    /// @dev Zero means "no opinion published yet", NOT "clamp the tilt to nothing". Every reference
+    ///      written before the slow workflow existed carries a zero here, and reading it as a cap
+    ///      would collapse the band on every one of them.
+    function test_BandEdgeZeroLeavesTheImmediateCapInForce() public {
+        uint256 realised = _bareRealised();
+        uint128 mid = uint128(realised * 10_000 / 10_300); // realised ~3% above mid
+
+        _setRef(mid, 0, int16(int256(uint256(MAX_TILT_BPS))), 0, uint128(BALANCE_A), 0);
+        harness.run(_bandProgram(0), _setup(true, AMOUNT_IN, true)); // must not revert
     }
 
     // ---------------------------------------------------------------------
