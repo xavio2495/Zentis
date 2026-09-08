@@ -1,0 +1,58 @@
+{
+  "chainId": 84532,
+  "name": "base-sepolia",
+  "contracts": {
+    "ZentisRefRegistry": {
+      "address": "0xFC603336a7B797f2D7EbA03ed69734Fad9EA521B",
+      "note": "oracle band disabled (FEED = address(0)): the Base Sepolia ETH/USD feed is access-gated against contract reads"
+    },
+    "AquaRouter": {
+      "address": "0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9",
+      "source": "contracts/lib/aqua @ 9c5c42e, unmodified",
+      "deployTx": "0x3bf6e1e6694aba2fbf1960336479c2b99caf41e5b522fea9de8a2817f91225f6"
+    },
+    "ZentisRouter": {
+      "address": "0xdd9752b377870bd9e41cd041f4a0e90770d0fb41",
+      "source": "contracts/src/routers/ZentisRouter.sol over swap-vm @ f09a41e",
+      "deployTx": "0x7e6e9a0f509ae59bb5adf3fc71a48c31dc91f052c9afcc0c783ef884ff837693"
+    }
+  },
+  "tokens": {
+    "tokenA": {
+      "symbol": "USDC",
+      "decimals": 6,
+      "address": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+    },
+    "tokenB": {
+      "symbol": "WETH",
+      "decimals": 18,
+      "address": "0x4200000000000000000000000000000000000006"
+    }
+  },
+  "position": {
+    "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "strategyHash": "0xb9b123182a174dae8f2eef4f70875034ca1df036f62b09320cca2688fd7fbe09",
+    "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
+    "deadline": 1791500000,
+    "shippedBalanceA": "10000000",
+    "shippedBalanceB": "2758188530000858",
+    "shippedAgainstRef": {
+      "mid": "275818853000085890554200491",
+      "seq": 3,
+      "updatedAt": 1788886218
+    },
+    "shipTx": "0x1955303658583ace3d68b4c944146d8b246a4c145ffad8023f5cb82ef391b088"
+  },
+  "fills": [
+    {
+      "tx": "0x1d366f386f984e2a32ece0cf5a40ce4d86046635d8128212bde0d2d758af12fa",
+      "block": 46559068,
+      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+      "tokenIn": "USDC",
+      "tokenOut": "WETH",
+      "amountIn": "1000000",
+      "amountOut": "249744434104129"
+    }
+  ],
+  "note": "Every hash here was resolved from an on-chain receipt, not from the position of an entry in forge run-latest.json -- that file lists transactions[].hash in an order that does not match its own function labels."
+}
