@@ -1,5 +1,5 @@
 {
-  "schedule": "*/10 * * * * *",
+  "schedule": "0 */1 * * * *",
   "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
   "kappaSecretId": "KAPPA_BPS",
   "spreadBps": 10,

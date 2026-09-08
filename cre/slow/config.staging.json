@@ -1,6 +1,26 @@
 {
-  "schedule": "0 */1 * * * *",
-  "url": "https://postman-echo.com/headers",
-  "secretId": "API_TOKEN",
-  "scoreThreshold": 500
+  "schedule": "*/10 * * * * *",
+  "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "apiKeySecretId": "ONEINCH_API_KEY",
+  "quoteUrl": "https://api.1inch.dev/fusion-plus/quoter/v1.0/quote/receive",
+  "minBandEdgeBps": 25,
+  "maxBandEdgeBps": 500,
+  "quote": {
+    "srcChainId": 8453,
+    "dstChainId": 42161,
+    "srcToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "dstToken": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "srcDecimals": 6,
+    "dstDecimals": 6,
+    "amount": "10000000",
+    "walletAddress": "0x4887B4695dEe830A341304bFEb14538E2442DD55"
+  },
+  "legA": {
+    "chainSelector": "10344971235874465080",
+    "registry": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910"
+  },
+  "legB": {
+    "chainSelector": "3478487238524512106",
+    "registry": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32"
+  }
 }
