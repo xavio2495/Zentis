@@ -1,0 +1,49 @@
+{
+  "chainId": 421614,
+  "name": "arbitrum-sepolia",
+  "contracts": {
+    "ZentisRefRegistry": {
+      "address": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
+      "note": "oracle band disabled (FEED = address(0)): Arbitrum Sepolia has no standard ETH/USD Data Feed, only Data Streams"
+    },
+    "AquaRouter": {
+      "address": "0x8f4f807c72a2bfab4024e783f68fc714d0ce2bbe",
+      "source": "contracts/lib/aqua @ 9c5c42e, unmodified",
+      "deployTx": "0x91569b57d124d8db6abda03a02a9bf9e1293ea028c4128293ee0dfc1073329f0"
+    },
+    "ZentisRouter": {
+      "address": "0xfc603336a7b797f2d7eba03ed69734fad9ea521b",
+      "source": "contracts/src/routers/ZentisRouter.sol over swap-vm @ f09a41e",
+      "deployTx": "0x245b46b92785e807953e8d0c10cf6e92f0b4759360f02f140f307b5ddd438c20",
+      "note": "Shares an address with Base Sepolia's ZentisRefRegistry: same deployer, same nonce, different chains. Different contracts -- do not confuse them."
+    }
+  },
+  "tokens": {
+    "tokenA": {
+      "symbol": "USDC",
+      "decimals": 6,
+      "address": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"
+    },
+    "tokenB": {
+      "symbol": "WETH",
+      "decimals": 18,
+      "address": "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73"
+    }
+  },
+  "position": {
+    "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "strategyHash": "0x80d27b5399c2504f0d62affed8d9d5b52c48e9a796ff0429054a3a9974fb320e",
+    "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
+    "deadline": 1791500000,
+    "shippedBalanceA": "10000000",
+    "shippedBalanceB": "5061896312124490",
+    "shippedAgainstRef": {
+      "mid": "506189631212449007683687217",
+      "seq": 3,
+      "updatedAt": 1788886218
+    },
+    "shipTx": "0x96cdbb1b26e57b0bcb00542e696b41c1a78c0d77c0441f5c24ac2e3ec3f9836c",
+    "note": "Same positionId as Base Sepolia, different strategyHash -- the chainSalt is what separates the two legs of one cross-chain position."
+  },
+  "fills": []
+}
