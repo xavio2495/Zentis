@@ -1,0 +1,21 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS
+# ==========================================================================
+# One RPC per leg of the position. The chain names are the CRE chain-selector
+# names, not our own: base-sepolia is ethereum-testnet-sepolia-base-1
+# (10344971235874465080) and arbitrum-sepolia is
+# ethereum-testnet-sepolia-arbitrum-1 (3478487238524512106).
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: https://sepolia.base.org
+    - chain-name: ethereum-testnet-sepolia-arbitrum-1
+      url: https://sepolia-rollup.arbitrum.io/rpc
+
+# ==========================================================================
+production-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: https://sepolia.base.org
+    - chain-name: ethereum-testnet-sepolia-arbitrum-1
+      url: https://sepolia-rollup.arbitrum.io/rpc
