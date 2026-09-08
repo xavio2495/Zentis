@@ -41,7 +41,21 @@
       "seq": 3,
       "updatedAt": 1788886218
     },
-    "shipTx": "0x1955303658583ace3d68b4c944146d8b246a4c145ffad8023f5cb82ef391b088"
+    "shipTx": "0x1955303658583ace3d68b4c944146d8b246a4c145ffad8023f5cb82ef391b088",
+    "topUps": [
+      {
+        "tx": "0x0ba85e42491ed06fe0b404fc97ca5af33c0c5b3fe020eb92efbc33051543e6cd",
+        "token": "WETH",
+        "amount": "1000000000000000",
+        "note": "push() to self on the live strategy: recorded WETH 1840946635888117 -> 2840946635888117, same strategyHash, no dock and no re-ship."
+      },
+      {
+        "tx": "0x58b693d50e65bb2e4077612b75eb189faae0fd2d4a82d9172cfff9f8632d7cc2",
+        "token": "WETH",
+        "amount": "1296336159113171",
+        "note": "Sized to put the curve's implied rate back on the reference mid, which unblocked the direction ZentisBand had refused."
+      }
+    ]
   },
   "fills": [
     {
@@ -62,7 +76,18 @@
       "amountIn": "4000000",
       "amountOut": "667644176426928",
       "note": "The fill that drove the cross-chain demonstration: it left Base 69.2% USDC against Arbitrum's 54.8%, which the next reference published as +36 bps on Base and -36 bps on Arbitrum."
+    },
+    {
+      "tx": "0x8ddb000dad0b41665c4321b7f027b21d6232eb7b9865325cb7b37f03f6f66f74",
+      "block": 46560194,
+      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+      "tokenIn": "WETH",
+      "tokenOut": "USDC",
+      "amountIn": "500000000000000",
+      "amountOut": "1612861",
+      "note": "The first fill in this direction. An identical attempt before the top-up was refused on-chain by ZentisBand with ZentisOutsideBand(2.229e26, 2.614e26, false)."
     }
   ],
-  "note": "Every hash here was resolved from an on-chain receipt, not from the position of an entry in forge run-latest.json -- that file lists transactions[].hash in an order that does not match its own function labels."
+  "note": "Every hash here was resolved from an on-chain receipt, not from the position of an entry in forge run-latest.json -- that file lists transactions[].hash in an order that does not match its own function labels.",
+  "aquaCustody": "ship() and dock() move no tokens: Aqua records a balance and pulls from the maker's wallet at settlement time, against the maker's approval. The Aqua contract's own token balance is zero. Funds never leave the maker's wallet."
 }
