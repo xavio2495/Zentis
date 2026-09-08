@@ -57,14 +57,14 @@ contract ZentisRefRegistry is IZentisRef, ReceiverTemplate {
     /// @dev Called by the CRE forwarder after DON consensus verifies the enclave attestation.
     function _processReport(bytes calldata report) internal override {
         (bytes32 id, ZentisRef memory r) = abi.decode(report, (bytes32, ZentisRef));
-        _write(id, r);
+        _write(id, r, false);
     }
 
     /// @notice Pre-CRE path. Permanently disabled by goLive().
     function pokeRef(bytes32 id, ZentisRef calldata r) external {
         require(msg.sender == OWNER, ZentisRefNotOwner());
         require(!creLive, ZentisRefCreIsLive());
-        _write(id, r);
+        _write(id, r, true);
     }
 
     function goLive() external {
@@ -72,21 +72,44 @@ contract ZentisRefRegistry is IZentisRef, ReceiverTemplate {
         creLive = true;
     }
 
-    function _write(bytes32 id, ZentisRef memory r) private {
+    /// @param loud whether a rejected reference should revert (the owner's interactive `pokeRef`) or
+    ///        be skipped with an event (the forwarder's `onReport`).
+    ///
+    /// @dev Rejection on the report path intentionally does NOT revert. `IReceiver.onReport`'s own
+    ///      contract is that a revert means "transient failure, retry" — but none of these conditions
+    ///      can clear on a retry: a replayed seq stays replayed, a report that predates the stored one
+    ///      stays older, a zero mid stays malformed, and a reference outside the oracle band was
+    ///      deliberately refused. Reverting would ask the DON to retry one doomed report forever, and
+    ///      would roll back the very event that makes the rejection visible, since logs are discarded
+    ///      with the rest of the transaction. Instead the write is skipped and the previous reference
+    ///      is left in place — it ages, the spread widens, and the position degrades rather than
+    ///      going dark, which is what should happen when the reference is not trustworthy.
+    ///
+    ///      `pokeRef` passes `loud = true`: it is an interactive owner call, where the caller wants
+    ///      the offending values back and there is no retry loop to poison.
+    function _write(bytes32 id, ZentisRef memory r, bool loud) private {
         ZentisRef memory prev = _refs[id];
+
         // A zero mid is never a legitimate reference, and with the oracle band disabled nothing else
         // would catch it. ZentisBand derives its bound by scaling mid, so a stored zero collapses the
         // bound to zero: one direction would then admit every fill and the other reject every fill.
-        require(r.mid != 0, ZentisRefZeroMid());
-        require(r.seq > prev.seq, ZentisRefStaleSeq(r.seq, prev.seq));
-        require(r.updatedAt <= block.timestamp && r.updatedAt >= prev.updatedAt, ZentisRefBadTimestamp(r.updatedAt));
-
-        // Oracle-band rejection intentionally does NOT revert: IReceiver's own contract is that a
-        // revert means "transient failure, retry" (see IReceiver.onReport), and a revert here would
-        // both discard the ZentisRefRejected event (logs roll back with the rest of the tx) and have
-        // the DON retry the same, deliberately-rejected report forever. Instead, skip the write and
-        // leave the previous ref in place — it ages and the spread widens, exactly as intended when
-        // the reference is not trustworthy, and the rejection is still visible on-chain via the event.
+        if (r.mid == 0) {
+            require(!loud, ZentisRefZeroMid());
+            emit ZentisRefRejected(id, "zero mid");
+            return;
+        }
+        if (r.seq <= prev.seq) {
+            require(!loud, ZentisRefStaleSeq(r.seq, prev.seq));
+            emit ZentisRefRejected(id, "stale seq");
+            return;
+        }
+        if (r.updatedAt > block.timestamp || r.updatedAt < prev.updatedAt) {
+            require(!loud, ZentisRefBadTimestamp(r.updatedAt));
+            emit ZentisRefRejected(id, "bad timestamp");
+            return;
+        }
+        // The band is never loud on either path: it is a policy refusal of a well-formed reference,
+        // not a caller error, and the owner poking one past the band wants the same event a DON does.
         if (!_withinOracleBand(r.mid)) {
             emit ZentisRefRejected(id, "mid outside oracle band");
             return;
