@@ -3,8 +3,9 @@
   "name": "base-sepolia",
   "contracts": {
     "ZentisRefRegistry": {
-      "address": "0xFC603336a7B797f2D7EbA03ed69734Fad9EA521B",
-      "note": "oracle band disabled (FEED = address(0)): the Base Sepolia ETH/USD feed is access-gated against contract reads"
+      "address": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910",
+      "note": "oracle band disabled (FEED = address(0)): the Base Sepolia ETH/USD feed is access-gated against contract reads. Redeployed so the on-chain bytecode matches the repository: the superseded instance predates the fix that makes onReport reject rather than revert.",
+      "supersedes": "0xFC603336a7B797f2D7EbA03ed69734Fad9EA521B"
     },
     "AquaRouter": {
       "address": "0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9",
@@ -31,17 +32,68 @@
   },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "strategyHash": "0xb9b123182a174dae8f2eef4f70875034ca1df036f62b09320cca2688fd7fbe09",
+    "strategyHash": "0x6f5c8eb881afabb45cdf3d08c75dcdcd61256e6e0bbfee2dc7093c8d7e174cd5",
     "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
     "deadline": 1791500000,
-    "shippedBalanceA": "10000000",
-    "shippedBalanceB": "2758188530000858",
+    "shippedBalanceA": "15000000",
+    "shippedBalanceB": "4137282795001288",
     "shippedAgainstRef": {
       "mid": "275818853000085890554200491",
-      "seq": 3,
-      "updatedAt": 1788886218
+      "seq": 1,
+      "updatedAt": 1788888860
     },
+    "shipTx": "0x1e3b22939307831c1848ac9daf1fe9d90ae54275b3f11638de81aa48c0ada662"
+  },
+  "fills": [
+    {
+      "tx": "0xba18f835b38a2e8d82e47c748c9d7bae77791f6a5e7cd7ff98cd46603206a902",
+      "block": 46560389,
+      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+      "tokenIn": "USDC",
+      "tokenOut": "WETH",
+      "amountIn": "150000",
+      "amountOut": "40861951301607",
+      "note": "1% of inventory, sized so the curve stays well inside the band."
+    }
+  ],
+  "note": "Every hash here was resolved from an on-chain receipt, not from the position of an entry in forge run-latest.json -- that file lists transactions[].hash in an order that does not match its own function labels.",
+  "aquaCustody": "ship() and dock() move no tokens: Aqua records a balance and pulls from the maker's wallet at settlement time, against the maker's approval. The Aqua contract's own token balance is zero. Funds never leave the maker's wallet.",
+  "supersededPosition": {
+    "strategyHash": "0xb9b123182a174dae8f2eef4f70875034ca1df036f62b09320cca2688fd7fbe09",
+    "shippedBalanceA": "10000000",
+    "shippedBalanceB": "2758188530000858",
     "shipTx": "0x1955303658583ace3d68b4c944146d8b246a4c145ffad8023f5cb82ef391b088",
+    "fills": [
+      {
+        "tx": "0x1d366f386f984e2a32ece0cf5a40ce4d86046635d8128212bde0d2d758af12fa",
+        "block": 46559068,
+        "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+        "tokenIn": "USDC",
+        "tokenOut": "WETH",
+        "amountIn": "1000000",
+        "amountOut": "249744434104129"
+      },
+      {
+        "tx": "0x9239660eb9c72d4ca2971638c4451124722f9531a36e57b36bdfcd179e5564c1",
+        "block": 46559509,
+        "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+        "tokenIn": "USDC",
+        "tokenOut": "WETH",
+        "amountIn": "4000000",
+        "amountOut": "667644176426928",
+        "note": "The fill that drove the cross-chain demonstration: it left Base 69.2% USDC against Arbitrum's 54.8%, which the next reference published as +36 bps on Base and -36 bps on Arbitrum."
+      },
+      {
+        "tx": "0x8ddb000dad0b41665c4321b7f027b21d6232eb7b9865325cb7b37f03f6f66f74",
+        "block": 46560194,
+        "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+        "tokenIn": "WETH",
+        "tokenOut": "USDC",
+        "amountIn": "500000000000000",
+        "amountOut": "1612861",
+        "note": "The first fill in this direction. An identical attempt before the top-up was refused on-chain by ZentisBand with ZentisOutsideBand(2.229e26, 2.614e26, false)."
+      }
+    ],
     "topUps": [
       {
         "tx": "0x0ba85e42491ed06fe0b404fc97ca5af33c0c5b3fe020eb92efbc33051543e6cd",
@@ -55,39 +107,17 @@
         "amount": "1296336159113171",
         "note": "Sized to put the curve's implied rate back on the reference mid, which unblocked the direction ZentisBand had refused."
       }
-    ]
+    ],
+    "note": "Docked when the registry was redeployed. Its fills are real and still on-chain; it read the superseded registry, whose address is an instruction immediate, so it could not follow the redeploy.",
+    "dockTx": "0x974645568871ee8efc3c592df7cf104e7d5131aae9045f07bd19d1796c8d0918"
   },
-  "fills": [
-    {
-      "tx": "0x1d366f386f984e2a32ece0cf5a40ce4d86046635d8128212bde0d2d758af12fa",
-      "block": 46559068,
-      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
-      "tokenIn": "USDC",
-      "tokenOut": "WETH",
-      "amountIn": "1000000",
-      "amountOut": "249744434104129"
-    },
-    {
-      "tx": "0x9239660eb9c72d4ca2971638c4451124722f9531a36e57b36bdfcd179e5564c1",
-      "block": 46559509,
-      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
-      "tokenIn": "USDC",
-      "tokenOut": "WETH",
-      "amountIn": "4000000",
-      "amountOut": "667644176426928",
-      "note": "The fill that drove the cross-chain demonstration: it left Base 69.2% USDC against Arbitrum's 54.8%, which the next reference published as +36 bps on Base and -36 bps on Arbitrum."
-    },
-    {
-      "tx": "0x8ddb000dad0b41665c4321b7f027b21d6232eb7b9865325cb7b37f03f6f66f74",
-      "block": 46560194,
-      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
-      "tokenIn": "WETH",
-      "tokenOut": "USDC",
-      "amountIn": "500000000000000",
-      "amountOut": "1612861",
-      "note": "The first fill in this direction. An identical attempt before the top-up was refused on-chain by ZentisBand with ZentisOutsideBand(2.229e26, 2.614e26, false)."
-    }
-  ],
-  "note": "Every hash here was resolved from an on-chain receipt, not from the position of an entry in forge run-latest.json -- that file lists transactions[].hash in an order that does not match its own function labels.",
-  "aquaCustody": "ship() and dock() move no tokens: Aqua records a balance and pulls from the maker's wallet at settlement time, against the maker's approval. The Aqua contract's own token balance is zero. Funds never leave the maker's wallet."
+  "creWritePath": {
+    "note": "The real IReceiver surface, exercised on-chain before any CRE workflow exists: forwarder gating, the ABI decode, the write guards and the event. Only the attestation is missing, and that is what Day 5 simulates.",
+    "forwarder": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
+    "acceptedReportTx": "0x5a4336bb0df17a161c05d7e882b860272a0047cb9398960b124f2d3ad4aa1231",
+    "acceptedResult": "wrote seq 3 with tiltBps 25",
+    "replayedReportTx": "0x1f44eda1b0d5919541b1e0aad7479083e2dfbaa03e6e3e534ab289df511030c6",
+    "replayedResult": "status 0x1 -- did not revert; emitted ZentisRefRejected(positionId, \"stale seq\") and left the stored ref untouched, which is what stops a DON retrying a doomed report forever",
+    "outOfGasNote": "An earlier attempt at the accepted write failed with gasUsed == gas limit == 39473. That was cast's gas estimate being too low, not a contract revert. Pass an explicit --gas-limit for onReport."
+  }
 }

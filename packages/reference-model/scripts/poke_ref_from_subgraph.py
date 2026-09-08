@@ -33,8 +33,8 @@ import time
 POSITION_ID = "0x" + "00" * 31 + "01"
 
 REGISTRIES = {
-    "base-sepolia": "0xFC603336a7B797f2D7EbA03ed69734Fad9EA521B",
-    "arbitrum-sepolia": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
+    "base-sepolia": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910",
+    "arbitrum-sepolia": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
 }
 
 REF_OF_SELECTOR = "0xf359606b"  # refOf(bytes32)

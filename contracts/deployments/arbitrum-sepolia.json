@@ -3,8 +3,9 @@
   "name": "arbitrum-sepolia",
   "contracts": {
     "ZentisRefRegistry": {
-      "address": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
-      "note": "oracle band disabled (FEED = address(0)): Arbitrum Sepolia has no standard ETH/USD Data Feed, only Data Streams"
+      "address": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
+      "note": "oracle band disabled (FEED = address(0)): Arbitrum Sepolia has no standard ETH/USD Data Feed, only Data Streams. Redeployed so the on-chain bytecode matches the repository: the superseded instance predates the fix that makes onReport reject rather than revert.",
+      "supersedes": "0xF86CdAeE90DB9901a5F104172294161085070C5A"
     },
     "AquaRouter": {
       "address": "0x8f4f807c72a2bfab4024e783f68fc714d0ce2bbe",
@@ -32,28 +33,28 @@
   },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "strategyHash": "0x80d27b5399c2504f0d62affed8d9d5b52c48e9a796ff0429054a3a9974fb320e",
+    "strategyHash": "0x043bc8498eb18c4ce6f7bde9a0302171d60d6747cf460853e2b553b4cd790cc3",
     "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
     "deadline": 1791500000,
-    "shippedBalanceA": "10000000",
-    "shippedBalanceB": "5061896312124490",
+    "shippedBalanceA": "15000000",
+    "shippedBalanceB": "7592844468186735",
     "shippedAgainstRef": {
       "mid": "506189631212449007683687217",
-      "seq": 3,
-      "updatedAt": 1788886218
+      "seq": 1,
+      "updatedAt": 1788888860
     },
-    "shipTx": "0x96cdbb1b26e57b0bcb00542e696b41c1a78c0d77c0441f5c24ac2e3ec3f9836c",
-    "note": "Same positionId as Base Sepolia, different strategyHash -- the chainSalt is what separates the two legs of one cross-chain position."
+    "note": "Same positionId as Base Sepolia, different strategyHash -- the chainSalt is what separates the two legs of one cross-chain position.",
+    "shipTx": "0x795fbe746785297c56a4b5395fac73f8542c6623bd8b98002233b3fa7557ffcd"
   },
   "fills": [
     {
-      "tx": "0x286f0496e2ad02b7b656b13b7e54a1018dca6e15a7c83abba6377ddf03f9ae51",
-      "block": 306791551,
+      "tx": "0xeefe0230ec144fd88008053444a3ecfb2ba7a7bd2e854c9849bfed82e5a94307",
+      "block": 306799145,
       "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
       "tokenIn": "USDC",
       "tokenOut": "WETH",
-      "amountIn": "1000000",
-      "amountOut": "459628650773710"
+      "amountIn": "150000",
+      "amountOut": "74968636018527"
     }
   ],
   "crossChainEffect": {
@@ -65,5 +66,25 @@
     "arbitrumTiltBpsBefore": 0,
     "arbitrumTiltBpsAfter": -36,
     "note": "Between the two quotes the only Arbitrum state that changed is the reference. Arbitrum is now the under-weight-USDC leg, so it pays takers more WETH for their USDC -- it bids USDC in, while Base discounts USDC out. Inventory moves between the chains through independent takers."
+  },
+  "supersededPosition": {
+    "strategyHash": "0x80d27b5399c2504f0d62affed8d9d5b52c48e9a796ff0429054a3a9974fb320e",
+    "shippedBalanceA": "10000000",
+    "shippedBalanceB": "5061896312124490",
+    "shipTx": "0x96cdbb1b26e57b0bcb00542e696b41c1a78c0d77c0441f5c24ac2e3ec3f9836c",
+    "fills": [
+      {
+        "tx": "0x286f0496e2ad02b7b656b13b7e54a1018dca6e15a7c83abba6377ddf03f9ae51",
+        "block": 306791551,
+        "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+        "tokenIn": "USDC",
+        "tokenOut": "WETH",
+        "amountIn": "1000000",
+        "amountOut": "459628650773710"
+      }
+    ],
+    "topUps": [],
+    "note": "Docked when the registry was redeployed. Its fills are real and still on-chain; it read the superseded registry, whose address is an instruction immediate, so it could not follow the redeploy.",
+    "dockTx": "0x16e2ea69a65b3f7f1890ddcb16dd1309f733df72ddcc16a28ceedc50980bc6ec"
   }
 }
