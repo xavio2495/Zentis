@@ -181,12 +181,18 @@ contract ZentisBandTest is Test {
 
     /// @dev The end-to-end invariant the duplication of maxTiltBps exists to protect: a program that
     ///      skews and then bands must never reject the very fill its own skew priced.
-    function testFuzz_BandNeverRejectsItsOwnSkewedFill(int16 tiltBps, uint256 amountIn) public {
+    function testFuzz_BandNeverRejectsItsOwnSkewedFill(int16 tiltBps, uint256 amountIn, uint16 bandEdgeBps)
+        public
+    {
         tiltBps = int16(bound(int256(tiltBps), -int256(uint256(MAX_TILT_BPS)), int256(uint256(MAX_TILT_BPS))));
         amountIn = bound(amountIn, 1e15, 10_000e18);
+        // A published edge anywhere from "nothing published" to wider than the immediate cap. The
+        // invariant has to survive all of it: whatever tightens the band must tighten the pricing
+        // tilt too, or the band starts refusing fills its own skew produced.
+        bandEdgeBps = uint16(bound(bandEdgeBps, 0, 2 * MAX_TILT_BPS));
 
         uint256 realised = _bareRealised();
-        _setRef(uint128(realised), 10, tiltBps, 0, uint128(BALANCE_A));
+        _setRef(uint128(realised), 10, tiltBps, 0, uint128(BALANCE_A), bandEdgeBps);
 
         // ZentisBand wraps ZentisSkew wraps the curve — the production nesting order.
         bytes memory program = bytes.concat(

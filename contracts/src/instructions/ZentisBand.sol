@@ -87,8 +87,16 @@ library ZentisBand {
         // Guard the division. OraclePriceAdjuster divides by amountIn with no guard; we do not.
         require(amountIn > 0 && amountOut > 0, ZentisZeroAmount(amountIn, amountOut));
 
+        // The slow workflow publishes its boundary here. It may only TIGHTEN the maker's signed cap:
+        // widening it would let whoever writes the reference loosen a guard the maker committed to,
+        // which is the whole reason maxTiltBps is an immediate in the first place. Zero means nothing
+        // has been published yet — every reference written before that workflow existed carries one,
+        // and reading it as a cap would collapse the band on all of them.
+        uint16 cap = maxTiltBps;
+        if (r.bandEdgeBps != 0 && r.bandEdgeBps < cap) cap = r.bandEdgeBps;
+
         // The same effective tilt ZentisSkew priced with — NOT raw r.tiltBps.
-        int256 tilt = ZentisTiltLib.effectiveTilt(r, liveA, maxTiltBps);
+        int256 tilt = ZentisTiltLib.effectiveTilt(r, liveA, cap);
         uint256 band = uint256(r.spreadBps) + uint256(tilt < 0 ? -tilt : tilt) + tolBps;
         require(band < BPS, ZentisBandTooWide(band));
 
