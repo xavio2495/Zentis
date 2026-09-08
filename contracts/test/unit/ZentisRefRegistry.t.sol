@@ -188,6 +188,67 @@ contract ZentisRefRegistryTest is Test {
         assertEq(registryNoFeed.refOf(POSITION_ID).mid, r.mid);
     }
 
+    /// @dev A report the DON must not retry has to be rejected, not reverted. `IReceiver.onReport`'s
+    ///      contract is that a revert means "transient failure, try again" — so reverting on a
+    ///      condition that can never clear (a replayed seq, a report that predates the stored one,
+    ///      a malformed zero mid) asks the DON to retry the same doomed report forever, and rolls
+    ///      back the very event that would have made the rejection visible. The oracle band was
+    ///      already written this way; these three guards were not, and replay is by far the likeliest
+    ///      of them in practice.
+    ///
+    ///      `pokeRef` keeps reverting on all three: it is an interactive owner call, where a caller
+    ///      wants the error and there is no retry loop to poison.
+
+    function test_OnReport_StaleSeq_RejectsWithoutReverting() public {
+        ZentisRef memory first = _ref(1e18, 5, uint40(block.timestamp));
+        registryNoFeed.pokeRef(POSITION_ID, first);
+
+        bytes memory replay = abi.encode(POSITION_ID, _ref(2e18, 5, uint40(block.timestamp)));
+        vm.expectEmit(true, false, false, true, address(registryNoFeed));
+        emit ZentisRefRegistry.ZentisRefRejected(POSITION_ID, "stale seq");
+        vm.prank(FORWARDER);
+        registryNoFeed.onReport("", replay);
+
+        ZentisRef memory stored = registryNoFeed.refOf(POSITION_ID);
+        assertEq(stored.mid, first.mid, "a rejected report must leave the prior ref in place");
+        assertEq(stored.seq, first.seq);
+    }
+
+    function test_OnReport_ZeroMid_RejectsWithoutReverting() public {
+        bytes memory report = abi.encode(POSITION_ID, _ref(0, 1, uint40(block.timestamp)));
+        vm.expectEmit(true, false, false, true, address(registryNoFeed));
+        emit ZentisRefRegistry.ZentisRefRejected(POSITION_ID, "zero mid");
+        vm.prank(FORWARDER);
+        registryNoFeed.onReport("", report);
+
+        assertEq(registryNoFeed.refOf(POSITION_ID).seq, 0, "nothing may be stored");
+    }
+
+    function test_OnReport_TimestampGoingBackwards_RejectsWithoutReverting() public {
+        uint40 t0 = 1_000;
+        vm.warp(t0);
+        registryNoFeed.pokeRef(POSITION_ID, _ref(1e18, 1, t0));
+
+        uint40 t1 = t0 + 100;
+        vm.warp(t1);
+        registryNoFeed.pokeRef(POSITION_ID, _ref(1e18, 2, t1));
+
+        bytes memory report = abi.encode(POSITION_ID, _ref(1e18, 3, t0));
+        vm.expectEmit(true, false, false, true, address(registryNoFeed));
+        emit ZentisRefRegistry.ZentisRefRejected(POSITION_ID, "bad timestamp");
+        vm.prank(FORWARDER);
+        registryNoFeed.onReport("", report);
+
+        assertEq(registryNoFeed.refOf(POSITION_ID).seq, 2, "the good ref must survive");
+    }
+
+    /// @dev The mirror of the three above: the owner path must still fail loudly.
+    function test_PokeRef_StillRevertsWhereOnReportRejects() public {
+        registryNoFeed.pokeRef(POSITION_ID, _ref(1e18, 5, uint40(block.timestamp)));
+        vm.expectRevert(abi.encodeWithSelector(ZentisRefRegistry.ZentisRefStaleSeq.selector, 5, 5));
+        registryNoFeed.pokeRef(POSITION_ID, _ref(1e18, 5, uint40(block.timestamp)));
+    }
+
     function testFuzz_PokeRef_SeqMustStrictlyIncrease(uint32 seq1, uint32 seq2) public {
         vm.assume(seq1 > 0);
         registryNoFeed.pokeRef(POSITION_ID, _ref(1e18, seq1, uint40(block.timestamp)));
