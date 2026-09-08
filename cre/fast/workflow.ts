@@ -255,7 +255,8 @@ export function initWorkflow(config: Config) {
 			// pinning both means a future addition cannot silently become acceptable.
 			[{ tee: 'nitro', regions: ['us-west-2'] }],
 			// NOTE: the capability budget below is deliberately NOT wired in as a `preHook`.
-			// Any workflow that supplies one fails to execute on cre-sdk 1.18.0 / CLI v1.32.0 with
+			// Any workflow that supplies one fails to execute on cre-sdk 1.20.0 / CLI v1.32.0 — both
+			// the latest as of writing, and re-verified against them — with
 			// "Failed to parse configuration: Unexpected end of JSON input" — including a plain
 			// `cre.handler` with a trivial function and `preHook: () => ({})`, so it is not the TEE
 			// path, the restriction contents, or this config. The budget is kept and unit-tested so
