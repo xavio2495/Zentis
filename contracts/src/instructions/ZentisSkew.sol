@@ -137,7 +137,15 @@ library ZentisSkew {
             require(pinned == 0 || pinned == r.seq, ZentisSeqMismatch(pinned, r.seq));
         }
 
-        int256 tilt = ZentisTiltLib.effectiveTilt(r, ZentisContextLib.liveA(ctx), maxTiltBps);
+        // The slow workflow's published boundary tightens the cap here as well as in ZentisBand, and
+        // for the same reason the two instructions duplicate maxTiltBps at all: the band must be
+        // computed against the tilt that was actually priced. Tightening only the band would make it
+        // reject fills this instruction produced. It can only ever narrow — a publisher must not be
+        // able to widen the cap the maker signed — and zero means nothing has been published yet.
+        uint16 cap = maxTiltBps;
+        if (r.bandEdgeBps != 0 && r.bandEdgeBps < cap) cap = r.bandEdgeBps;
+
+        int256 tilt = ZentisTiltLib.effectiveTilt(r, ZentisContextLib.liveA(ctx), cap);
         uint256 mag = uint256(tilt < 0 ? -tilt : tilt);
 
         // tilt > 0 => over-weight tokenA here => make tokenA cheap. MakerTraits sorts tokenA < tokenB.
