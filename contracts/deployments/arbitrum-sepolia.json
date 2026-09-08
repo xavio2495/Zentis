@@ -45,5 +45,25 @@
     "shipTx": "0x96cdbb1b26e57b0bcb00542e696b41c1a78c0d77c0441f5c24ac2e3ec3f9836c",
     "note": "Same positionId as Base Sepolia, different strategyHash -- the chainSalt is what separates the two legs of one cross-chain position."
   },
-  "fills": []
+  "fills": [
+    {
+      "tx": "0x286f0496e2ad02b7b656b13b7e54a1018dca6e15a7c83abba6377ddf03f9ae51",
+      "block": 306791551,
+      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+      "tokenIn": "USDC",
+      "tokenOut": "WETH",
+      "amountIn": "1000000",
+      "amountOut": "459628650773710"
+    }
+  ],
+  "crossChainEffect": {
+    "claim": "A fill on Base moves the Arbitrum quote, with no Arbitrum transaction in between and no bridging.",
+    "quotedInput": "1000000 USDC",
+    "arbitrumOutputBefore": "382760074316830",
+    "arbitrumOutputAfter": "384096652134317",
+    "deltaBps": 34.9,
+    "arbitrumTiltBpsBefore": 0,
+    "arbitrumTiltBpsAfter": -36,
+    "note": "Between the two quotes the only Arbitrum state that changed is the reference. Arbitrum is now the under-weight-USDC leg, so it pays takers more WETH for their USDC -- it bids USDC in, while Base discounts USDC out. Inventory moves between the chains through independent takers."
+  }
 }

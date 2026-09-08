@@ -52,6 +52,16 @@
       "tokenOut": "WETH",
       "amountIn": "1000000",
       "amountOut": "249744434104129"
+    },
+    {
+      "tx": "0x9239660eb9c72d4ca2971638c4451124722f9531a36e57b36bdfcd179e5564c1",
+      "block": 46559509,
+      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+      "tokenIn": "USDC",
+      "tokenOut": "WETH",
+      "amountIn": "4000000",
+      "amountOut": "667644176426928",
+      "note": "The fill that drove the cross-chain demonstration: it left Base 69.2% USDC against Arbitrum's 54.8%, which the next reference published as +36 bps on Base and -36 bps on Arbitrum."
     }
   ],
   "note": "Every hash here was resolved from an on-chain receipt, not from the position of an entry in forge run-latest.json -- that file lists transactions[].hash in an order that does not match its own function labels."
