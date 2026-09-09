@@ -1,0 +1,136 @@
+"""
+Which pricing curve a position's program actually uses.
+NONE means the program decoded cleanly but contains no curve instruction.
+UNKNOWN means the program could not be attributed to a known dialect, so no claim is made.
+"""
+enum CurveKind {
+  XYC
+  XYC_CONCENTRATE
+  XYC_DECAY
+  PEGGED
+  EXTRUCTION
+  NONE
+  UNKNOWN
+}
+
+"""
+The opcode table a program's bytes were read against. An app address is only assigned a
+dialect when its opcode table is known from verified source; everything else stays UNKNOWN
+and its opcodes are reported as custom rather than guessed at.
+"""
+enum Dialect {
+  AQUA_SWAPVM_V1
+  UNKNOWN
+}
+
+"""
+One contract that Aqua makers ship strategies to. The canonical 1inch SwapVM router is one
+app among many: any contract can be an app, and each declares its own strategy encoding.
+"""
+type App @entity(immutable: false) {
+  id: Bytes! # app address
+  dialect: Dialect!
+  positionCount: Int!
+  decodedPositionCount: Int!
+  positions: [MakerPosition!]! @derivedFrom(field: "app")
+}
+
+"""
+A maker's shipped position, standardized across every app on Aqua.
+
+Identity is (maker, app, strategyHash), because that triple is what Aqua keys balances by.
+strategyHash alone does not identify a position: two apps may define the same strategy bytes.
+"""
+type MakerPosition @entity(immutable: false) {
+  id: Bytes! # maker ++ app ++ strategyHash
+  strategyHash: Bytes!
+  maker: Bytes!
+  app: App!
+  active: Boolean!
+
+  """Tokens this position was shipped with, in the order Aqua credited them."""
+  tokens: [Bytes!]!
+  balances: [PositionBalance!]! @derivedFrom(field: "position")
+
+  """The raw strategy blob, exactly as Shipped carried it. Data availability is on-chain."""
+  strategy: Bytes!
+
+  """
+  False when the strategy blob is not a SwapVM order envelope, or the program walk ran off
+  the end of the bytes. Every decoded field below is null or a no-claim value when false.
+  """
+  decoded: Boolean!
+  dialect: Dialect!
+
+  curve: CurveKind!
+
+  """Maker (LP) fee. Denominated against 1e9 = 100%, the deployed router's scale."""
+  feeBps: BigInt
+  """Protocol fee, same 1e9 scale, if the program carries one."""
+  protocolFeeBps: BigInt
+  protocolFeeReceiver: Bytes
+
+  """True when the program gates takers on holding a credential token."""
+  takerGated: Boolean!
+  takerGateToken: Bytes
+
+  """True when the program carries an order-invalidator instruction."""
+  hasInvalidator: Boolean!
+
+  """Opcodes present in the program that the assigned dialect does not define."""
+  customOpcodes: [Int!]!
+
+  """The decoded program, in execution order."""
+  instructions: [Instruction!]! @derivedFrom(field: "position")
+  instructionCount: Int!
+
+  shippedAtBlock: BigInt!
+  shippedAtTimestamp: BigInt!
+  dockedAtBlock: BigInt
+  fillCount: Int!
+}
+
+"""One decoded [opcode][length][args] instruction. name is UNKNOWN when the dialect has no entry."""
+type Instruction @entity(immutable: true) {
+  id: Bytes! # position id ++ index
+  position: MakerPosition!
+  index: Int!
+  opcode: Int!
+  name: String!
+  known: Boolean!
+  args: Bytes!
+}
+
+"""Running committed balance of one token in one position, as Aqua accounts for it."""
+type PositionBalance @entity(immutable: false) {
+  id: Bytes! # position id ++ token
+  position: MakerPosition!
+  token: Bytes!
+  amount: BigInt!
+  pushed: BigInt!
+  pulled: BigInt!
+}
+
+"""
+One Aqua balance movement. A taker fill shows up as a Pushed of the token coming in and a
+Pulled of the token going out, in the same transaction, against the same position, so fills
+are reconstructable for every app without knowing any app's own swap event.
+
+The maker's opening credit is a PUSH too: ship() emits Pushed once per token.
+"""
+enum MovementKind {
+  PUSH
+  PULL
+}
+
+type Movement @entity(immutable: true) {
+  id: Bytes! # tx hash ++ log index
+  position: MakerPosition!
+  kind: MovementKind!
+  token: Bytes!
+  amount: BigInt!
+  transaction: Bytes!
+  logIndex: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
