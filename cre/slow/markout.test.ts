@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import vectors from './markout_vectors.json'
-import { markoutBps, type MarkoutFill, type MarkoutReference } from './policy'
+import { markoutBps, toBase64, type MarkoutFill, type MarkoutReference } from './policy'
 
 /**
  * The workflow's markout has to agree with the Python reference model exactly, because the model is
@@ -49,4 +49,18 @@ describe('the published term is bounded by construction', () => {
 			expect(result.matured + result.skipped).toBe(example.fills.length)
 		}
 	})
+})
+
+describe('base64 for the request body', () => {
+	// The body has to survive the protobuf JSON round trip, so it is checked against a known-good
+	// decoder rather than against hand-written expectations. Padding and multi-byte input are the
+	// two things a hand-rolled encoder gets wrong.
+	const cases = ['', 'f', 'fo', 'foo', 'foob', '{"query":"{ fills { amountIn } }"}', 'ÿþ€']
+
+	for (const input of cases) {
+		test(`round-trips ${JSON.stringify(input)}`, () => {
+			const bytes = new TextEncoder().encode(input)
+			expect(toBase64(bytes)).toBe(Buffer.from(bytes).toString('base64'))
+		})
+	}
 })

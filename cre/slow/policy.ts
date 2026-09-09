@@ -205,3 +205,26 @@ export const markoutBps = (
 	const floored = weighted < 0n ? -weighted : 0n
 	return { matured, skipped, weightedBps: weighted, publishedBps: floored > capBps ? capBps : floored }
 }
+
+/**
+ * Base64 for arbitrary bytes.
+ *
+ * The HTTP capability takes its request body as protobuf `bytes`, whose JSON form is base64, and a
+ * GraphQL query has to be POSTed because the endpoint does not serve queries over GET. The workflow
+ * runtime is neither a browser nor Node, so there is no `btoa` and no `Buffer` to lean on.
+ */
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+export const toBase64 = (bytes: Uint8Array): string => {
+	let out = ''
+	for (let i = 0; i < bytes.length; i += 3) {
+		const b0 = bytes[i] as number
+		const b1 = bytes[i + 1]
+		const b2 = bytes[i + 2]
+		out += B64[b0 >> 2]
+		out += B64[((b0 & 0x03) << 4) | ((b1 ?? 0) >> 4)]
+		out += b1 === undefined ? '=' : B64[((b1 & 0x0f) << 2) | ((b2 ?? 0) >> 6)]
+		out += b2 === undefined ? '=' : B64[b2 & 0x3f]
+	}
+	return out
+}

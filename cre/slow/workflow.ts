@@ -21,13 +21,24 @@ import {
 } from 'viem'
 import { z } from 'zod'
 
-import { BPS } from './policy'
+import {
+	BPS,
+	markoutBps,
+	toBase64,
+	type MarkoutFill,
+	type MarkoutReference,
+} from './policy'
 
 // ─── Config ─────────────────────────────────────────────────
 /** Where a reference gets written: one Zentis leg, on a testnet. */
 const legSchema = z.object({
 	chainSelector: z.string(),
 	registry: z.string(),
+	/**
+	 * This leg's fills subgraph. Markout is a per-venue measurement — the flow one leg sees is not
+	 * the flow the other sees — so each leg is scored against its own indexed history.
+	 */
+	fillsSubgraphUrl: z.string(),
 })
 
 /**
@@ -60,6 +71,16 @@ export const configSchema = z.object({
 	minBandEdgeBps: z.number(),
 	/** Ceiling, so a broken quote cannot widen it past what the maker would accept. */
 	maxBandEdgeBps: z.number(),
+	/** How long after a fill the reference is read to score it. */
+	markoutHorizonSeconds: z.number(),
+	/**
+	 * Ceiling on the published markout. The spread instruction reverts the whole swap when the base
+	 * spread, this term and the soft-bound widen sum past the full basis, so an unbounded markout
+	 * would not widen a leg, it would brick it.
+	 */
+	markoutCapBps: z.number(),
+	/** How many recent fills and references to score over. */
+	markoutWindow: z.number(),
 	legA: legSchema,
 	legB: legSchema,
 })
@@ -146,6 +167,100 @@ export const bandEdgeFromQuote = (
 
 const clampBps = (v: bigint, lo: bigint, hi: bigint) => (v < lo ? lo : v > hi ? hi : v)
 
+/**
+ * One document, sent unchanged to whichever leg's subgraph is being scored.
+ *
+ * Both legs are indexed against the same standardized schema, so the enclave does not branch on
+ * which chain it is asking. The fills carry the direction and both amounts; the references carry the
+ * mid and the timestamp of the block it described, which is what a fill is scored against.
+ */
+const MARKOUT_QUERY = `query Markout($positionId: ID!, $window: Int!) {
+  position(id: $positionId) {
+    fills(orderBy: timestamp, orderDirection: desc, first: $window) {
+      timestamp
+      isAToB
+      amountIn
+      amountOut
+    }
+    references(orderBy: seq, orderDirection: desc, first: $window) {
+      updatedAt
+      mid
+    }
+  }
+}`
+
+type MarkoutResponse = {
+	data?: {
+		position: {
+			fills: { timestamp: string; isAToB: boolean; amountIn: string; amountOut: string }[]
+			references: { updatedAt: string; mid: string }[]
+		} | null
+	}
+	errors?: { message: string }[]
+}
+
+/**
+ * What this leg's recent flow has cost the maker, in basis points of half-spread.
+ *
+ * The measurement runs inside the enclave and only its result is published. The horizon, the
+ * weighting and the cap are the maker's model and stay here; the number the instruction adds is
+ * necessarily public, because the instruction reads it on-chain to price with. Claiming the value
+ * itself is secret would be false.
+ *
+ * A leg with no matured fills scores zero, which is the right default: absence of evidence about
+ * adverse selection is not evidence of it.
+ */
+const readMarkout = (
+	runtime: TeeRuntime<Config>,
+	leg: z.infer<typeof legSchema>,
+	positionId: Hex,
+): bigint => {
+	const config = runtime.config
+	const body = JSON.stringify({
+		query: MARKOUT_QUERY,
+		variables: { positionId, window: config.markoutWindow },
+	})
+
+	const response = new cre.capabilities.HTTPClient()
+		.sendRequest(runtime, {
+			url: leg.fillsSubgraphUrl,
+			method: 'POST',
+			multiHeaders: { 'Content-Type': { values: ['application/json'] } },
+			body: toBase64(new TextEncoder().encode(body)),
+		})
+		.result()
+
+	if (!ok(response)) {
+		throw new Error(`fills subgraph failed with status ${response.statusCode}`)
+	}
+
+	const payload = JSON.parse(text(response)) as MarkoutResponse
+	if (payload.errors && payload.errors.length > 0) {
+		throw new Error(`fills subgraph returned an error: ${payload.errors[0]?.message}`)
+	}
+
+	const position = payload.data?.position
+	if (!position) return 0n
+
+	const fills: MarkoutFill[] = position.fills.map((f) => ({
+		timestamp: BigInt(f.timestamp),
+		isAToB: f.isAToB,
+		amountIn: BigInt(f.amountIn),
+		amountOut: BigInt(f.amountOut),
+	}))
+	const references: MarkoutReference[] = position.references.map((r) => ({
+		updatedAt: BigInt(r.updatedAt),
+		mid: BigInt(r.mid),
+	}))
+
+	return markoutBps(
+		fills,
+		references,
+		BigInt(config.markoutHorizonSeconds),
+		BigInt(config.markoutCapBps),
+	).publishedBps
+}
+
 const readRef = (don: Runtime<Config>, leg: z.infer<typeof legSchema>, positionId: Hex): StoredRef => {
 	const client = new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 	const header = client
@@ -214,19 +329,28 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 		BigInt(config.maxBandEdgeBps),
 	)
 
+	// Measured before dropping to the DON runtime, so the model and the raw fill history stay inside
+	// the enclave and only the reduced number crosses out.
+	const markout = [config.legA, config.legB].map((leg) => readMarkout(runtime, leg, positionId))
+
 	const don = runtime.usingTheDons()
 
-	const written = [config.legA, config.legB].map((leg) => {
+	const written = [config.legA, config.legB].map((leg, index) => {
 		const current = readRef(don, leg, positionId)
 		const payload = encodeAbiParameters(REPORT_ABI, [
 			positionId,
-			{ ...current, bandEdgeBps: Number(edge), seq: current.seq + 1 },
+			{
+				...current,
+				bandEdgeBps: Number(edge),
+				markoutBps: Number(markout[index] ?? 0n),
+				seq: current.seq + 1,
+			},
 		])
 		const report = don.report(prepareReportRequest(payload)).result()
 		new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 			.writeReport(don, { receiver: leg.registry, report })
 			.result()
-		return `${leg.registry}: seq ${current.seq} -> ${current.seq + 1}`
+		return `${leg.registry}: seq ${current.seq} -> ${current.seq + 1}, markoutBps ${markout[index] ?? 0n}`
 	})
 
 	return `bandEdgeBps ${edge} | ${written.join(' | ')}`
