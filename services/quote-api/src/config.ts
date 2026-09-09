@@ -35,7 +35,7 @@ export const CHAINS: readonly ChainConfig[] = [
     name: "sepolia",
     subgraphUrl: env(
       "ZENTIS_SUBGRAPH_SEPOLIA",
-      "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.0"
+      "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1"
     ),
     rpcUrl: env("ZENTIS_RPC_SEPOLIA", "https://ethereum-sepolia-rpc.publicnode.com")
   }

@@ -19,6 +19,9 @@ function chainId(): i32 {
   const network = dataSource.network();
   if (network == "base-sepolia") return 84532;
   if (network == "arbitrum-sepolia") return 421614;
+  if (network == "sepolia") return 11155111;
+  // Deliberately not a silent default. A leg reporting chain 0 is a manifest deployed to a network
+  // this mapping has never been told about, and it should be obvious in the data.
   return 0;
 }
 
