@@ -16,6 +16,12 @@ type Position @entity(immutable: false) {
   tokenB: Bytes!
   active: Boolean!
 
+  """
+  The strategy blob exactly as shipped. It is abi.encode(Order), so a quote surface can
+  rebuild the order and ask the router itself for a price without holding any configuration.
+  """
+  strategy: Bytes!
+
   """The registry this leg's program reads, taken from the program itself, not from config."""
   refRegistry: Bytes!
   """Bounds the maker signed into the program, at the Zentis scale of 10000 = 100%."""

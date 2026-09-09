@@ -45,6 +45,7 @@ export function handleShipped(event: Shipped): void {
   position.strategyHash = event.params.strategyHash;
   position.maker = event.params.maker;
   position.app = event.params.app;
+  position.strategy = event.params.strategy;
   position.tokenA = program.tokenA;
   position.tokenB = program.tokenB;
   position.active = true;
