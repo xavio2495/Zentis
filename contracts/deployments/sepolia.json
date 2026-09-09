@@ -1,0 +1,47 @@
+{
+  "chainId": 11155111,
+  "name": "sepolia",
+  "note": "The third leg. Chosen over Optimism Sepolia and Unichain Sepolia on the criterion that binds: a reference pool deep and active enough that one testnet swap cannot move the mid. Sepolia's 1% WETH/USDC tier carries 1.57e17 liquidity against Unichain's 1.14e15 and Optimism's 3.22e12.",
+  "contracts": {
+    "ZentisRefRegistry": {
+      "address": "0xA5dCB9B329b17253FF35202dEb7a2093d06fd7b0",
+      "deployBlock": 11669777,
+      "deployTx": "0x858ee89656665a2a132068a7195a4742871ef166cbf42b09072bf24de5f3426c",
+      "note": "Oracle band disabled (FEED = address(0)), as on the other two legs -- but for a different reason. Sepolia's Chainlink ETH/USD feed at 0x694AA1769357215DE4FAC081bf1f309aDC325306 IS contract-readable, unlike Base Sepolia's, and returned $2489.30 live. It is disabled because the reference pool's implied price is about 14x the feed's, so an enabled band would reject every publish -- which is the band working as designed, not a fault."
+    },
+    "AquaRouter": {
+      "address": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
+      "deployBlock": 11669775,
+      "deployTx": "0xf00b5a5e881c486ea1bc81c0be55f0f1f0365473d8177efbc34f34f034d7d31d",
+      "source": "contracts/lib/aqua @ 9c5c42e, unmodified"
+    },
+    "ZentisRouter": {
+      "address": "0x57706A10f41d4649fE65de6D38c3eCe429D2d147",
+      "deployBlock": 11669775,
+      "deployTx": "0xc71b112a0343dfc797ef75742cf67ddacf164bd4f4983ea7e58cd9c8f25ebed1",
+      "source": "contracts/src/routers/ZentisRouter.sol over swap-vm @ f09a41e"
+    }
+  },
+  "tokens": {
+    "tokenA": {
+      "symbol": "USDC",
+      "decimals": 6,
+      "address": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+    },
+    "tokenB": {
+      "symbol": "WETH",
+      "decimals": 18,
+      "address": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+    }
+  },
+  "referencePool": {
+    "address": "0x6418eec70f50913ff0d756b48d32ce7c02b47c47",
+    "feeTier": 10000,
+    "liquidity": "157295183475483626",
+    "swapsInSixDays": 492,
+    "note": "All four fee tiers agree on price within 0.4%, so the tiers are arbitraged against each other even though the pool as a whole is far from the off-chain market."
+  },
+  "subgraphs": {
+    "referencePool": "https://api.studio.thegraph.com/query/1760020/zentis-reference-pool-sepolia/v0.0.1"
+  }
+}

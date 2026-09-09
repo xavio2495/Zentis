@@ -1,0 +1,43 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Pool
+    network: sepolia
+    source:
+      # Uniswap v3 WETH/USDC 1% on Sepolia — the deepest and busiest of the four fee tiers
+      # (1.57e17 liquidity, 492 swaps in six days), chosen the same way as the other two chains.
+      address: "0x6418eec70f50913ff0d756b48d32ce7c02b47c47"
+      abi: UniswapV3Pool
+      # Deliberately not the pool's creation block. The reference only needs current state — the
+      # Pool entity is rebuilt from each swap and carries no history — and Sepolia's public nodes
+      # prune state and cap log queries at 50k blocks, so the creation block is not cheaply
+      # discoverable. This is roughly a week of history, which is ample for the reference and far
+      # faster to sync.
+      startBlock: 11620000
+    context:
+      tokenA:
+        type: Bytes
+        data: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+      tokenB:
+        type: Bytes
+        data: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Swap
+      abis:
+        - name: UniswapV3Pool
+          file: ./abis/UniswapV3Pool.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed address,int256,int256,uint160,uint128,int24)
+          handler: handleSwap
+      file: ./src/mapping.ts
