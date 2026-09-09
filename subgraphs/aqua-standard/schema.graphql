@@ -84,6 +84,14 @@ type MakerPosition @entity(immutable: false) {
   instructions: [Instruction!]! @derivedFrom(field: "position")
   instructionCount: Int!
 
+  """
+  The venue pair this position contributes to, once both of its tokens are known. Null for a
+  position that is not exactly two tokens, which is excluded from the aggregates rather than
+  folded into them under a guess.
+  """
+  pair: VenuePair
+  inAggregate: Boolean!
+
   shippedAtBlock: BigInt!
   shippedAtTimestamp: BigInt!
   dockedAtBlock: BigInt
@@ -133,4 +141,54 @@ type Movement @entity(immutable: true) {
   logIndex: BigInt!
   blockNumber: BigInt!
   timestamp: BigInt!
+}
+
+
+"""
+How the whole venue is positioned in one token pair, summed over every maker and every app.
+
+This is the number no pooled AMM can produce. A pool's reserves are the aggregate of everyone who
+deposited, with no attribution, so there is no maker base to describe. On Aqua positions are
+per-maker and every inventory change is emitted, so the venue's aggregate exposure is recoverable
+from chain data alone.
+
+Raw balances only, deliberately: no prices live in this subgraph. A consumer applies whatever mid
+it already trusts, so the schema stays a description of the venue rather than of one team's model.
+
+    crowding = (totalA*mid/1e18 - totalB) / (totalA*mid/1e18 + totalB)   in [-1, +1]
+"""
+type VenuePair @entity(immutable: false) {
+  id: Bytes! # tokenA ++ tokenB, address-sorted
+  tokenA: Bytes! # the lower-addressed token
+  tokenB: Bytes!
+  totalCommittedA: BigInt!
+  totalCommittedB: BigInt!
+  activePositions: Int!
+  """Makers with at least one active position in this pair."""
+  distinctMakers: Int!
+  """Apps with at least one active position in this pair — how many venues share this exposure."""
+  distinctApps: Int!
+  positions: [MakerPosition!]! @derivedFrom(field: "pair")
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+}
+
+"""
+One maker's presence in one pair. Exists so that distinctMakers can go *down* when a maker docks
+its last position: a counter incremented on first sight and never decremented drifts permanently
+wrong, and a venue aggregate that only grows is worse than none.
+"""
+type VenuePairMaker @entity(immutable: false) {
+  id: Bytes! # pair ++ maker
+  pair: VenuePair!
+  maker: Bytes!
+  activePositions: Int!
+}
+
+"""One app's presence in one pair, for the same reason."""
+type VenuePairApp @entity(immutable: false) {
+  id: Bytes! # pair ++ app
+  pair: VenuePair!
+  app: Bytes!
+  activePositions: Int!
 }

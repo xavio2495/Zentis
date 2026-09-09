@@ -4,6 +4,7 @@ import { App, Instruction, MakerPosition, Movement, PositionBalance } from "../g
 import { CURVE_UNKNOWN, classify } from "./classify";
 import { DIALECT_UNKNOWN, dialectOf, opcodeInfo } from "./dialect";
 import { decodeOrder, walkProgram } from "./program";
+import { applyDelta, joinPair, leavePair } from "./venue";
 
 function positionId(maker: Address, app: Address, strategyHash: Bytes): Bytes {
   return Bytes.fromUint8Array(maker.concat(app).concat(strategyHash));
@@ -38,6 +39,7 @@ export function handleShipped(event: Shipped): void {
   position.customOpcodes = [];
   position.instructionCount = 0;
   position.decoded = false;
+  position.inAggregate = false;
   position.shippedAtBlock = event.block.number;
   position.shippedAtTimestamp = event.block.timestamp;
   position.fillCount = 0;
@@ -85,6 +87,10 @@ export function handleDocked(event: Docked): void {
   const id = positionId(event.params.maker, event.params.app, event.params.strategyHash);
   const position = MakerPosition.load(id);
   if (position == null) return;
+
+  // Leave the aggregate BEFORE zeroing the balances, so what is subtracted is what was actually
+  // committed. Doing it after would remove zero and leave the venue total permanently inflated.
+  leavePair(position, event);
 
   position.active = false;
   position.dockedAtBlock = event.block.number;
@@ -139,6 +145,29 @@ function loadBalance(position: MakerPosition, token: Address): PositionBalance {
   return balance;
 }
 
+/**
+ * Keeps the venue aggregate in step with one position's balance change.
+ *
+ * A position joins the aggregate the moment its second token appears, which is when the pair is
+ * first known — `ship()` emits one push per token, so that is mid-transaction. A position that
+ * grows a third token is no longer a pair and leaves again rather than being folded in under a
+ * guess about which two tokens matter.
+ */
+function updateVenue(
+  position: MakerPosition,
+  token: Address,
+  delta: BigInt,
+  event: ethereum.Event
+): void {
+  const count = position.tokens.length;
+  if (position.inAggregate) {
+    if (count != 2) leavePair(position, event);
+    else applyDelta(position, token, delta, event);
+    return;
+  }
+  if (count == 2) joinPair(position, event);
+}
+
 export function handlePushed(event: Pushed): void {
   const id = positionId(event.params.maker, event.params.app, event.params.strategyHash);
   const position = MakerPosition.load(id);
@@ -148,6 +177,8 @@ export function handlePushed(event: Pushed): void {
   balance.amount = balance.amount.plus(event.params.amount);
   balance.pushed = balance.pushed.plus(event.params.amount);
   balance.save();
+
+  updateVenue(position, event.params.token, event.params.amount, event);
   position.save();
 
   recordMovement(event, position, "PUSH", event.params.token, event.params.amount);
@@ -162,6 +193,8 @@ export function handlePulled(event: Pulled): void {
   balance.amount = balance.amount.minus(event.params.amount);
   balance.pulled = balance.pulled.plus(event.params.amount);
   balance.save();
+
+  updateVenue(position, event.params.token, event.params.amount.neg(), event);
 
   // A taker fill pays the maker in one token and takes the other; the pull is the leg the
   // maker gives up, so counting pulls counts fills once each.
