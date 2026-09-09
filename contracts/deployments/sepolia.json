@@ -42,6 +42,32 @@
     "note": "All four fee tiers agree on price within 0.4%, so the tiers are arbitraged against each other even though the pool as a whole is far from the off-chain market."
   },
   "subgraphs": {
-    "referencePool": "https://api.studio.thegraph.com/query/1760020/zentis-reference-pool-sepolia/v0.0.1"
-  }
+    "referencePool": "https://api.studio.thegraph.com/query/1760020/zentis-reference-pool-sepolia/v0.0.1",
+    "fills": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1"
+  },
+  "position": {
+    "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "strategyHash": "0x67ee91a188604f42c6d50978e68d9b2a0e6bb6f79421fa696a804836273e4d79",
+    "maker": "0x4887b4695dee830a341304bfeb14538e2442dd55",
+    "deadline": 1791500000,
+    "shippedBalanceA": "15000000",
+    "shippedBalanceB": "415074829001483",
+    "shippedAgainstRef": {
+      "mid": "27671655266765545300028160",
+      "seq": 5
+    },
+    "shipTx": "0x27636831df167e09c7f0ea8564be7ef252a2dec4752effa1be3ebadffc813139",
+    "note": "Balances and fill amounts here are read from the fills subgraph, not from forge output. The forge script's printed amountOut is a pre-broadcast quote and drifts from the Swapped event."
+  },
+  "fills": [
+    {
+      "tx": "0xf82db8a3fdcd408b8e649db42bafacf06773fa08a5db3a528fc0f7e056ff1630",
+      "block": 11669815,
+      "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+      "tokenIn": "USDC",
+      "tokenOut": "WETH",
+      "amountIn": "150000",
+      "amountOut": "4009890146858"
+    }
+  ]
 }
