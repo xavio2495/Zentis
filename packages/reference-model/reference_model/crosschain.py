@@ -85,6 +85,22 @@ def anti_symmetric(leg0: dict, leg1: dict, kappa_bps: int, max_tilt_bps: int) ->
     )
 
 
+def distribute(legs: list[dict], kappa_bps: int, max_tilt_bps: int) -> list[dict]:
+    """The N-leg policy. At two legs it returns exactly what `anti_symmetric` does.
+
+    Each leg is tilted by its own deviation from the book's average weight, so the tilts sum to zero
+    up to integer rounding — which is conservation restated: inventory tilted off one leg has to be
+    tilted onto the others, because tilting cannot create or destroy any.
+    """
+    xs = cross_leg_imbalance(legs)
+    out = []
+    for x, leg in zip(xs, legs):
+        tilt = trunc_div(kappa_bps * x, ONE_E18)
+        tilt = max(-max_tilt_bps, min(max_tilt_bps, tilt))
+        out.append({"x": x, "tiltBps": tilt, "dTiltPerA": _slope(leg, kappa_bps)})
+    return out
+
+
 def _slope(leg: dict, kappa_bps: int) -> int:
     """d(tiltBps)/d(raw tokenA), 1e18-scaled — the `dTiltPerA` field's units."""
     return (kappa_bps * leg["bInA"] * ONE_E18) // (2 * leg["totalInA"] ** 2)

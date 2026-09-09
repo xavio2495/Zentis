@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Day 4, task 4.4: publish one anti-symmetric pair of references from the two legs' live inventory.
+"""Publish one reference per leg, from every leg's live inventory, in a single observation.
+
+Generalised from the two-leg anti-symmetric pair to N legs: each leg is tilted by its deviation from
+the book's average weight, which sums to zero and reduces to the original +x/-x pair at two legs.
 
 Supersedes `poke_ref_from_subgraph.py`, which wrote a measured `mid` but a hardcoded `tiltBps = 0`
 because no position existed to be imbalanced. Now one does, on both chains, under one `positionId` —
@@ -31,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from reference_model.crosschain import anti_symmetric, leg_weight
+from reference_model.crosschain import distribute, leg_weight
 from reference_model.onchain import block_timestamp, eth_call
 from fetch_live_mid import CHAINS, fetch_chain
 from poke_ref_from_subgraph import POKE_REF_SIG, POSITION_ID, UINT128_MAX, read_ref, block_number_latest
@@ -81,7 +84,7 @@ def main() -> None:
     args = ap.parse_args()
 
     now = int(time.time())
-    order = list(CHAINS)  # base-sepolia, arbitrum-sepolia — leg 0 and leg 1 of the policy
+    order = list(CHAINS)  # every configured leg, in declaration order
     legs = {}
     for name in order:
         cfg = CHAINS[name]
@@ -98,10 +101,10 @@ def main() -> None:
         leg["inventory"] = leg_weight(balance_a, balance_b, leg["mid"])
         legs[name] = leg
 
-    policy0, policy1 = anti_symmetric(
-        legs[order[0]]["inventory"], legs[order[1]]["inventory"], KAPPA_BPS, MAX_TILT_BPS
+    policies = distribute(
+        [legs[name]["inventory"] for name in order], KAPPA_BPS, MAX_TILT_BPS
     )
-    for name, policy in zip(order, (policy0, policy1)):
+    for name, policy in zip(order, policies):
         legs[name]["policy"] = policy
 
     # One updatedAt and one seq across both legs: they describe a single cross-chain instant, and a
@@ -155,9 +158,11 @@ def main() -> None:
         tx = next((l.split()[-1] for l in result.stdout.splitlines() if l.startswith("transactionHash")), "?")
         print(f"{'':>18} | sent {tx}\n")
 
-    a, b = (legs[n]["policy"]["tiltBps"] for n in order)
-    assert a == -b, "the two legs' tilts must be equal and opposite"
-    print(f"anti-symmetry check: {order[0]} {a:+d} bps, {order[1]} {b:+d} bps")
+    tilts = [legs[n]["policy"]["tiltBps"] for n in order]
+    # Conservation, restated: tilting moves inventory between legs and cannot create any, so the
+    # tilts must sum to zero. Integer truncation leaves at most one basis point per leg.
+    assert abs(sum(tilts)) <= len(tilts) - 1, f"tilts do not net out: {tilts}"
+    print("distribution: " + ", ".join(f"{n} {t:+d} bps" for n, t in zip(order, tilts)))
 
 
 if __name__ == "__main__":
