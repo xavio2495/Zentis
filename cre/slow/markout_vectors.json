@@ -1,0 +1,1627 @@
+{
+  "seed": 1,
+  "horizonSeconds": 300,
+  "capBps": 200,
+  "cases": [
+    {
+      "name": "no fills at all",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "every fill is younger than the horizon, so nothing has matured",
+      "fills": [
+        {
+          "timestamp": "1700",
+          "isAToB": true,
+          "amountIn": "15000000",
+          "amountOut": "4137282795001288"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "the maker bought tokenA and the price rose, which is a favourable markout",
+      "fills": [
+        {
+          "timestamp": "1000",
+          "isAToB": true,
+          "amountIn": "15000000",
+          "amountOut": "4137282795001288"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 0,
+        "weightedBps": "99",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "the maker sold tokenA and the price rose, which is adverse selection",
+      "fills": [
+        {
+          "timestamp": "1000",
+          "isAToB": false,
+          "amountIn": "4137282795001288",
+          "amountOut": "15000000"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 0,
+        "weightedBps": "-99",
+        "publishedBps": "99"
+      }
+    },
+    {
+      "name": "a favourable markout is floored, never narrowing the spread",
+      "fills": [
+        {
+          "timestamp": "1000",
+          "isAToB": true,
+          "amountIn": "15000000",
+          "amountOut": "3723554515501159"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 0,
+        "weightedBps": "1089",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "a large adverse fill outweighs several small favourable ones",
+      "fills": [
+        {
+          "timestamp": "1000",
+          "isAToB": false,
+          "amountIn": "4137282795001288",
+          "amountOut": "15000000"
+        },
+        {
+          "timestamp": "1010",
+          "isAToB": true,
+          "amountIn": "10000",
+          "amountOut": "2758188530000"
+        },
+        {
+          "timestamp": "1020",
+          "isAToB": true,
+          "amountIn": "10000",
+          "amountOut": "2758188530000"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 3,
+        "skipped": 0,
+        "weightedBps": "-98",
+        "publishedBps": "98"
+      }
+    },
+    {
+      "name": "a violent move saturates the cap rather than bricking the leg",
+      "fills": [
+        {
+          "timestamp": "1000",
+          "isAToB": false,
+          "amountIn": "2068641397500644",
+          "amountOut": "15000000"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        },
+        {
+          "updatedAt": "1400",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1800",
+          "mid": "273060664470085031648658486"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 0,
+        "weightedBps": "-5049",
+        "publishedBps": "200"
+      }
+    },
+    {
+      "name": "no reference has ever been published",
+      "fills": [
+        {
+          "timestamp": "1000",
+          "isAToB": true,
+          "amountIn": "15000000",
+          "amountOut": "4137282795001288"
+        }
+      ],
+      "references": [],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 0",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "297884361240092761798536530"
+        },
+        {
+          "updatedAt": "1881",
+          "mid": "274053612340885340854653607"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 1",
+      "fills": [
+        {
+          "timestamp": "1698",
+          "isAToB": true,
+          "amountIn": "151334",
+          "amountOut": "45080031923908"
+        },
+        {
+          "timestamp": "1445",
+          "isAToB": false,
+          "amountIn": "4957432151325539",
+          "amountOut": "15361972"
+        },
+        {
+          "timestamp": "1109",
+          "isAToB": false,
+          "amountIn": "460870076657532",
+          "amountOut": "2062859"
+        },
+        {
+          "timestamp": "952",
+          "isAToB": false,
+          "amountIn": "180065933040707",
+          "amountOut": "627732"
+        },
+        {
+          "timestamp": "1343",
+          "isAToB": false,
+          "amountIn": "10884949921081662",
+          "amountOut": "48721143"
+        },
+        {
+          "timestamp": "1980",
+          "isAToB": true,
+          "amountIn": "29396138",
+          "amountOut": "8999890063029385"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "286851607120089326176368510"
+        },
+        {
+          "updatedAt": "1543",
+          "mid": "315536767832098258794005361"
+        },
+        {
+          "updatedAt": "1991",
+          "mid": "302915297118814328442245146"
+        },
+        {
+          "updatedAt": "2147",
+          "mid": "318061061974755044864357403"
+        }
+      ],
+      "expected": {
+        "matured": 5,
+        "skipped": 1,
+        "weightedBps": "-1857",
+        "publishedBps": "200"
+      }
+    },
+    {
+      "name": "random 2",
+      "fills": [
+        {
+          "timestamp": "3179",
+          "isAToB": false,
+          "amountIn": "1686914349487357",
+          "amountOut": "6720904"
+        },
+        {
+          "timestamp": "3477",
+          "isAToB": false,
+          "amountIn": "4775353066124177",
+          "amountOut": "19900422"
+        },
+        {
+          "timestamp": "2262",
+          "isAToB": false,
+          "amountIn": "14746860052483174",
+          "amountOut": "47737271"
+        },
+        {
+          "timestamp": "2628",
+          "isAToB": false,
+          "amountIn": "11417237161028653",
+          "amountOut": "44993445"
+        },
+        {
+          "timestamp": "2142",
+          "isAToB": true,
+          "amountIn": "33521620",
+          "amountOut": "10355402152597307"
+        },
+        {
+          "timestamp": "2511",
+          "isAToB": false,
+          "amountIn": "706010180616198",
+          "amountOut": "2326989"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "267544287410083313837574476"
+        },
+        {
+          "updatedAt": "1413",
+          "mid": "259517958787780814422447241"
+        },
+        {
+          "updatedAt": "2166",
+          "mid": "251732420024147389989773823"
+        },
+        {
+          "updatedAt": "3005",
+          "mid": "261801716825113285589364775"
+        },
+        {
+          "updatedAt": "3361",
+          "mid": "235621545142601957030428297"
+        }
+      ],
+      "expected": {
+        "matured": 4,
+        "skipped": 2,
+        "weightedBps": "120",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 3",
+      "fills": [
+        {
+          "timestamp": "1803",
+          "isAToB": false,
+          "amountIn": "12862038899099037",
+          "amountOut": "45273977"
+        },
+        {
+          "timestamp": "988",
+          "isAToB": true,
+          "amountIn": "34129924",
+          "amountOut": "8095761781967688"
+        },
+        {
+          "timestamp": "1697",
+          "isAToB": true,
+          "amountIn": "26400902",
+          "amountOut": "7500322503041903"
+        },
+        {
+          "timestamp": "1401",
+          "isAToB": false,
+          "amountIn": "7125654189049086",
+          "amountOut": "31505541"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "281335230060087608365284500"
+        },
+        {
+          "updatedAt": "1484",
+          "mid": "267268468557083227947020275"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 3,
+        "weightedBps": "1124",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 4",
+      "fills": [
+        {
+          "timestamp": "1928",
+          "isAToB": true,
+          "amountIn": "835545",
+          "amountOut": "212022338447560"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "300642549770093620704078535"
+        },
+        {
+          "updatedAt": "1667",
+          "mid": "324693953751701110360404817"
+        },
+        {
+          "updatedAt": "2130",
+          "mid": "357163349126871221396445298"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 5",
+      "fills": [
+        {
+          "timestamp": "3394",
+          "isAToB": false,
+          "amountIn": "112770832861942",
+          "amountOut": "393133"
+        },
+        {
+          "timestamp": "2999",
+          "isAToB": false,
+          "amountIn": "11043951400069253",
+          "amountOut": "34817910"
+        },
+        {
+          "timestamp": "1741",
+          "isAToB": true,
+          "amountIn": "3776370",
+          "amountOut": "1145753446094327"
+        },
+        {
+          "timestamp": "2393",
+          "isAToB": false,
+          "amountIn": "4145975369579389",
+          "amountOut": "13420996"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "295126172710091902892994525"
+        },
+        {
+          "updatedAt": "1297",
+          "mid": "301028696164293740950854415"
+        },
+        {
+          "updatedAt": "1883",
+          "mid": "304038983125936678360362959"
+        },
+        {
+          "updatedAt": "2534",
+          "mid": "307079372957196045143966588"
+        },
+        {
+          "updatedAt": "3064",
+          "mid": "300937785498052124241087256"
+        }
+      ],
+      "expected": {
+        "matured": 2,
+        "skipped": 2,
+        "weightedBps": "232",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 6",
+      "fills": [
+        {
+          "timestamp": "2256",
+          "isAToB": true,
+          "amountIn": "1887369",
+          "amountOut": "489337635601843"
+        },
+        {
+          "timestamp": "1625",
+          "isAToB": false,
+          "amountIn": "2846692400931196",
+          "amountOut": "12142208"
+        },
+        {
+          "timestamp": "1945",
+          "isAToB": true,
+          "amountIn": "45181884",
+          "amountOut": "10468092953860863"
+        },
+        {
+          "timestamp": "1240",
+          "isAToB": false,
+          "amountIn": "6710172689075371",
+          "amountOut": "30410234"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "289609795650090185081910515"
+        },
+        {
+          "updatedAt": "1892",
+          "mid": "292505893606591086932729620"
+        },
+        {
+          "updatedAt": "2376",
+          "mid": "295430952542656997802056916"
+        },
+        {
+          "updatedAt": "2437",
+          "mid": "316111119220642987648200900"
+        }
+      ],
+      "expected": {
+        "matured": 3,
+        "skipped": 1,
+        "weightedBps": "-26",
+        "publishedBps": "26"
+      }
+    },
+    {
+      "name": "random 7",
+      "fills": [
+        {
+          "timestamp": "1494",
+          "isAToB": true,
+          "amountIn": "10722287",
+          "amountOut": "2839112545802622"
+        },
+        {
+          "timestamp": "1980",
+          "isAToB": false,
+          "amountIn": "11792675837077899",
+          "amountOut": "44077472"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "267544287410083313837574476"
+        },
+        {
+          "updatedAt": "1335",
+          "mid": "248816187291377481868944262"
+        },
+        {
+          "updatedAt": "2211",
+          "mid": "271209644147601455237149245"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 1,
+        "weightedBps": "236",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 8",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "286851607120089326176368510"
+        },
+        {
+          "updatedAt": "1779",
+          "mid": "286851607120089326176368510"
+        },
+        {
+          "updatedAt": "2347",
+          "mid": "301194187476093792485186935"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 9",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "281335230060087608365284500"
+        },
+        {
+          "updatedAt": "1411",
+          "mid": "289775286961890236616243035"
+        },
+        {
+          "updatedAt": "2286",
+          "mid": "278184275483414627151593313"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 10",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "292367984180091043987452520"
+        },
+        {
+          "updatedAt": "1274",
+          "mid": "318681102756299237946323246"
+        },
+        {
+          "updatedAt": "1776",
+          "mid": "286812992480669314151690921"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 11",
+      "fills": [
+        {
+          "timestamp": "1803",
+          "isAToB": false,
+          "amountIn": "13196451114997491",
+          "amountOut": "42340381"
+        },
+        {
+          "timestamp": "2746",
+          "isAToB": true,
+          "amountIn": "43530529",
+          "amountOut": "9725297869206250"
+        },
+        {
+          "timestamp": "2517",
+          "isAToB": false,
+          "amountIn": "7138779189144030",
+          "amountOut": "21568441"
+        },
+        {
+          "timestamp": "2646",
+          "isAToB": true,
+          "amountIn": "20049106",
+          "amountOut": "4866330850125483"
+        },
+        {
+          "timestamp": "1768",
+          "isAToB": false,
+          "amountIn": "4766110260516226",
+          "amountOut": "20571258"
+        },
+        {
+          "timestamp": "1213",
+          "isAToB": true,
+          "amountIn": "20000375",
+          "amountOut": "4964832442864433"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "259269721820080737120948461"
+        },
+        {
+          "updatedAt": "1096",
+          "mid": "246306235729076700264901037"
+        },
+        {
+          "updatedAt": "1612",
+          "mid": "261084609872821302280795099"
+        },
+        {
+          "updatedAt": "2366",
+          "mid": "268917148169005941349218951"
+        }
+      ],
+      "expected": {
+        "matured": 3,
+        "skipped": 3,
+        "weightedBps": "587",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 12",
+      "fills": [
+        {
+          "timestamp": "2067",
+          "isAToB": true,
+          "amountIn": "47256193",
+          "amountOut": "15510637250988718"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "297884361240092761798536530"
+        },
+        {
+          "updatedAt": "1318",
+          "mid": "280011299565687196090624338"
+        },
+        {
+          "updatedAt": "1386",
+          "mid": "299612090535285299816968041"
+        },
+        {
+          "updatedAt": "1484",
+          "mid": "323581057778108123802325484"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 13",
+      "fills": [
+        {
+          "timestamp": "2916",
+          "isAToB": true,
+          "amountIn": "44701653",
+          "amountOut": "12822741003974562"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "250995156230078160404322446"
+        },
+        {
+          "updatedAt": "1447",
+          "mid": "240955349980875033988149548"
+        },
+        {
+          "updatedAt": "1862",
+          "mid": "224088475482213781608979079"
+        },
+        {
+          "updatedAt": "2132",
+          "mid": "242015553520790884137697405"
+        },
+        {
+          "updatedAt": "2882",
+          "mid": "249276020126414610661828327"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 14",
+      "fills": [
+        {
+          "timestamp": "937",
+          "isAToB": true,
+          "amountIn": "22004306",
+          "amountOut": "7040274832700173"
+        },
+        {
+          "timestamp": "1176",
+          "isAToB": true,
+          "amountIn": "14306187",
+          "amountOut": "3827538606470397"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "292367984180091043987452520"
+        },
+        {
+          "updatedAt": "1571",
+          "mid": "263131185762081939588707268"
+        },
+        {
+          "updatedAt": "1964",
+          "mid": "286812992480669314151690922"
+        }
+      ],
+      "expected": {
+        "matured": 2,
+        "skipped": 0,
+        "weightedBps": "-1374",
+        "publishedBps": "200"
+      }
+    },
+    {
+      "name": "random 15",
+      "fills": [
+        {
+          "timestamp": "1603",
+          "isAToB": false,
+          "amountIn": "9366669786818710",
+          "amountOut": "35746840"
+        },
+        {
+          "timestamp": "966",
+          "isAToB": false,
+          "amountIn": "1381758322072278",
+          "amountOut": "5692794"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "281335230060087608365284500"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 2,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 16",
+      "fills": [
+        {
+          "timestamp": "1580",
+          "isAToB": false,
+          "amountIn": "4870015745870547",
+          "amountOut": "17142304"
+        },
+        {
+          "timestamp": "1593",
+          "isAToB": true,
+          "amountIn": "19553127",
+          "amountOut": "5123465008619759"
+        },
+        {
+          "timestamp": "1901",
+          "isAToB": true,
+          "amountIn": "36998424",
+          "amountOut": "8776182068622130"
+        },
+        {
+          "timestamp": "1556",
+          "isAToB": true,
+          "amountIn": "4921927",
+          "amountOut": "1411862670077759"
+        },
+        {
+          "timestamp": "1201",
+          "isAToB": false,
+          "amountIn": "5492077328032188",
+          "amountOut": "22887241"
+        },
+        {
+          "timestamp": "1674",
+          "isAToB": true,
+          "amountIn": "36938313",
+          "amountOut": "9576986136013071"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "262027910350081596026490466"
+        },
+        {
+          "updatedAt": "1611",
+          "mid": "251546793936078332185430847"
+        }
+      ],
+      "expected": {
+        "matured": 1,
+        "skipped": 5,
+        "weightedBps": "-460",
+        "publishedBps": "200"
+      }
+    },
+    {
+      "name": "random 17",
+      "fills": [
+        {
+          "timestamp": "1087",
+          "isAToB": false,
+          "amountIn": "276011804836890",
+          "amountOut": "840924"
+        },
+        {
+          "timestamp": "959",
+          "isAToB": true,
+          "amountIn": "7734397",
+          "amountOut": "1749299857533590"
+        },
+        {
+          "timestamp": "1669",
+          "isAToB": true,
+          "amountIn": "39389003",
+          "amountOut": "11516083405973558"
+        },
+        {
+          "timestamp": "1563",
+          "isAToB": true,
+          "amountIn": "11242912",
+          "amountOut": "2945956737609856"
+        },
+        {
+          "timestamp": "1551",
+          "isAToB": false,
+          "amountIn": "2039641179945607",
+          "amountOut": "6911082"
+        },
+        {
+          "timestamp": "2449",
+          "isAToB": false,
+          "amountIn": "9851203198606245",
+          "amountOut": "36445109"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "253753344760079019309864451"
+        },
+        {
+          "updatedAt": "1333",
+          "mid": "256290878207679809502963095"
+        },
+        {
+          "updatedAt": "1695",
+          "mid": "276794148464294194263200142"
+        },
+        {
+          "updatedAt": "2302",
+          "mid": "257418558071793600664776132"
+        },
+        {
+          "updatedAt": "2830",
+          "mid": "252270186910357728651480609"
+        }
+      ],
+      "expected": {
+        "matured": 6,
+        "skipped": 0,
+        "weightedBps": "-84",
+        "publishedBps": "84"
+      }
+    },
+    {
+      "name": "random 18",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "270302475940084172743116481"
+        },
+        {
+          "updatedAt": "1788",
+          "mid": "283817599737088381380272305"
+        },
+        {
+          "updatedAt": "2170",
+          "mid": "263950367755492194683653243"
+        },
+        {
+          "updatedAt": "2442",
+          "mid": "290345404531041414152018567"
+        },
+        {
+          "updatedAt": "2827",
+          "mid": "264214318123247686878336895"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 19",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "300642549770093620704078535"
+        },
+        {
+          "updatedAt": "1387",
+          "mid": "312668251760897365532241676"
+        },
+        {
+          "updatedAt": "1847",
+          "mid": "312668251760897365532241676"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 20",
+      "fills": [
+        {
+          "timestamp": "1014",
+          "isAToB": true,
+          "amountIn": "41470317",
+          "amountOut": "13039656606078557"
+        },
+        {
+          "timestamp": "1604",
+          "isAToB": true,
+          "amountIn": "23889144",
+          "amountOut": "6325513245344528"
+        },
+        {
+          "timestamp": "1087",
+          "isAToB": false,
+          "amountIn": "5235939156932472",
+          "amountOut": "20633971"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "275818853000085890554200491"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 3,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 21",
+      "fills": [
+        {
+          "timestamp": "1129",
+          "isAToB": true,
+          "amountIn": "38554394",
+          "amountOut": "10740369018505327"
+        },
+        {
+          "timestamp": "1016",
+          "isAToB": true,
+          "amountIn": "20597945",
+          "amountOut": "4658667282528260"
+        },
+        {
+          "timestamp": "1067",
+          "isAToB": true,
+          "amountIn": "38866477",
+          "amountOut": "10612906035231277"
+        },
+        {
+          "timestamp": "1025",
+          "isAToB": true,
+          "amountIn": "36532349",
+          "amountOut": "11990809612308813"
+        },
+        {
+          "timestamp": "1196",
+          "isAToB": false,
+          "amountIn": "1621156986303271",
+          "amountOut": "6186963"
+        },
+        {
+          "timestamp": "1012",
+          "isAToB": true,
+          "amountIn": "16368409",
+          "amountOut": "4740451585607097"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "278577041530086749459742495"
+        },
+        {
+          "updatedAt": "1143",
+          "mid": "273005500699485014470547645"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 6,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 22",
+      "fills": [
+        {
+          "timestamp": "972",
+          "isAToB": false,
+          "amountIn": "481177573450475",
+          "amountOut": "1453785"
+        },
+        {
+          "timestamp": "910",
+          "isAToB": true,
+          "amountIn": "24114925",
+          "amountOut": "7382999558588236"
+        },
+        {
+          "timestamp": "1380",
+          "isAToB": false,
+          "amountIn": "2456680631677739",
+          "amountOut": "10356817"
+        },
+        {
+          "timestamp": "1413",
+          "isAToB": false,
+          "amountIn": "5103616187546601",
+          "amountOut": "22027985"
+        },
+        {
+          "timestamp": "1421",
+          "isAToB": false,
+          "amountIn": "2920599968500844",
+          "amountOut": "11636081"
+        },
+        {
+          "timestamp": "1053",
+          "isAToB": false,
+          "amountIn": "5862705579859309",
+          "amountOut": "21470341"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "270302475940084172743116481"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 6,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 23",
+      "fills": [
+        {
+          "timestamp": "1029",
+          "isAToB": false,
+          "amountIn": "2992786470558787",
+          "amountOut": "9518027"
+        },
+        {
+          "timestamp": "1639",
+          "isAToB": true,
+          "amountIn": "21221009",
+          "amountOut": "6965253690642554"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "292367984180091043987452520"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 2,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 24",
+      "fills": [
+        {
+          "timestamp": "1163",
+          "isAToB": false,
+          "amountIn": "8850005500408858",
+          "amountOut": "29987193"
+        },
+        {
+          "timestamp": "1924",
+          "isAToB": false,
+          "amountIn": "10858784691058055",
+          "amountOut": "36118589"
+        },
+        {
+          "timestamp": "944",
+          "isAToB": true,
+          "amountIn": "22737701",
+          "amountOut": "5644337948711015"
+        },
+        {
+          "timestamp": "1956",
+          "isAToB": true,
+          "amountIn": "43391776",
+          "amountOut": "12686366079114054"
+        },
+        {
+          "timestamp": "977",
+          "isAToB": true,
+          "amountIn": "23829851",
+          "amountOut": "7690084938880051"
+        },
+        {
+          "timestamp": "1466",
+          "isAToB": false,
+          "amountIn": "2463647975879456",
+          "amountOut": "9304295"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "264786098880082454932032471"
+        },
+        {
+          "updatedAt": "1242",
+          "mid": "262138237891281630382712146"
+        },
+        {
+          "updatedAt": "1745",
+          "mid": "280487914543671344509501996"
+        },
+        {
+          "updatedAt": "1966",
+          "mid": "255244002234740923503646816"
+        },
+        {
+          "updatedAt": "2757",
+          "mid": "247586682167698695798537411"
+        }
+      ],
+      "expected": {
+        "matured": 6,
+        "skipped": 0,
+        "weightedBps": "50",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 25",
+      "fills": [
+        {
+          "timestamp": "1895",
+          "isAToB": true,
+          "amountIn": "35490573",
+          "amountOut": "9788969137175817"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "281335230060087608365284500"
+        },
+        {
+          "updatedAt": "1637",
+          "mid": "286961934661289360532590190"
+        },
+        {
+          "updatedAt": "1873",
+          "mid": "312788508780805402980523307"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 26",
+      "fills": [
+        {
+          "timestamp": "2588",
+          "isAToB": true,
+          "amountIn": "41032758",
+          "amountOut": "10978079999580395"
+        },
+        {
+          "timestamp": "1798",
+          "isAToB": true,
+          "amountIn": "4811732",
+          "amountOut": "1486426369325866"
+        },
+        {
+          "timestamp": "2410",
+          "isAToB": true,
+          "amountIn": "13689754",
+          "amountOut": "3738133323672004"
+        },
+        {
+          "timestamp": "2123",
+          "isAToB": false,
+          "amountIn": "10532883381650174",
+          "amountOut": "37075422"
+        },
+        {
+          "timestamp": "1576",
+          "isAToB": false,
+          "amountIn": "14860816252722335",
+          "amountOut": "49430183"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "303400738300094479609620540"
+        },
+        {
+          "updatedAt": "1508",
+          "mid": "333740812130103927570582594"
+        },
+        {
+          "updatedAt": "2316",
+          "mid": "323728587766200809743465116"
+        },
+        {
+          "updatedAt": "2620",
+          "mid": "323728587766200809743465116"
+        },
+        {
+          "updatedAt": "3186",
+          "mid": "339915017154510850230638371"
+        }
+      ],
+      "expected": {
+        "matured": 5,
+        "skipped": 0,
+        "weightedBps": "245",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 27",
+      "fills": [
+        {
+          "timestamp": "2828",
+          "isAToB": false,
+          "amountIn": "1074189516834999",
+          "amountOut": "3508601"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "253753344760079019309864451"
+        },
+        {
+          "updatedAt": "1186",
+          "mid": "276591145788486131047752251"
+        },
+        {
+          "updatedAt": "1772",
+          "mid": "298718437451565021531572431"
+        },
+        {
+          "updatedAt": "2218",
+          "mid": "283782515578986770454993809"
+        },
+        {
+          "updatedAt": "2437",
+          "mid": "278106865267407035045893932"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 1,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 28",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "303400738300094479609620540"
+        },
+        {
+          "updatedAt": "1416",
+          "mid": "309468753066096369201812950"
+        },
+        {
+          "updatedAt": "2003",
+          "mid": "293995315412791550741722302"
+        },
+        {
+          "updatedAt": "2620",
+          "mid": "267535737025640311174967294"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 29",
+      "fills": [
+        {
+          "timestamp": "2163",
+          "isAToB": false,
+          "amountIn": "10381945662661427",
+          "amountOut": "44282882"
+        },
+        {
+          "timestamp": "1811",
+          "isAToB": false,
+          "amountIn": "4642000227755843",
+          "amountOut": "16182584"
+        },
+        {
+          "timestamp": "1786",
+          "isAToB": true,
+          "amountIn": "21851739",
+          "amountOut": "6509291314000223"
+        },
+        {
+          "timestamp": "1158",
+          "isAToB": false,
+          "amountIn": "8402517001576085",
+          "amountOut": "32756878"
+        },
+        {
+          "timestamp": "1144",
+          "isAToB": true,
+          "amountIn": "35849793",
+          "amountOut": "10481331712683538"
+        },
+        {
+          "timestamp": "1141",
+          "isAToB": false,
+          "amountIn": "4885321990409729",
+          "amountOut": "18644281"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "303400738300094479609620540"
+        },
+        {
+          "updatedAt": "1163",
+          "mid": "297332723534092590017428129"
+        },
+        {
+          "updatedAt": "1977",
+          "mid": "273546105651365182816033878"
+        }
+      ],
+      "expected": {
+        "matured": 3,
+        "skipped": 3,
+        "weightedBps": "-606",
+        "publishedBps": "200"
+      }
+    },
+    {
+      "name": "random 30",
+      "fills": [
+        {
+          "timestamp": "2140",
+          "isAToB": true,
+          "amountIn": "17484932",
+          "amountOut": "4485086716792782"
+        },
+        {
+          "timestamp": "1254",
+          "isAToB": true,
+          "amountIn": "36405783",
+          "amountOut": "9238089204859623"
+        },
+        {
+          "timestamp": "1459",
+          "isAToB": true,
+          "amountIn": "16846421",
+          "amountOut": "5018285358766684"
+        },
+        {
+          "timestamp": "1244",
+          "isAToB": false,
+          "amountIn": "9632838891075129",
+          "amountOut": "32947653"
+        },
+        {
+          "timestamp": "1149",
+          "isAToB": false,
+          "amountIn": "10986015247301060",
+          "amountOut": "38298601"
+        }
+      ],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "295126172710091902892994525"
+        },
+        {
+          "updatedAt": "1064",
+          "mid": "283321125801688226777274744"
+        },
+        {
+          "updatedAt": "1665",
+          "mid": "294653970833755755848365733"
+        },
+        {
+          "updatedAt": "2317",
+          "mid": "265188573750380180263529159"
+        }
+      ],
+      "expected": {
+        "matured": 4,
+        "skipped": 1,
+        "weightedBps": "137",
+        "publishedBps": "0"
+      }
+    },
+    {
+      "name": "random 31",
+      "fills": [],
+      "references": [
+        {
+          "updatedAt": "1000",
+          "mid": "273060664470085031648658486"
+        },
+        {
+          "updatedAt": "1890",
+          "mid": "253946417957179079433252391"
+        }
+      ],
+      "expected": {
+        "matured": 0,
+        "skipped": 0,
+        "weightedBps": "0",
+        "publishedBps": "0"
+      }
+    }
+  ]
+}
