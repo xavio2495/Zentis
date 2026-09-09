@@ -52,7 +52,7 @@
       "tokenIn": "USDC",
       "tokenOut": "WETH",
       "amountIn": "150000",
-      "amountOut": "40861951301607",
+      "amountOut": "40849835560801",
       "note": "1% of inventory, sized so the curve stays well inside the band."
     }
   ],
@@ -80,7 +80,7 @@
         "tokenIn": "USDC",
         "tokenOut": "WETH",
         "amountIn": "4000000",
-        "amountOut": "667644176426928",
+        "amountOut": "667497460008612",
         "note": "The fill that drove the cross-chain demonstration: it left Base 69.2% USDC against Arbitrum's 54.8%, which the next reference published as +36 bps on Base and -36 bps on Arbitrum."
       },
       {
@@ -90,7 +90,7 @@
         "tokenIn": "WETH",
         "tokenOut": "USDC",
         "amountIn": "500000000000000",
-        "amountOut": "1612861",
+        "amountOut": "1612430",
         "note": "The first fill in this direction. An identical attempt before the top-up was refused on-chain by ZentisBand with ZentisOutsideBand(2.229e26, 2.614e26, false)."
       }
     ],

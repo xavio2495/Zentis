@@ -54,7 +54,7 @@
       "tokenIn": "USDC",
       "tokenOut": "WETH",
       "amountIn": "150000",
-      "amountOut": "74968636018527"
+      "amountOut": "74939009708834"
     }
   ],
   "crossChainEffect": {
@@ -80,7 +80,7 @@
         "tokenIn": "USDC",
         "tokenOut": "WETH",
         "amountIn": "1000000",
-        "amountOut": "459628650773710"
+        "amountOut": "459503354458188"
       }
     ],
     "topUps": [],
