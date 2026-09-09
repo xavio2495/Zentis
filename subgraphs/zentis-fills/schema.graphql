@@ -28,6 +28,7 @@ type Position @entity(immutable: false) {
   balanceB: BigInt!
 
   """The most recent accepted reference, denormalized so a quote needs one read."""
+  hasReference: Boolean!
   refMid: BigInt
   refTiltBps: Int
   refSeq: Int
@@ -65,6 +66,12 @@ type Fill @entity(immutable: true) {
   """True when the taker sold tokenA, so the maker's tokenA inventory grew."""
   isAToB: Boolean!
 
+  """
+  False when no reference had been published yet when this fill landed, which is a different
+  thing from a reference whose tilt happened to be zero. Every ref* field below is only
+  meaningful when this is true.
+  """
+  hasReference: Boolean!
   refMid: BigInt
   refTiltBps: Int
   refSeq: Int

@@ -36,6 +36,7 @@ export function handleShipped(event: Shipped): void {
   if (position == null) {
     position = new Position(skew.positionId);
     position.fillCount = 0;
+    position.hasReference = false;
     position.volumeInA = BigInt.zero();
     position.volumeInB = BigInt.zero();
   }
@@ -117,6 +118,7 @@ export function handleSwapped(event: Swapped): void {
 
   // The reference the curve actually priced against, captured now: reading it back later
   // would give whatever the workflow has published since.
+  fill.hasReference = position.hasReference;
   fill.refMid = position.refMid;
   fill.refTiltBps = position.refTiltBps;
   fill.refSeq = position.refSeq;
@@ -155,6 +157,7 @@ export function handleRefUpdated(event: ZentisRefUpdated): void {
   reference.timestamp = event.block.timestamp;
   reference.save();
 
+  position.hasReference = true;
   position.refMid = event.params.mid;
   position.refTiltBps = event.params.tiltBps;
   position.refSeq = seq;
