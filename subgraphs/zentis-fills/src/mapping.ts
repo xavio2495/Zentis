@@ -5,7 +5,14 @@ import {
   ZentisRefRejected,
   ZentisRefUpdated
 } from "../generated/ZentisRefRegistry/ZentisRefRegistry";
-import { Fill, Position, RejectedReference, Reference, StrategyLink } from "../generated/schema";
+import {
+  Fill,
+  LatestReference,
+  Position,
+  RejectedReference,
+  Reference,
+  StrategyLink
+} from "../generated/schema";
 import { decodeStrategy, readSkewArgs } from "./strategy";
 
 function chainId(): i32 {
@@ -59,6 +66,19 @@ export function handleShipped(event: Shipped): void {
   position.dockedAtBlock = null;
   position.shippedAtBlock = event.block.number;
   position.shippedAtTimestamp = event.block.timestamp;
+
+  // A leg cannot be shipped until a reference exists, because the ship sizes the position against
+  // it. So the first reference always predates the position, and without this the leg would start
+  // life claiming none had been published — and price its first fills as unreferenced.
+  const latest = LatestReference.load(skew.positionId);
+  if (latest != null) {
+    const leg = position as Position;
+    leg.hasReference = true;
+    leg.refMid = latest.mid;
+    leg.refTiltBps = latest.tiltBps;
+    leg.refSeq = latest.seq;
+    leg.refUpdatedAt = latest.updatedAt;
+  }
   position.save();
 
   const link = new StrategyLink(event.params.strategyHash);
@@ -141,14 +161,16 @@ export function handleSwapped(event: Swapped): void {
 
 export function handleRefUpdated(event: ZentisRefUpdated): void {
   const position = Position.load(event.params.positionId);
-  if (position == null) return;
 
   const seq = event.params.seq.toI32();
   const reference = new Reference(
     Bytes.fromUint8Array(event.params.positionId.concatI32(seq))
   );
-  reference.position = position.id;
-  reference.chainId = position.chainId;
+  reference.positionId = event.params.positionId;
+  if (position != null) {
+    reference.position = position.id;
+    reference.chainId = position.chainId;
+  }
   reference.mid = event.params.mid;
   reference.tiltBps = event.params.tiltBps;
   reference.seq = seq;
@@ -158,21 +180,37 @@ export function handleRefUpdated(event: ZentisRefUpdated): void {
   reference.timestamp = event.block.timestamp;
   reference.save();
 
-  position.hasReference = true;
-  position.refMid = event.params.mid;
-  position.refTiltBps = event.params.tiltBps;
-  position.refSeq = seq;
-  position.refUpdatedAt = event.params.updatedAt;
-  position.save();
+  // Recorded whether or not a leg exists yet, so a later ship can pick it up. A new leg cannot be
+  // shipped before a reference exists, because the ship sizes the position against it, so the
+  // first reference on every leg necessarily arrives before the position does.
+  let latest = LatestReference.load(event.params.positionId);
+  if (latest == null) latest = new LatestReference(event.params.positionId);
+  const record = latest as LatestReference;
+  record.mid = event.params.mid;
+  record.tiltBps = event.params.tiltBps;
+  record.seq = seq;
+  record.updatedAt = event.params.updatedAt;
+  record.save();
+
+  if (position == null) return;
+  const leg = position as Position;
+  leg.hasReference = true;
+  leg.refMid = event.params.mid;
+  leg.refTiltBps = event.params.tiltBps;
+  leg.refSeq = seq;
+  leg.refUpdatedAt = event.params.updatedAt;
+  leg.save();
 }
 
 export function handleRefRejected(event: ZentisRefRejected): void {
   const position = Position.load(event.params.positionId);
-  if (position == null) return;
 
   const rejection = new RejectedReference(eventId(event));
-  rejection.position = position.id;
-  rejection.chainId = position.chainId;
+  rejection.positionId = event.params.positionId;
+  if (position != null) {
+    rejection.position = position.id;
+    rejection.chainId = position.chainId;
+  }
   rejection.reason = event.params.reason;
   rejection.transaction = event.transaction.hash;
   rejection.blockNumber = event.block.number;

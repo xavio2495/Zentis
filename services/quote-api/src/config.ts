@@ -17,7 +17,7 @@ export const CHAINS: readonly ChainConfig[] = [
     name: "base-sepolia",
     subgraphUrl: env(
       "ZENTIS_SUBGRAPH_BASE_SEPOLIA",
-      "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.1.2"
+      "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.2.0"
     ),
     rpcUrl: env("ZENTIS_RPC_BASE_SEPOLIA", "https://sepolia.base.org")
   },
@@ -26,9 +26,18 @@ export const CHAINS: readonly ChainConfig[] = [
     name: "arbitrum-sepolia",
     subgraphUrl: env(
       "ZENTIS_SUBGRAPH_ARBITRUM_SEPOLIA",
-      "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.1.2"
+      "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.2.0"
     ),
     rpcUrl: env("ZENTIS_RPC_ARBITRUM_SEPOLIA", "https://sepolia-rollup.arbitrum.io/rpc")
+  },
+  {
+    chainId: 11155111,
+    name: "sepolia",
+    subgraphUrl: env(
+      "ZENTIS_SUBGRAPH_SEPOLIA",
+      "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.0"
+    ),
+    rpcUrl: env("ZENTIS_RPC_SEPOLIA", "https://ethereum-sepolia-rpc.publicnode.com")
   }
 ] as const;
 

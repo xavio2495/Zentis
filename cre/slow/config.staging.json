@@ -18,12 +18,12 @@
   "legA": {
     "chainSelector": "10344971235874465080",
     "registry": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910",
-    "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.1.2"
+    "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.2.0"
   },
   "legB": {
     "chainSelector": "3478487238524512106",
     "registry": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
-    "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.1.2"
+    "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.2.0"
   },
   "markoutHorizonSeconds": 300,
   "markoutCapBps": 200,

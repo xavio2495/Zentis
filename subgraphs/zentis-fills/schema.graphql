@@ -91,11 +91,18 @@ type Fill @entity(immutable: true) {
   timestamp: BigInt!
 }
 
-"""An accepted reference write. seq is monotonic per position, so this is the audit trail."""
+"""
+An accepted reference write. seq is monotonic per position, so this is the audit trail.
+
+`position` is null when the reference was published before the leg was shipped. That is not an
+edge case: bootstrapping a new leg *requires* a reference to exist first, because the ship script
+sizes the position against it. `positionId` is always set, so nothing is lost.
+"""
 type Reference @entity(immutable: true) {
   id: Bytes! # positionId ++ seq
-  position: Position!
-  chainId: Int!
+  positionId: Bytes!
+  position: Position
+  chainId: Int
   mid: BigInt!
   tiltBps: Int!
   seq: Int!
@@ -112,8 +119,9 @@ publisher does not roll back the very log that explains why it is being refused.
 """
 type RejectedReference @entity(immutable: true) {
   id: Bytes! # tx hash ++ log index
-  position: Position!
-  chainId: Int!
+  positionId: Bytes!
+  position: Position
+  chainId: Int
   reason: String!
   transaction: Bytes!
   blockNumber: BigInt!
@@ -129,4 +137,18 @@ inside it names the position. This is the join, and it is rebuilt on every re-sh
 type StrategyLink @entity(immutable: false) {
   id: Bytes! # strategyHash
   position: Position!
+}
+
+"""
+The newest accepted reference for a positionId, kept whether or not a leg is shipped yet.
+
+Without this, a leg that is shipped after its first reference starts life claiming no reference
+exists — and its first fills would be recorded as unpriced when the router had in fact priced them.
+"""
+type LatestReference @entity(immutable: false) {
+  id: Bytes! # positionId
+  mid: BigInt!
+  tiltBps: Int!
+  seq: Int!
+  updatedAt: BigInt!
 }

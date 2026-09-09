@@ -53,9 +53,28 @@ def leg_weight(balance_a: int, balance_b: int, mid: int) -> dict:
     }
 
 
+def cross_leg_imbalance(legs: list[dict]) -> list[int]:
+    """Each leg's deviation from the book's average weight, 1e18-scaled, summing to ~zero.
+
+        x_i = w_i - mean(w)
+
+    Written over a common numerator, `(n*w_i - Sum(w)) / n`, so that at n = 2 it reduces to
+    `(w_0 - w_1) / 2` exactly — same numerator, same divisor, same rounding — and the two-leg
+    behaviour this policy shipped with is preserved bit for bit rather than approximately.
+    """
+    n = len(legs)
+    if n < 2:
+        raise ValueError("an imbalance needs at least two legs")
+    total = sum(leg["weightA"] for leg in legs)
+    return [trunc_div(n * leg["weightA"] - total, n) for leg in legs]
+
+
 def anti_symmetric(leg0: dict, leg1: dict, kappa_bps: int, max_tilt_bps: int) -> tuple[dict, dict]:
     """`leg0`/`leg1` are `leg_weight` results. Returns (ref inputs for leg0, for leg1)."""
-    x = (leg0["weightA"] - leg1["weightA"]) // 2  # 1e18-scaled, in [-1e18, 1e18]
+    # Truncating division, not Python's floor: the on-chain library and the TypeScript in the
+    # workflow both truncate toward zero, and floor division disagreed with them whenever this
+    # numerator was negative and odd.
+    x = trunc_div(leg0["weightA"] - leg1["weightA"], 2)  # 1e18-scaled, in [-1e18, 1e18]
 
     tilt0 = trunc_div(kappa_bps * x, ONE_E18)
     tilt0 = max(-max_tilt_bps, min(max_tilt_bps, tilt0))
