@@ -1,0 +1,19 @@
+{
+  "name": "@zentis/zentis-fills-subgraph",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "codegen": "graph codegen subgraph.base-sepolia.yaml",
+    "build": "graph build subgraph.base-sepolia.yaml",
+    "build:arbitrum-sepolia": "graph build subgraph.arbitrum-sepolia.yaml",
+    "test": "graph test -d",
+    "deploy:base-sepolia": "graph deploy zentis-fills-base-sepolia subgraph.base-sepolia.yaml --version-label v0.1.0",
+    "deploy:arbitrum-sepolia": "graph deploy zentis-fills-arbitrum-sepolia subgraph.arbitrum-sepolia.yaml --version-label v0.1.0"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.98.1",
+    "@graphprotocol/graph-ts": "^0.38.2",
+    "assemblyscript": "0.19.23",
+    "matchstick-as": "^0.6.0"
+  }
+}

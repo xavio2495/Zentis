@@ -1,0 +1,97 @@
+specVersion: 1.0.0
+description: Zentis position fills and published references on base-sepolia, keyed by positionId.
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Aqua
+    network: base-sepolia
+    source:
+      address: "0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9"
+      abi: Aqua
+      startBlock: 46559000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Position
+        - Fill
+        - Reference
+        - RejectedReference
+        - StrategyLink
+      abis:
+        - name: Aqua
+          file: ./abis/Aqua.json
+        - name: ZentisRouter
+          file: ./abis/ZentisRouter.json
+        - name: ZentisRefRegistry
+          file: ./abis/ZentisRefRegistry.json
+      eventHandlers:
+        - event: Shipped(address,address,bytes32,bytes)
+          handler: handleShipped
+        - event: Docked(address,address,bytes32)
+          handler: handleDocked
+        - event: Pushed(address,address,bytes32,address,uint256)
+          handler: handlePushed
+        - event: Pulled(address,address,bytes32,address,uint256)
+          handler: handlePulled
+  - kind: ethereum
+    name: ZentisRouter
+    network: base-sepolia
+    source:
+      address: "0xdd9752b377870bd9e41cd041f4a0e90770d0fb41"
+      abi: ZentisRouter
+      startBlock: 46559000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Position
+        - Fill
+        - Reference
+        - RejectedReference
+        - StrategyLink
+      abis:
+        - name: Aqua
+          file: ./abis/Aqua.json
+        - name: ZentisRouter
+          file: ./abis/ZentisRouter.json
+        - name: ZentisRefRegistry
+          file: ./abis/ZentisRefRegistry.json
+      eventHandlers:
+        - event: Swapped(bytes32,address,address,address,address,uint256,uint256)
+          handler: handleSwapped
+  - kind: ethereum
+    name: ZentisRefRegistry
+    network: base-sepolia
+    source:
+      address: "0x2FE4cCe316287505ce114101b9d58c1f56d8E910"
+      abi: ZentisRefRegistry
+      startBlock: 46559000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Position
+        - Fill
+        - Reference
+        - RejectedReference
+        - StrategyLink
+      abis:
+        - name: Aqua
+          file: ./abis/Aqua.json
+        - name: ZentisRouter
+          file: ./abis/ZentisRouter.json
+        - name: ZentisRefRegistry
+          file: ./abis/ZentisRefRegistry.json
+      eventHandlers:
+        - event: ZentisRefUpdated(indexed bytes32,uint128,int16,uint40,uint32)
+          handler: handleRefUpdated
+        - event: ZentisRefRejected(indexed bytes32,string)
+          handler: handleRefRejected

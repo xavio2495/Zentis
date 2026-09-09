@@ -1,0 +1,119 @@
+"""
+One leg of a Zentis position on one chain.
+
+The entity is keyed by positionId, the cross-chain identity, so the same key addresses both
+legs. Each chain has its own deployment of this subgraph, and a client joins the two legs by
+asking both endpoints for the same id. strategyHash is Aqua's per-chain identity and is a
+field here, never the key: re-shipping a leg changes it while the position stays the same.
+"""
+type Position @entity(immutable: false) {
+  id: Bytes! # positionId
+  chainId: Int!
+  strategyHash: Bytes!
+  maker: Bytes!
+  app: Bytes! # the Zentis router this leg is shipped to
+  tokenA: Bytes! # the lower-addressed token; imbalance is signed against it
+  tokenB: Bytes!
+  active: Boolean!
+
+  """The registry this leg's program reads, taken from the program itself, not from config."""
+  refRegistry: Bytes!
+  """Bounds the maker signed into the program, at the Zentis scale of 10000 = 100%."""
+  maxTiltBps: Int!
+  maxStalenessSeconds: Int!
+  widenBpsPerMinute: Int!
+  maxWidenBps: Int!
+
+  balanceA: BigInt!
+  balanceB: BigInt!
+
+  """The most recent accepted reference, denormalized so a quote needs one read."""
+  refMid: BigInt
+  refTiltBps: Int
+  refSeq: Int
+  refUpdatedAt: BigInt
+
+  fills: [Fill!]! @derivedFrom(field: "position")
+  references: [Reference!]! @derivedFrom(field: "position")
+  rejections: [RejectedReference!]! @derivedFrom(field: "position")
+
+  fillCount: Int!
+  volumeInA: BigInt!
+  volumeInB: BigInt!
+
+  shippedAtBlock: BigInt!
+  shippedAtTimestamp: BigInt!
+  dockedAtBlock: BigInt
+}
+
+"""
+One taker fill against a leg, with the reference that priced it captured alongside.
+
+The snapshot is what makes markout computable later: without it, a fill can only be compared
+against a reference read at query time, which is not the one the curve actually used.
+"""
+type Fill @entity(immutable: true) {
+  id: Bytes! # tx hash ++ log index
+  position: Position!
+  chainId: Int!
+  orderHash: Bytes! # equals the leg's strategyHash
+  taker: Bytes!
+  tokenIn: Bytes!
+  tokenOut: Bytes!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  """True when the taker sold tokenA, so the maker's tokenA inventory grew."""
+  isAToB: Boolean!
+
+  refMid: BigInt
+  refTiltBps: Int
+  refSeq: Int
+  refUpdatedAt: BigInt
+  """Seconds between the block the reference described and the block the fill landed in."""
+  refAgeSeconds: BigInt
+
+  transaction: Bytes!
+  logIndex: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+"""An accepted reference write. seq is monotonic per position, so this is the audit trail."""
+type Reference @entity(immutable: true) {
+  id: Bytes! # positionId ++ seq
+  position: Position!
+  chainId: Int!
+  mid: BigInt!
+  tiltBps: Int!
+  seq: Int!
+  """Timestamp of the block the workflow queried, not of the write."""
+  updatedAt: BigInt!
+  transaction: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+"""
+A reference the registry refused. These are emitted rather than reverted, so that a retrying
+publisher does not roll back the very log that explains why it is being refused.
+"""
+type RejectedReference @entity(immutable: true) {
+  id: Bytes! # tx hash ++ log index
+  position: Position!
+  chainId: Int!
+  reason: String!
+  transaction: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+"""
+Maps Aqua's per-chain strategyHash to the cross-chain positionId.
+
+The router's swap event names the order by its hash, which is the strategyHash; the program
+inside it names the position. This is the join, and it is rebuilt on every re-ship.
+"""
+type StrategyLink @entity(immutable: false) {
+  id: Bytes! # strategyHash
+  position: Position!
+}

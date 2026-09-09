@@ -1,0 +1,23 @@
+[
+  {
+    "type": "event",
+    "name": "ZentisRefUpdated",
+    "anonymous": false,
+    "inputs": [
+      { "name": "positionId", "type": "bytes32", "indexed": true },
+      { "name": "mid", "type": "uint128", "indexed": false },
+      { "name": "tiltBps", "type": "int16", "indexed": false },
+      { "name": "updatedAt", "type": "uint40", "indexed": false },
+      { "name": "seq", "type": "uint32", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "ZentisRefRejected",
+    "anonymous": false,
+    "inputs": [
+      { "name": "positionId", "type": "bytes32", "indexed": true },
+      { "name": "reason", "type": "string", "indexed": false }
+    ]
+  }
+]
