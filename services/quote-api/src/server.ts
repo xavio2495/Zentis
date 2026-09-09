@@ -2,6 +2,7 @@ import { CHAINS, PORT, REFERENCE_WARN_AGE_SECONDS } from "./config.js";
 import { fetchLeg, type LegResult } from "./legs.js";
 import { QuoteRefused, quoteLeg } from "./quote.js";
 import { explain } from "./reason.js";
+import { crowdingBps, fetchVenue } from "./crowding.js";
 
 interface LegQuote {
   chainId: number;
@@ -141,6 +142,60 @@ async function handleQuote(url: URL): Promise<Response> {
   });
 }
 
+async function handleCrowding(url: URL): Promise<Response> {
+  const first = Number(url.searchParams.get("first") ?? "20");
+  const midRaw = url.searchParams.get("mid");
+  const tokenA = url.searchParams.get("tokenA");
+  const tokenB = url.searchParams.get("tokenB");
+
+  // A mid prices exactly one pair. Applying it across the venue would produce confident nonsense
+  // for every pair it does not describe, so crowding is only computed for a named pair.
+  if (midRaw !== null && (tokenA === null || tokenB === null)) {
+    return json({ error: "mid requires tokenA and tokenB, because a mid prices one pair" }, 400);
+  }
+
+  const venue = await fetchVenue(Number.isFinite(first) && first > 0 ? Math.min(first, 100) : 20);
+  if (venue.error !== null) return json({ error: venue.error }, 502);
+
+  const wanted =
+    tokenA === null || tokenB === null
+      ? null
+      : [tokenA.toLowerCase(), tokenB.toLowerCase()].sort().join("");
+
+  const selected = venue.pairs.filter(
+    (pair) =>
+      wanted === null ||
+      [pair.tokenA.toLowerCase(), pair.tokenB.toLowerCase()].sort().join("").replace(/0x/g, "") ===
+        wanted.replace(/0x/g, "")
+  );
+
+  let mid: bigint | null = null;
+  if (midRaw !== null) {
+    try {
+      mid = BigInt(midRaw);
+    } catch {
+      return json({ error: "mid must be an integer, raw tokenB per 1e18 raw tokenA" }, 400);
+    }
+  }
+
+  const pairs = selected.map((pair) => ({
+    ...pair,
+    crowdingBps:
+      mid === null
+        ? null
+        : crowdingBps(BigInt(pair.totalCommittedA), BigInt(pair.totalCommittedB), mid)?.toString() ??
+          null
+  }));
+
+  const caveats =
+    mid === null
+      ? ["no mid supplied, so only raw committed totals are returned"]
+      : ["crowding is computed against the supplied mid, not one this service chose"];
+  if (wanted !== null && pairs.length === 0) caveats.push("no maker on the venue holds this pair");
+
+  return json({ pairs, caveats, _meta: venue.meta });
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
@@ -153,6 +208,7 @@ const server = Bun.serve({
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/quote") return handleQuote(url);
+    if (url.pathname === "/crowding") return handleCrowding(url);
     if (url.pathname === "/health") return json({ ok: true, chains: CHAINS.map((c) => c.name) });
     return json({ error: "not found" }, 404);
   }

@@ -74,3 +74,36 @@ describe("the reason follows the instruction's own sign convention", () => {
     );
   });
 });
+
+import { crowdingBps } from "../src/crowding.js";
+
+describe("venue crowding", () => {
+  const ONE = 10n ** 18n;
+
+  test("a venue holding only tokenA is fully long it", () => {
+    expect(crowdingBps(1000n, 0n, ONE)).toBe(10000n);
+  });
+
+  test("a venue holding only tokenB is fully short it", () => {
+    expect(crowdingBps(0n, 1000n, ONE)).toBe(-10000n);
+  });
+
+  test("equal value on both sides is flat", () => {
+    expect(crowdingBps(1000n, 1000n, ONE)).toBe(0n);
+  });
+
+  // An empty pair is not a balanced one, and reporting zero would say it was.
+  test("an empty pair reports nothing rather than zero", () => {
+    expect(crowdingBps(0n, 0n, ONE)).toBe(null);
+  });
+
+  test("the mid, not the raw amounts, decides the balance point", () => {
+    // 1 tokenA is worth 2 tokenB at this mid, so 1 against 2 is flat.
+    expect(crowdingBps(1n, 2n, 2n * ONE)).toBe(0n);
+  });
+
+  // The live Arbitrum One WETH/USDC pair at the time this was written.
+  test("reproduces the measured venue lean", () => {
+    expect(crowdingBps(39393943685136285n, 85626655n, 2_500_000_000n)).toBe(698n);
+  });
+});
