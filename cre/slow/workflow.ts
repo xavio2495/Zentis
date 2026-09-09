@@ -22,7 +22,9 @@ import {
 import { z } from 'zod'
 
 import {
+	allocateBandEdge,
 	BPS,
+	crowdingBpsOf,
 	markoutBps,
 	toBase64,
 	type MarkoutFill,
@@ -39,6 +41,25 @@ const legSchema = z.object({
 	 * the flow the other sees — so each leg is scored against its own indexed history.
 	 */
 	fillsSubgraphUrl: z.string(),
+	/**
+	 * The standardized Aqua subgraph for the mainnet this leg corresponds to, and the pair to read
+	 * from it. Empty means no positioning data for this leg, which allocates it the full budget —
+	 * absence of evidence about crowding is not evidence of it.
+	 *
+	 * The position runs on testnets and the crowding is a mainnet fact, for the same reason the
+	 * impulse boundary is priced from a mainnet quote: what it costs to compete for corrective flow
+	 * in this pair is a real-market quantity, and a testnet venue has no maker base to measure.
+	 */
+	crowdingSubgraphUrl: z.string().default(''),
+	/**
+	 * The two mainnet tokens of the venue pair, with `crowdingTokenA` naming the one that plays the
+	 * role of THIS leg's tokenA. The standardized schema keys a pair in address order, and address
+	 * order on the mainnet need not match address order on the testnet the leg runs on — so without
+	 * this the crowding sign would be measured against the opposite token from our own lean, and the
+	 * contested test would be inverted rather than merely noisy.
+	 */
+	crowdingTokenA: z.string().default(''),
+	crowdingTokenB: z.string().default(''),
 })
 
 /**
@@ -81,8 +102,11 @@ export const configSchema = z.object({
 	markoutCapBps: z.number(),
 	/** How many recent fills and references to score over. */
 	markoutWindow: z.number(),
-	legA: legSchema,
-	legB: legSchema,
+	/** The secret holding how hard the maker responds to a crowded venue. */
+	congestionSecretId: z.string(),
+	/** Floor under an allocated budget. Never zero: zero reads as "nothing published" on-chain. */
+	minAllocatedEdgeBps: z.number(),
+	legs: z.array(legSchema).min(2),
 })
 
 export type Config = z.infer<typeof configSchema>
@@ -199,6 +223,78 @@ type MarkoutResponse = {
 	errors?: { message: string }[]
 }
 
+const CROWDING_QUERY = `query Crowding($id: ID!) {
+  venuePair(id: $id) {
+    tokenA
+    totalCommittedA
+    totalCommittedB
+    activePositions
+    distinctMakers
+    distinctApps
+  }
+}`
+
+type CrowdingResponse = {
+	data?: {
+		venuePair: {
+			tokenA: string
+			totalCommittedA: string
+			totalCommittedB: string
+			activePositions: number
+			distinctMakers: number
+			distinctApps: number
+		} | null
+	}
+	errors?: { message: string }[]
+}
+
+/**
+ * How the whole venue is positioned in this leg's pair, in basis points, from the standardized
+ * Aqua schema.
+ *
+ * A leg with no configured source, or a pair no maker holds, reads as zero — which the allocation
+ * treats as no evidence and leaves at full budget. Failing loudly here would take the whole
+ * reference publish down over a signal that is an optimisation, not a correctness requirement.
+ */
+const readCrowding = (
+	runtime: TeeRuntime<Config>,
+	leg: z.infer<typeof legSchema>,
+	mid: bigint,
+): bigint => {
+	if (leg.crowdingSubgraphUrl === '' || leg.crowdingTokenA === '' || leg.crowdingTokenB === '') {
+		return 0n
+	}
+	// The pair id is the two token addresses concatenated in address order, which is how the
+	// standardized schema keys a venue pair.
+	const a = leg.crowdingTokenA.toLowerCase().replace('0x', '')
+	const b = leg.crowdingTokenB.toLowerCase().replace('0x', '')
+	const id = a < b ? `0x${a}${b}` : `0x${b}${a}`
+
+	const body = JSON.stringify({ query: CROWDING_QUERY, variables: { id } })
+	const response = new cre.capabilities.HTTPClient()
+		.sendRequest(runtime, {
+			url: leg.crowdingSubgraphUrl,
+			method: 'POST',
+			multiHeaders: { 'Content-Type': { values: ['application/json'] } },
+			body: toBase64(new TextEncoder().encode(body)),
+		})
+		.result()
+
+	if (!ok(response)) return 0n
+	const payload = JSON.parse(text(response)) as CrowdingResponse
+	if (payload.errors && payload.errors.length > 0) return 0n
+	const pair = payload.data?.venuePair
+	if (!pair) return 0n
+
+	// Re-orient the venue's totals so that "A" means this leg's tokenA, which is what `mid` is
+	// denominated against and what our own lean is signed against.
+	const matches = pair.tokenA.toLowerCase() === leg.crowdingTokenA.toLowerCase()
+	const totalA = BigInt(matches ? pair.totalCommittedA : pair.totalCommittedB)
+	const totalB = BigInt(matches ? pair.totalCommittedB : pair.totalCommittedA)
+
+	return crowdingBpsOf(totalA, totalB, mid)
+}
+
 /**
  * What this leg's recent flow has cost the maker, in basis points of half-spread.
  *
@@ -210,11 +306,17 @@ type MarkoutResponse = {
  * A leg with no matured fills scores zero, which is the right default: absence of evidence about
  * adverse selection is not evidence of it.
  */
+export type LegSignals = {
+	markoutBps: bigint
+	/** Newest indexed mid for this leg, reused to value the venue's inventory. */
+	mid: bigint
+}
+
 const readMarkout = (
 	runtime: TeeRuntime<Config>,
 	leg: z.infer<typeof legSchema>,
 	positionId: Hex,
-): bigint => {
+): LegSignals => {
 	const config = runtime.config
 	const body = JSON.stringify({
 		query: MARKOUT_QUERY,
@@ -240,7 +342,7 @@ const readMarkout = (
 	}
 
 	const position = payload.data?.position
-	if (!position) return 0n
+	if (!position) return { markoutBps: 0n, mid: 0n }
 
 	const fills: MarkoutFill[] = position.fills.map((f) => ({
 		timestamp: BigInt(f.timestamp),
@@ -253,12 +355,18 @@ const readMarkout = (
 		mid: BigInt(r.mid),
 	}))
 
-	return markoutBps(
-		fills,
-		references,
-		BigInt(config.markoutHorizonSeconds),
-		BigInt(config.markoutCapBps),
-	).publishedBps
+	// `references` comes back newest-first, so the head is the current mid.
+	const newest = references.length > 0 ? (references[0] as MarkoutReference).mid : 0n
+
+	return {
+		markoutBps: markoutBps(
+			fills,
+			references,
+			BigInt(config.markoutHorizonSeconds),
+			BigInt(config.markoutCapBps),
+		).publishedBps,
+		mid: newest,
+	}
 }
 
 const readRef = (don: Runtime<Config>, leg: z.infer<typeof legSchema>, positionId: Hex): StoredRef => {
@@ -329,31 +437,56 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 		BigInt(config.maxBandEdgeBps),
 	)
 
-	// Measured before dropping to the DON runtime, so the model and the raw fill history stay inside
-	// the enclave and only the reduced number crosses out.
-	const markout = [config.legA, config.legB].map((leg) => readMarkout(runtime, leg, positionId))
+	// Everything that touches the maker's model happens here, inside the enclave, and only the
+	// reduced numbers cross out: the markout horizon and weighting, and how hard to respond to a
+	// crowded venue. The crowding itself is public Aqua data and is not treated as secret.
+	const congestionBps = BigInt(runtime.getSecret({ id: config.congestionSecretId }).result().value)
+
+	const signals = config.legs.map((leg) => readMarkout(runtime, leg, positionId))
+	const crowding = config.legs.map((leg, i) => {
+		const mid = (signals[i] as LegSignals).mid
+		return mid === 0n ? 0n : readCrowding(runtime, leg, mid)
+	})
 
 	const don = runtime.usingTheDons()
 
-	const written = [config.legA, config.legB].map((leg, index) => {
-		const current = readRef(don, leg, positionId)
+	const current = config.legs.map((leg) => readRef(don, leg, positionId))
+
+	// Our own lean on each leg is the sign of the tilt already published there. A leg we lean the
+	// same way as the rest of the venue is contested, and gets a smaller share of the budget.
+	const ownLeans = current.map((ref) => BigInt(ref.tiltBps))
+	const edges = allocateBandEdge(
+		edge,
+		ownLeans,
+		crowding,
+		congestionBps,
+		BigInt(config.minAllocatedEdgeBps),
+		BigInt(config.maxBandEdgeBps),
+	)
+
+	const written = config.legs.map((leg, index) => {
+		const ref = current[index] as StoredRef
 		const payload = encodeAbiParameters(REPORT_ABI, [
 			positionId,
 			{
-				...current,
-				bandEdgeBps: Number(edge),
-				markoutBps: Number(markout[index] ?? 0n),
-				seq: current.seq + 1,
+				...ref,
+				bandEdgeBps: Number(edges[index] as bigint),
+				markoutBps: Number((signals[index] as LegSignals).markoutBps),
+				seq: ref.seq + 1,
 			},
 		])
 		const report = don.report(prepareReportRequest(payload)).result()
 		new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 			.writeReport(don, { receiver: leg.registry, report })
 			.result()
-		return `${leg.registry}: seq ${current.seq} -> ${current.seq + 1}, markoutBps ${markout[index] ?? 0n}`
+		return (
+			`${leg.registry}: seq ${ref.seq} -> ${ref.seq + 1}, ` +
+			`bandEdgeBps ${edges[index]}, markoutBps ${(signals[index] as LegSignals).markoutBps}, ` +
+			`crowdingBps ${crowding[index]}`
+		)
 	})
 
-	return `bandEdgeBps ${edge} | ${written.join(' | ')}`
+	return `baseEdgeBps ${edge} | ${written.join(' | ')}`
 }
 
 export function initWorkflow(config: Config) {

@@ -280,3 +280,22 @@ export const allocateBandEdge = (
 		return edge < minEdgeBps ? minEdgeBps : edge > maxEdgeBps ? maxEdgeBps : edge
 	})
 }
+
+/**
+ * Signed venue lean for one pair, positive when the venue is over-weight tokenA.
+ *
+ *   crowding = (totalA * mid / 1e18 - totalB) / (totalA * mid / 1e18 + totalB)
+ *
+ * `mid` is raw tokenB per 1e18 raw tokenA, the same scale the references carry, so no decimals
+ * handling appears here any more than it does on-chain.
+ *
+ * An empty pair returns zero rather than throwing: nothing committed is no evidence about
+ * contention, and the allocation treats no evidence as "leave this leg at full budget".
+ */
+export const crowdingBpsOf = (totalA: bigint, totalB: bigint, mid: bigint): bigint => {
+	if (mid <= 0n) throw new Error('mid must be positive')
+	const aInB = (totalA * mid) / ONE
+	const denominator = aInB + totalB
+	if (denominator === 0n) return 0n
+	return ((aInB - totalB) * BPS) / denominator
+}

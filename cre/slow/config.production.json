@@ -15,17 +15,37 @@
     "amount": "10000000",
     "walletAddress": "0x4887B4695dEe830A341304bFEb14538E2442DD55"
   },
-  "legA": {
-    "chainSelector": "10344971235874465080",
-    "registry": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910",
-    "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.2.0"
-  },
-  "legB": {
-    "chainSelector": "3478487238524512106",
-    "registry": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
-    "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.2.0"
-  },
   "markoutHorizonSeconds": 300,
   "markoutCapBps": 200,
-  "markoutWindow": 50
+  "markoutWindow": 50,
+  "congestionSecretId": "CONGESTION_BPS",
+  "minAllocatedEdgeBps": 1,
+  "legs": [
+    {
+      "chainSelector": "10344971235874465080",
+      "registry": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910",
+      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.2.0",
+      "crowdingSubgraphUrl": "",
+      "crowdingTokenA": "",
+      "crowdingTokenB": "",
+      "_note": "Base mainnet Aqua has no shipping activity (zero Shipped events in two days), so this leg has no positioning source and is allocated the full budget."
+    },
+    {
+      "chainSelector": "3478487238524512106",
+      "registry": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
+      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.2.0",
+      "crowdingSubgraphUrl": "https://api.studio.thegraph.com/query/1758742/aqua-standard/v0.2.0",
+      "crowdingTokenA": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "crowdingTokenB": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1"
+    },
+    {
+      "chainSelector": "16015286601757825753",
+      "registry": "0xA5dCB9B329b17253FF35202dEb7a2093d06fd7b0",
+      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1",
+      "crowdingSubgraphUrl": "",
+      "crowdingTokenA": "",
+      "crowdingTokenB": "",
+      "_note": "Ethereum mainnet carries the most Aqua activity of any chain (262 Shipped in two days). Its aqua-standard deployment is pending a Studio slug; until then this leg has no positioning source."
+    }
+  ]
 }
