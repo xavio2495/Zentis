@@ -26,16 +26,23 @@ CHAINS = {
     "base-sepolia": {
         "rpc_url": "https://sepolia.base.org",
         "subgraph": "zentis-reference-pool-base-sepolia",
+        "studio": "1758742",
     },
     "arbitrum-sepolia": {
         "rpc_url": "https://sepolia-rollup.arbitrum.io/rpc",
         "subgraph": "zentis-reference-pool-arbitrum-sepolia",
+        "studio": "1758742",
+    },
+    "sepolia": {
+        "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
+        "subgraph": "zentis-reference-pool-sepolia",
+        "studio": "1760020",
     },
 }
 
 
 def fetch_chain(name: str, cfg: dict, now: int) -> dict:
-    url = endpoint(cfg["subgraph"])
+    url = endpoint(cfg["subgraph"], cfg.get("studio", "1758742"))
     head = indexer_head(url)
     head_block = int(head["number"])
 

@@ -8,12 +8,14 @@ import json
 import os
 import urllib.request
 
+# Studio allows three subgraphs per account, so the deployments are split across three of them.
+# The account id is part of the query URL, which means it is per-subgraph, not global.
 STUDIO_ID = "1758742"
 VERSION = "v0.0.1"
 
 
-def endpoint(subgraph_name: str) -> str:
-    return f"https://api.studio.thegraph.com/query/{STUDIO_ID}/{subgraph_name}/{VERSION}"
+def endpoint(subgraph_name: str, studio_id: str = STUDIO_ID) -> str:
+    return f"https://api.studio.thegraph.com/query/{studio_id}/{subgraph_name}/{VERSION}"
 
 
 def query(url: str, document: str, variables: dict | None = None) -> dict:

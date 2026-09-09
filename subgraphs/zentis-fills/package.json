@@ -8,7 +8,9 @@
     "build:arbitrum-sepolia": "graph build subgraph.arbitrum-sepolia.yaml",
     "test": "graph test -d",
     "deploy:base-sepolia": "graph deploy zentis-fills-base-sepolia subgraph.base-sepolia.yaml --version-label v0.1.0",
-    "deploy:arbitrum-sepolia": "graph deploy zentis-fills-arbitrum-sepolia subgraph.arbitrum-sepolia.yaml --version-label v0.1.0"
+    "deploy:arbitrum-sepolia": "graph deploy zentis-fills-arbitrum-sepolia subgraph.arbitrum-sepolia.yaml --version-label v0.1.0",
+    "build:sepolia": "graph build subgraph.sepolia.yaml",
+    "deploy:sepolia": "graph deploy zentis-fills-sepolia subgraph.sepolia.yaml --version-label v0.1.2"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "^0.98.1",
