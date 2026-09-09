@@ -228,3 +228,55 @@ export const toBase64 = (bytes: Uint8Array): string => {
 	}
 	return out
 }
+
+/**
+ * Crowding-weighted allocation of the rebalancing budget across legs.
+ *
+ * The budget is `bandEdgeBps`, which on-chain can only ever tighten the cap the maker signed. So
+ * allocating it means deciding, per leg, how much concession the maker is willing to bid — a
+ * different question from how far out of balance the leg is, which is the tilt's job.
+ *
+ * A leg is throttled exactly when our own lean and the venue's lean point the same way: there we
+ * are bidding for the same corrective takers as everyone else and would have to out-concede them.
+ * A leg the venue leans *against* keeps its full budget, because there we are the natural
+ * counterparty and the flow arrives without paying up.
+ *
+ * `strength` is the maker's own aggression and never leaves the enclave. `crowding` is computed
+ * from public Aqua events and is deliberately not secret. Mirrors `reference_model.allocation`.
+ */
+
+const sign = (v: bigint): bigint => (v === 0n ? 0n : v > 0n ? 1n : -1n)
+
+/** How much of the venue's lean works against us on this leg. Zero unless the signs agree. */
+export const contestedBps = (ownLean: bigint, crowdingBps: bigint): bigint => {
+	const a = sign(ownLean)
+	const b = sign(crowdingBps)
+	if (a === 0n || b === 0n || a !== b) return 0n
+	return crowdingBps < 0n ? -crowdingBps : crowdingBps
+}
+
+export const allocateBandEdge = (
+	baseEdgeBps: bigint,
+	ownLeans: bigint[],
+	crowdingBps: bigint[],
+	strengthBps: bigint,
+	minEdgeBps: bigint,
+	maxEdgeBps: bigint,
+): bigint[] => {
+	if (ownLeans.length !== crowdingBps.length)
+		throw new Error('every leg needs both its own lean and its venue\'s')
+	if (baseEdgeBps < 0n || strengthBps < 0n)
+		throw new Error('neither the budget nor the aggression may be negative')
+	// Zero means "nothing has been published" to the instruction, so an allocation must never
+	// produce it: a throttled leg would silently become an unbounded one.
+	if (minEdgeBps < 1n) throw new Error('the floor must be at least 1, because 0 reads as unpublished')
+	if (minEdgeBps > maxEdgeBps) throw new Error('the floor cannot exceed the ceiling')
+
+	return ownLeans.map((lean, i) => {
+		const contested = contestedBps(lean, crowdingBps[i] as bigint)
+		let weight = BPS - (strengthBps * contested) / BPS
+		if (weight < 0n) weight = 0n
+		const edge = (baseEdgeBps * weight) / BPS
+		return edge < minEdgeBps ? minEdgeBps : edge > maxEdgeBps ? maxEdgeBps : edge
+	})
+}

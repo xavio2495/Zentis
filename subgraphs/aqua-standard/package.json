@@ -6,7 +6,9 @@
     "codegen": "graph codegen subgraph.arbitrum-one.yaml",
     "build": "graph build subgraph.arbitrum-one.yaml",
     "test": "graph test -d",
-    "deploy": "graph deploy aqua-standard subgraph.arbitrum-one.yaml --node https://api.studio.thegraph.com/deploy/ --ipfs https://api.studio.thegraph.com/ipfs/"
+    "deploy": "graph deploy aqua-standard subgraph.arbitrum-one.yaml --node https://api.studio.thegraph.com/deploy/ --ipfs https://api.studio.thegraph.com/ipfs/",
+    "build:mainnet": "graph build subgraph.mainnet.yaml",
+    "deploy:mainnet": "graph deploy aqua-standard-ethereum subgraph.mainnet.yaml --version-label v0.2.0"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "^0.98.1",
