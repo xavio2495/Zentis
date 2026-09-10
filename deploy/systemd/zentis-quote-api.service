@@ -1,0 +1,12 @@
+[Unit]
+Description=Zentis quote API (the taker-facing quote surface, read by the console and the recorder)
+
+[Service]
+Environment=PATH=%h/.nvm/versions/node/v24.18.0/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=%h/projects/Zentis/services/quote-api
+ExecStart=%h/.nvm/versions/node/v24.18.0/bin/bun run src/server.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

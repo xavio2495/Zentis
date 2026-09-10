@@ -7,6 +7,6 @@ here=$(cd "$(dirname "$0")" && pwd)
 mkdir -p ~/.config/systemd/user
 cp "$here"/zentis-*.service "$here"/zentis-*.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now zentis-fast.timer zentis-slow.timer
+systemctl --user enable --now zentis-fast.timer zentis-slow.timer zentis-quote-api.service
 loginctl enable-linger "$USER" || true
 systemctl --user list-timers | grep zentis
