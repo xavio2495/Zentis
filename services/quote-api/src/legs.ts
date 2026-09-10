@@ -74,7 +74,49 @@ export interface LegResult {
   readonly error: string | null;
 }
 
+/**
+ * Every /quote costs one Studio query per leg, and Studio's allowance (~3,000 per three hours at
+ * the time of writing) is shared with the workflows and the console. A leg's indexed state does
+ * not change between two quotes a few seconds apart, so a read is reused for a short window, and
+ * when Studio refuses, the last good read is served with a note rather than a blank leg. The
+ * window is deliberately short: this is the surface a taker acts on, and a stale balance is a
+ * mispriced quote, so ZENTIS_LEG_CACHE_SECONDS trades allowance for freshness and nothing else.
+ */
+const CACHE_SECONDS = Number(process.env["ZENTIS_LEG_CACHE_SECONDS"] ?? "60");
+interface Cached { readonly result: LegResult; readonly at: number }
+const fresh = new Map<string, Cached>();
+const lastGood = new Map<string, Cached>();
+const keyOf = (chain: ChainConfig, positionId: string) => `${chain.chainId}:${positionId.toLowerCase()}`;
+
+/** Forget cached reads; with `keepLastGood` only the freshness window is cleared. */
+export function clearLegCache(options: { keepLastGood?: boolean } = {}): void {
+  fresh.clear();
+  if (!options.keepLastGood) lastGood.clear();
+}
+
 export async function fetchLeg(
+  chain: ChainConfig,
+  positionId: string,
+  signal?: AbortSignal
+): Promise<LegResult> {
+  const key = keyOf(chain, positionId);
+  const now = Date.now();
+  const hit = fresh.get(key);
+  if (hit !== undefined && now - hit.at < CACHE_SECONDS * 1000) return hit.result;
+
+  const result = await fetchLegUncached(chain, positionId, signal);
+  if (result.error === null) {
+    fresh.set(key, { result, at: now });
+    lastGood.set(key, { result, at: now });
+    return result;
+  }
+  const good = lastGood.get(key);
+  if (good === undefined) return result;
+  const age = Math.round((now - good.at) / 1000);
+  return { ...good.result, error: `${result.error}; showing what was read ${age}s ago` };
+}
+
+async function fetchLegUncached(
   chain: ChainConfig,
   positionId: string,
   signal?: AbortSignal
