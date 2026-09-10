@@ -1,0 +1,24 @@
+{
+  "name": "@zentis/console-data",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "record": "bun run scripts/record.ts"
+  },
+  "dependencies": {
+    "@zentis/strategy-sdk": "file:../strategy-sdk",
+    "viem": "2.34.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/bun": "latest"
+  }
+}
