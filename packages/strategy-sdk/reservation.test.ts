@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import vectors from './reservation_vectors.json'
-import { legWeight, reservation } from './policy'
+import { legWeight, reservation } from './src/index'
 
 /**
  * The policy in the workflow has to agree with the Python reference model exactly, because the

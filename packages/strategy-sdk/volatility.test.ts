@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import vectors from './volatility_vectors.json'
-import { isqrt, sigmaOverHorizonBps, volatilitySpreadBps, type PriceSample } from './policy'
+import { isqrt, sigmaOverHorizonBps, volatilitySpreadBps, type PriceSample } from './src/index'
 
 /**
  * The workflow's volatility has to agree with the Python reference model exactly, because the model

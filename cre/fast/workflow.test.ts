@@ -4,7 +4,7 @@ import { protoBigIntToBigint, type TeeRuntime } from '@chainlink/cre-sdk'
 import { encodeAbiParameters, parseAbiParameters } from 'viem'
 
 import { onCronTrigger, restrictions, type Config } from './workflow'
-import { anchorTiltBps, antiSymmetric, legWeight, midFromSqrtPriceX96 } from './policy'
+import { anchorTiltBps, antiSymmetric, legWeight, midFromSqrtPriceX96 } from '@zentis/strategy-sdk'
 
 const KAPPA = '10000'
 const KAPPA_BOOK = '5000'

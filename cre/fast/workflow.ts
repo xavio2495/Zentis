@@ -14,7 +14,7 @@ import {
 import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, parseAbiParameters, type Address, type Hex } from 'viem'
 import { z } from 'zod'
 
-import { legWeight, midFromSqrtPriceX96, reservation, type LegWeight } from './policy'
+import { legWeight, midFromSqrtPriceX96, reservation, type LegWeight } from '@zentis/strategy-sdk'
 
 // ─── Config ─────────────────────────────────────────────────
 const legSchema = z.object({

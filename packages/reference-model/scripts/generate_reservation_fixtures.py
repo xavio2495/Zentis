@@ -19,7 +19,7 @@ RANDOM_CASE_COUNT = 32
 MAX_TILT_BPS = 500
 MID = 275_818_853_000_085_890_554_200_491  # the live Base Sepolia reference mid
 
-OUT = Path(__file__).resolve().parents[3] / "cre" / "fast" / "reservation_vectors.json"
+OUT = Path(__file__).resolve().parents[3] / "packages" / "strategy-sdk" / "reservation_vectors.json"
 
 
 def _named() -> list[dict]:

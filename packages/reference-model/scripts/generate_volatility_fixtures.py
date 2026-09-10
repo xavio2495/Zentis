@@ -23,7 +23,7 @@ MULTIPLIER_BPS = 10_000
 CAP_BPS = 200
 MID = 275_818_853_000_085_890_554_200_491
 
-OUT = Path(__file__).resolve().parents[3] / "cre" / "slow" / "volatility_vectors.json"
+OUT = Path(__file__).resolve().parents[3] / "packages" / "strategy-sdk" / "volatility_vectors.json"
 
 
 def _steps(steps_bps, dt=60):
