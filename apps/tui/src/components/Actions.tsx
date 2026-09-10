@@ -1,14 +1,8 @@
 import { Box, Text } from "ink";
 import type { Snapshot } from "@zentis/console-data";
+import type { Action } from "../actions.js";
 import { Divider } from "./Divider.js";
 import { UI } from "../theme.js";
-
-export interface Action {
-  readonly key: string;
-  readonly label: string;
-  /** null when the action can run; otherwise why it cannot, said plainly */
-  readonly disabledReason: string | null;
-}
 
 const SHORT: Record<number, string> = { 11155111: "sep", 421614: "arb", 84532: "base" };
 
@@ -43,11 +37,13 @@ export function Actions({
   snapshot,
   actions,
   running,
+  pending,
   lastResult,
 }: {
   snapshot: Snapshot;
   actions: Action[];
   running: string | null;
+  pending: Action | null;
   lastResult: string | null;
 }) {
   const watchOnly = actions.every((a) => a.disabledReason !== null || a.key === "q");
@@ -67,13 +63,18 @@ export function Actions({
       </Box>
       <Finality snapshot={snapshot} />
       <Box>
-        {running !== null && <Text color={UI.caveat}>running: {running}</Text>}
-        {running === null && lastResult !== null && (
+        {pending !== null && (
+          <Text color={UI.caveat}>
+            {pending.describe} — press y to broadcast, any other key to cancel
+          </Text>
+        )}
+        {pending === null && running !== null && <Text color={UI.caveat}>running: {running}</Text>}
+        {pending === null && running === null && lastResult !== null && (
           <Text color={UI.muted} wrap="truncate-end">
             {lastResult}
           </Text>
         )}
-        {running === null && lastResult === null && watchOnly && (
+        {pending === null && running === null && lastResult === null && watchOnly && (
           <Text color={UI.muted}>
             watch-only: no ZENTIS_ENV was given, so nothing here can sign. Re-quote still works.
           </Text>

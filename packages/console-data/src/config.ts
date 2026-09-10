@@ -24,6 +24,8 @@ export interface LegConfig {
   readonly app: `0x${string}`;
   readonly aqua: `0x${string}`;
   readonly strategyHash: `0x${string}`;
+  /** the maker's signed expiry, which the fill and quote scripts both need */
+  readonly deadline: number;
   readonly tokenA: TokenConfig;
   readonly tokenB: TokenConfig;
   readonly referencePool: `0x${string}`;
@@ -116,6 +118,7 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     app: fast.app as `0x${string}`,
     aqua: fast.aqua as `0x${string}`,
     strategyHash: fast.strategyHash as `0x${string}`,
+    deadline: deployment.position.deadline,
     tokenA: deployment.tokens.tokenA as TokenConfig,
     tokenB: deployment.tokens.tokenB as TokenConfig,
     referencePool: slow.referencePool as `0x${string}`,

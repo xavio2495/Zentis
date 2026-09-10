@@ -1,7 +1,9 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createStore } from "@zentis/console-data";
-import { type Action, Actions } from "./components/Actions.js";
+import { Actions } from "./components/Actions.js";
+import { buildActions } from "./actions.js";
+import { run, summarise } from "./runner.js";
 import { BookStrip } from "./components/BookStrip.js";
 import { Feed } from "./components/Feed.js";
 import { LegColumn } from "./components/LegColumn.js";
@@ -33,17 +35,51 @@ export function App({ envFile }: { envFile: string | null }) {
     };
   }, [store]);
 
-  const unsigned = envFile === null ? "no ZENTIS_ENV file was given, so this cannot sign" : null;
-  const actions: Action[] = [
-    { key: "r", label: "republish fast", disabledReason: unsigned },
-    { key: "s", label: "republish slow", disabledReason: unsigned },
-    { key: "f", label: "fill sepolia", disabledReason: unsigned },
-    { key: "q", label: "re-quote", disabledReason: null },
-  ];
+  const actions = useMemo(() => buildActions(envFile), [envFile]);
+  const [running, setRunning] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
 
   useInput((input) => {
-    if (input === "x") exit();
-    if (input === "q") void store.refresh();
+    if (input === "x") {
+      exit();
+      return;
+    }
+    if (running !== null) return;
+
+    // An action that has been offered for confirmation consumes the next keystroke, so that the
+    // key which broadcasts is never the same key that was pressed to ask about broadcasting.
+    if (pending !== null) {
+      const action = actions.find((a) => a.key === pending);
+      setPending(null);
+      if (input !== "y" || action?.command == null) {
+        setLastResult(`${action?.label ?? "action"} cancelled`);
+        return;
+      }
+      setRunning(action.label);
+      void run(action.command)
+        .then((result) => setLastResult(summarise(action, result)))
+        .catch((cause: unknown) => setLastResult(`${action.label} could not start: ${String(cause)}`))
+        .finally(() => {
+          setRunning(null);
+          void store.refresh();
+        });
+      return;
+    }
+
+    const action = actions.find((a) => a.key === input);
+    if (action === undefined) return;
+    if (action.disabledReason !== null) {
+      setLastResult(action.disabledReason);
+      return;
+    }
+    // Re-quote reads and is therefore immediate. Everything else signs and broadcasts, and a
+    // console that did that on one keystroke would broadcast every time a key was brushed.
+    if (action.command === null) {
+      void store.refresh();
+      return;
+    }
+    setPending(action.key);
   });
 
   const snapshot = state.snapshot;
@@ -71,8 +107,9 @@ export function App({ envFile }: { envFile: string | null }) {
       <Actions
         snapshot={snapshot}
         actions={actions}
-        running={null}
-        lastResult={state.loading ? "refreshing…" : null}
+        running={running}
+        pending={pending === null ? null : (actions.find((a) => a.key === pending) ?? null)}
+        lastResult={lastResult ?? (state.loading ? "refreshing…" : null)}
       />
       {snapshot.caveats.map((caveat, i) => (
         <Text key={i} color={UI.caveat} wrap="truncate-end">
