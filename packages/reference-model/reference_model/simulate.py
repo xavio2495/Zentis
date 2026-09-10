@@ -26,6 +26,19 @@ import random
 from dataclasses import dataclass, field
 
 from reference_model.crosschain import distribute, leg_weight
+from reference_model.tilt import trunc_div
+
+#: The candidate signals. Each names what the tilt is a function of, and they compose: a name that
+#: starts with `anchor` adds the anchor term to whatever follows it.
+#:
+#:   cross_leg   the shipped policy — each leg's weight against the book's mean weight
+#:   book        the book's mean weight against an even split, the same sign on every leg
+#:   own         this leg's own weight against an even split — what a single-chain maker can see,
+#:               kept as the control that shows what the cross-chain reference adds
+#:   anchor      the correction that brings this leg's own curve back to the reference mid: a
+#:               constant-product leg holding excess tokenA is already pricing tokenA below the mid,
+#:               and the anchor prices it back up
+SIGNALS = ("cross_leg", "book", "own", "anchor", "anchor_cross_leg", "anchor_book", "anchor_own")
 
 BPS = 10_000
 ONE_E18 = 10**18
@@ -79,6 +92,13 @@ class Book:
     band_tol_bps: int = 500
     #: what it costs the maker to move inventory between legs itself
     transfer_cost_bps: int = 54
+    #: which of `SIGNALS` the tilt is computed from
+    signal: str = "cross_leg"
+    #: whether the maker moves inventory itself when the published tilt sits at its cap
+    impulse: bool = True
+    #: how many ticks a published reference stands before the next one. The tilt and the mid the
+    #: band judges against are frozen in between, as they are on-chain between workflow runs.
+    ref_interval_ticks: int = 1
 
 
 @dataclass
@@ -119,10 +139,41 @@ def price_path(series: Series) -> list[float]:
     return out
 
 
+def anchor_tilt_bps(weight_a: int) -> int:
+    """The tilt that moves a constant-product leg's effective price back onto the mid.
+
+    The leg's own price is `balanceB / balanceA`, which in weight terms is `(1 - w) / w` of the mid.
+    Scaling balanceIn by `(1 - w) / w` on the way in reprices the curve at the mid, and in the
+    instruction's sign convention that is a tilt of `(1 - 2w) / w`: negative when the leg holds
+    excess tokenA, because excess tokenA is already cheap on the curve and must be made dear again.
+    Exact for one direction, second-order off for the other, and capped by the caller.
+    """
+    if weight_a <= 0:
+        return 0
+    return trunc_div((ONE_E18 - 2 * weight_a) * BPS, weight_a)
+
+
 def _tilts(legs: list[Leg], book: Book, bounded: bool) -> list[int]:
+    if book.signal not in SIGNALS:
+        raise ValueError(f"unknown signal {book.signal!r}")
     weights = [leg_weight(leg.balance_a, leg.balance_b, leg.mid) for leg in legs]
     cap = book.max_tilt_bps if bounded else BPS  # unbounded means "no clamp that ever binds"
-    return [p["tiltBps"] for p in distribute(weights, book.kappa_bps, cap)]
+    ws = [w["weightA"] for w in weights]
+    mean_w = sum(ws) // len(ws)
+    cross = [p["tiltBps"] for p in distribute(weights, book.kappa_bps, BPS)]
+    out = []
+    for i, w in enumerate(ws):
+        tilt = 0
+        if book.signal.endswith("cross_leg"):
+            tilt += cross[i]
+        if book.signal.endswith("book"):
+            tilt += trunc_div(book.kappa_bps * (mean_w - ONE_E18 // 2), ONE_E18)
+        if book.signal.endswith("own"):
+            tilt += trunc_div(book.kappa_bps * (w - ONE_E18 // 2), ONE_E18)
+        if book.signal.startswith("anchor"):
+            tilt += anchor_tilt_bps(w)
+        out.append(max(-cap, min(cap, tilt)))
+    return out
 
 
 def _quote(leg: Leg, tilt_bps: int, a_to_b: bool, amount_in: int, book: Book) -> int:
@@ -192,12 +243,18 @@ def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, b
     opening_balances = [(leg.balance_a, leg.balance_b) for leg in legs]
     result = Result(name=name)
 
+    tilts = [0] * len(legs)
+    ref_mids = [leg.mid for leg in legs]
     for tick in range(series.ticks):
         for index, leg in enumerate(legs):
             # Each leg sees the same path, offset so the legs are not perfectly synchronised.
             leg.mid = int(base_mid * path[tick] * (1.0 + 0.001 * index))
 
-        tilts = _tilts(legs, book, bounded) if tilted else [0] * len(legs)
+        # A reference is published every `ref_interval_ticks`; between publications the tilt and
+        # the mid stand as written, whatever the live curve and the live price have done since.
+        if tick % book.ref_interval_ticks == 0:
+            ref_mids = [leg.mid for leg in legs]
+            tilts = _tilts(legs, book, bounded) if tilted else [0] * len(legs)
 
         if rng.randrange(BPS) < book.arrival_bps:
             a_to_b = rng.randrange(BPS) < book.flow_a_to_b_bps
@@ -220,7 +277,9 @@ def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, b
             depth = book.external_depth_a * (1 if index == 0 else book.external_depth_multiple)
             floor = _external_out(leg, a_to_b, amount_in, depth)
             if got > 0 and got >= floor:
-                if banded and not band_allows(leg.mid, tilt, book, a_to_b=a_to_b, amount_in=amount_in, amount_out=got):
+                if banded and not band_allows(
+                    ref_mids[index], tilt, book, a_to_b=a_to_b, amount_in=amount_in, amount_out=got
+                ):
                     result.refused += 1
                 else:
                     if a_to_b:
@@ -233,10 +292,10 @@ def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, b
             else:
                 result.declined += 1
 
-        # The impulse: when the tilt has run to its cap, pricing has stopped working and the maker
-        # moves inventory itself, paying the transfer cost.
-        if banded:
-            for i, tilt in enumerate(_tilts(legs, book, bounded)):
+        # The impulse: when the published tilt has run to its cap, pricing has stopped working and
+        # the maker moves inventory itself, paying the transfer cost.
+        if banded and book.impulse:
+            for i, tilt in enumerate(tilts):
                 if abs(tilt) >= book.max_tilt_bps and len(legs) > 1:
                     other = legs[(i + 1) % len(legs)]
                     move = abs(legs[i].balance_a - other.balance_a) // 4

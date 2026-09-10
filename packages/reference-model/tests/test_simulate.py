@@ -6,7 +6,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from reference_model.simulate import BPS, ONE_E18, Book, Leg, Series, band_allows, run  # noqa: E402
+from reference_model.simulate import (  # noqa: E402
+    BPS,
+    ONE_E18,
+    Book,
+    Leg,
+    Series,
+    anchor_tilt_bps,
+    band_allows,
+    run,
+)
 
 MID = 275_818_853_000_085_890_554_200_491
 
@@ -71,3 +80,32 @@ class TestPnlIsDecomposed:
         r = run("static", Series(), Book(), tilted=False, bounded=False, banded=False)
         assert r.trading_pnl_a == r.pnl_a - r.hold_pnl_a
         assert r.hold_pnl_a != 0
+
+
+class TestTheAnchorSignal:
+    def test_a_leg_at_the_mid_needs_no_correction(self):
+        assert anchor_tilt_bps(ONE_E18 // 2) == 0
+
+    def test_excess_token_a_is_made_dear_again(self):
+        """A constant-product leg holding excess tokenA prices tokenA below the mid; the anchor is
+        negative, which in the instruction's convention makes tokenA expensive."""
+        assert anchor_tilt_bps(ONE_E18 * 51 // 100) < 0
+
+    def test_the_anchored_quote_sits_on_the_mid_to_within_the_spread(self):
+        from reference_model.crosschain import leg_weight
+        from reference_model.simulate import _quote
+
+        book = Book(fill_fraction_bps=1)  # a dust fill, so the curve's own slippage is negligible
+        leg = _leg(300)  # 3% below mid
+        tilt = anchor_tilt_bps(leg_weight(leg.balance_a, leg.balance_b, leg.mid)["weightA"])
+        amount_in = leg.balance_a * book.fill_fraction_bps // BPS
+        got = _quote(leg, tilt, True, amount_in, book)
+        realised = got * ONE_E18 // amount_in
+        off_bps = (realised - MID) * BPS // MID
+        assert -book.spread_bps - 8 <= off_bps <= 0, off_bps  # spread plus the curve's own slippage
+
+    def test_an_unknown_signal_is_refused(self):
+        import pytest
+
+        with pytest.raises(ValueError):
+            run("x", Series(ticks=2), Book(signal="tilt"), tilted=True, bounded=True, banded=True)
