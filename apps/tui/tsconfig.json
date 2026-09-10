@@ -13,7 +13,13 @@
     "types": [
       "bun-types"
     ],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "react-devtools-core": [
+        "./src/stubs/react-devtools-core.ts"
+      ]
+    },
+    "baseUrl": "."
   },
   "include": [
     "src",
