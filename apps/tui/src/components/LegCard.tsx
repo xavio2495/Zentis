@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { BACKFILLING, type LegSnapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
 import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weightBar } from "../format.js";
 import { plot } from "../chart.js";
+import { quoted } from "../quoted.js";
 import { Panel, panelInner } from "./Panel.js";
 import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
@@ -201,7 +202,8 @@ export function LegCard({
     const over = duration(Number(windowSeconds));
     const lineRows = Math.min(4, innerRows - rows.length - 1);
     if (lineRows >= 2) {
-      const p = plot([{ key: "s", samples: leg.series.samples }], inner, lineRows, windowSeconds).byKey.get("s")!;
+      // As quoted, like the chart: the line rises when the price on the row below it rises.
+      const p = plot([{ key: "s", samples: quoted(leg.series.samples) }], inner, lineRows, windowSeconds).byKey.get("s")!;
       for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
     }
     rows.push(<Text color={UI.muted}>{chooseFit([`${price} · ${over} window`, price], inner)}</Text>);

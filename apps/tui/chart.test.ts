@@ -47,13 +47,16 @@ test("each series is normalised to its own start, so different mids draw the sam
   expect(cheap.rows).toEqual(dear.rows);
 });
 
-test("samples outside the volatility window are not plotted", () => {
+test("a sample older than the window is carried to its edge, not drawn at its own time", () => {
+  // The axis spans exactly the window. The older sample is the price the pool held when the window
+  // opened, so it appears at the left edge — never back at its own timestamp, far off the axis.
   const samples = [
     { timestamp: 10_000n, mid: 10n ** 18n },
     { timestamp: 1n, mid: 5n * 10n ** 17n }, // far outside a 60-second window
   ];
-  const { from } = plot([{ key: "a", samples }], 20, 4, 60n);
-  expect(from).toBe(10_000n);
+  const { from, to } = plot([{ key: "a", samples }], 20, 4, 60n);
+  expect(from).toBe(10_000n - 60n);
+  expect(to).toBe(10_000n);
 });
 
 test("no samples draws blank rows rather than throwing or a stray axis", () => {
@@ -181,4 +184,25 @@ test("a price that holds between swaps is drawn flat, and a swap is a vertical s
   expect(text).toContain("╭"); // and into the high one
   expect(rows[0]!.includes("─")).toBe(true); // the high price holds along the top row
   expect(rows[rows.length - 1]!.includes("─")).toBe(true); // the low one along the bottom
+});
+
+test("a short window on a quiet pool starts at the price the pool was holding, not at nothing", () => {
+  // The price is a step function: it holds from one swap to the next. A one-hour window over a pool
+  // whose last swap was two hours ago must draw that price flat across the hour. Dropping every
+  // sample older than the window drew a single point at "now" instead.
+  const samples = [
+    { timestamp: 10_000n, mid: 2n * 10n ** 18n }, // the head, now
+    { timestamp: 2_800n, mid: 2n * 10n ** 18n }, // the last swap, two hours before
+    { timestamp: 1_000n, mid: 10n ** 18n },
+  ];
+  const p = plot([{ key: "a", samples }], 20, 4, 3_600n).byKey.get("a")!;
+  expect(p.from).toBe(10_000n - 3_600n); // the axis spans exactly the window
+  const inked = p.rows.join("").replace(/ /g, "").length;
+  expect(inked).toBeGreaterThanOrEqual(20); // a line across the whole width, not one cell
+});
+
+test("the plot reports the prices at its top and bottom, so the axis can be labelled with them", () => {
+  const p = plot([{ key: "a", samples: ramp(30, 1, 2) }], 20, 4, WINDOW).byKey.get("a")!;
+  expect(p.lowMid).toBe(10n ** 18n);
+  expect(p.highMid).toBe(2n * 10n ** 18n);
 });

@@ -25,6 +25,7 @@ export interface Binding {
 export const BINDINGS: Binding[] = [
   { scope: "main", keys: ["left", "right"], label: "step the price chart to the previous or next leg", id: "step" },
   { scope: "main", keys: ["1", "2", "3"], label: "open a leg's detail; the same number closes it", id: "leg" },
+  { scope: "main", keys: ["t"], label: "chart window: 1h, 24h, 7d, then back to automatic", id: "window" },
   { scope: "overlay", keys: ["esc"], label: "back to the charts", id: "back" },
   { scope: "global", keys: ["q"], label: "re-quote every leg now", id: "quote" },
   { scope: "main", keys: ["r"], label: "republish the fast workflow", id: "fast" },

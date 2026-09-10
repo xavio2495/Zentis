@@ -30,23 +30,42 @@ export interface Plot {
   readonly maxRatio: number;
   /** how many of this series' points fell outside that band and were drawn on its edge */
   readonly clipped: number;
+  /** the prices at the bottom and top of the band, so the axis is labelled in prices, not ratios */
+  readonly lowMid: bigint;
+  readonly highMid: bigint;
   readonly from: bigint | null;
   readonly to: bigint | null;
 }
 
 const EMPTY_ROW = (width: number) => " ".repeat(width);
 
+/** A mid scaled by a ratio, kept in bigint so an eighteen-decimal price does not lose its digits. */
+const scaleMid = (mid: bigint, ratio: number): bigint =>
+  (mid * BigInt(Math.round(ratio * 1e12))) / 1_000_000_000_000n;
+
 /**
  * Samples come newest-first from the subgraph. Normalising against the *oldest* in the window is
  * what makes the line read left to right as time moving forwards.
  */
-function normalise(samples: PriceSample[], windowSeconds: bigint): { t: bigint; ratio: number }[] {
-  if (samples.length === 0) return [];
+function normalise(
+  samples: PriceSample[],
+  windowSeconds: bigint,
+): { points: { t: bigint; ratio: number; mid: bigint }[]; baseMid: bigint } {
+  if (samples.length === 0) return { points: [], baseMid: 0n };
   const newest = samples[0]!.timestamp;
-  const inWindow = samples.filter((s) => newest - s.timestamp <= windowSeconds).slice().reverse();
-  const base = inWindow[0];
-  if (base === undefined || base.mid === 0n) return [];
-  return inWindow.map((s) => ({ t: s.timestamp, ratio: Number(s.mid) / Number(base.mid) }));
+  const start = newest - windowSeconds;
+  const inWindow = samples.filter((s) => s.timestamp >= start).slice().reverse();
+  // The price a pool was holding when the window opened is the last swap *before* it, carried to the
+  // window's left edge. A pool's price is a step function, so dropping that sample left a quiet
+  // pool's one-hour window as a single point at "now".
+  const before = samples.find((s) => s.timestamp < start);
+  const series = before === undefined ? inWindow : [{ timestamp: start, mid: before.mid }, ...inWindow];
+  const base = series[0];
+  if (base === undefined || base.mid === 0n) return { points: [], baseMid: 0n };
+  return {
+    points: series.map((s) => ({ t: s.timestamp, ratio: Number(s.mid) / Number(base.mid), mid: s.mid })),
+    baseMid: base.mid,
+  };
 }
 
 /**
@@ -60,7 +79,8 @@ export function plot(
   height: number,
   windowSeconds: bigint,
 ): { byKey: Map<string, Plot>; from: bigint | null; to: bigint | null } {
-  const points = new Map(series.map((s) => [s.key, normalise(s.samples, windowSeconds)]));
+  const normalised = new Map(series.map((s) => [s.key, normalise(s.samples, windowSeconds)]));
+  const points = new Map([...normalised].map(([key, n]) => [key, n.points]));
   const all = [...points.values()].flat();
   const byKey = new Map<string, Plot>();
 
@@ -71,6 +91,8 @@ export function plot(
         minRatio: 1,
         maxRatio: 1,
         clipped: 0,
+        lowMid: 0n,
+        highMid: 0n,
         from: null,
         to: null,
       });
@@ -160,6 +182,9 @@ export function plot(
       minRatio: lo,
       maxRatio: hi,
       clipped: pts.filter((p) => p.ratio < lo || p.ratio > hi).length,
+      // The band's ends back in the series' own units: its base price scaled by the ratio at each end.
+      lowMid: scaleMid(normalised.get(s.key)!.baseMid, lo),
+      highMid: scaleMid(normalised.get(s.key)!.baseMid, hi),
       from,
       to,
     });

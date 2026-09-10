@@ -1,6 +1,6 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { BOOK, type Store, createStore } from "@zentis/console-data";
+import { type Store, createStore } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs } from "./components/Graphs.js";
@@ -9,12 +9,12 @@ import { LegCard } from "./components/LegCard.js";
 import { LegDetail } from "./components/LegDetail.js";
 import { Panel, panelInner } from "./components/Panel.js";
 import { StatusBar } from "./components/StatusBar.js";
-import { extentOf } from "./components/Graphs.js";
 import { type Pending, landed } from "./landed.js";
 import { pairPrice } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
 import { resolve } from "./keymap.js";
 import { LEG_ORDER, UI, legColour } from "./theme.js";
+import { WINDOWS, autoWindow } from "./window.js";
 
 /**
  * The console: three leg cards down the left, a status bar, the reference-pool charts and the feed
@@ -60,6 +60,9 @@ export function App({
   // Bumped by a manual step so the rotation timer restarts from it: a chart the operator just chose
   // should not be carried off a second later because the clock happened to be about to fire.
   const [stepped, setStepped] = useState(0);
+  // Which window the charts use: an index into WINDOWS, or null for automatic — the shortest window
+  // that still contains the leg's last fill, so the beat is never a single column at the edge.
+  const [windowChoice, setWindowChoice] = useState<number | null>(null);
   const [confirming, setConfirming] = useState<Action | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [transient, setTransient] = useState<string | null>(null);
@@ -134,6 +137,9 @@ export function App({
       case "quote":
         void store.refresh(true);
         return;
+      case "window":
+        setWindowChoice((current) => (current === null ? 0 : current + 1 >= WINDOWS.length ? null : current + 1));
+        return;
       case "step": {
         const count = Math.max(1, snapshot?.legs.length ?? 1);
         setShown((current) => (current + (key.leftArrow ? count - 1 : 1)) % count);
@@ -192,6 +198,12 @@ export function App({
   const selected = ordered[Math.min(legIndex, ordered.length - 1)];
 
   const rotating = ordered[shown % Math.max(1, ordered.length)] ?? ordered[0];
+  const lastFillAt = (chainId: number): number | null => {
+    const fills = snapshot.feed.filter((row) => row.kind === "fill" && row.chainId === chainId);
+    return fills.length === 0 ? null : Math.max(...fills.map((row) => Number(row.timestamp)));
+  };
+  const windowFor = (chainId: number) =>
+    windowChoice === null ? autoWindow(lastFillAt(chainId), snapshot.takenAtSeconds) : WINDOWS[windowChoice]!;
   const graphInner = panelInner(regions.rightWidth, regions.graphRows);
 
   return (
@@ -205,7 +217,7 @@ export function App({
             width={regions.legsWidth}
             height={regions.cardHeights[i] ?? 0}
             selected={overlay === "leg" && i === legIndex}
-            windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
+            windowSeconds={BigInt(windowFor(leg.config.chainId).seconds)}
           />
         ))}
       </Box>
@@ -246,7 +258,7 @@ export function App({
               <LegDetail
                 leg={selected}
                 {...panelInner(regions.rightWidth, regions.graphRows)}
-                windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
+                windowSeconds={BigInt(windowFor(selected.config.chainId).seconds)}
               />
             </Panel>
           ) : rotating === undefined ? null : (
@@ -257,10 +269,7 @@ export function App({
                   ? ""
                   : ` · ${pairPrice(rotating.series.mid, rotating.config.tokenA, rotating.config.tokenB)}`)
               }
-              right={
-                extentOf(rotating, graphInner.width, graphInner.height, BigInt(BOOK.volatilityWindowSeconds)) ||
-                `${(shown % ordered.length) + 1}/${ordered.length}`
-              }
+              right={`${windowFor(rotating.config.chainId).label} window${windowChoice === null ? " · auto" : ""} · t`}
               width={regions.rightWidth}
               height={regions.graphRows}
               colour={legColour(rotating.config.chainId)}
@@ -269,7 +278,7 @@ export function App({
                 leg={rotating}
                 snapshot={snapshot}
                 {...graphInner}
-                windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
+                windowSeconds={BigInt(windowFor(rotating.config.chainId).seconds)}
               />
             </Panel>
           ))}

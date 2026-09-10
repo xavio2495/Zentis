@@ -278,13 +278,21 @@ export function pairPrice(
   tokenB: { symbol: string; decimals: number },
 ): string {
   if (mid <= 0n) return "no price";
+  return `1 ${tokenB.symbol} = ${priceFigure(mid, tokenA, tokenB)} ${tokenA.symbol}`;
+}
+
+/** The number in `pairPrice`, alone: what one whole tokenB costs in tokenA, for an axis label. */
+export function priceFigure(
+  mid: bigint,
+  tokenA: { decimals: number },
+  tokenB: { decimals: number },
+): string {
+  if (mid <= 0n) return "—";
   // raw tokenA per one whole tokenB = 1e18 * 10^decB / mid, then shown at tokenA's decimals.
   const rawA = (10n ** 18n * 10n ** BigInt(tokenB.decimals) + mid / 2n) / mid;
   const scale = 10n ** BigInt(tokenA.decimals);
   const whole = (rawA + scale / 2n) / scale;
-  const shown =
-    whole >= 100n
-      ? whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-      : tokenAmount(rawA, tokenA.decimals, 4);
-  return `1 ${tokenB.symbol} = ${shown} ${tokenA.symbol}`;
+  return whole >= 100n
+    ? whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : tokenAmount(rawA, tokenA.decimals, 4);
 }
