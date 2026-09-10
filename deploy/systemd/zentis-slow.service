@@ -1,0 +1,7 @@
+[Unit]
+Description=Zentis slow reference publisher
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.cre/bin:%h/.foundry/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/projects/Zentis/scripts/publisher.sh slow

@@ -1,0 +1,10 @@
+[Unit]
+Description=Publish the slow reference hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=2min
+
+[Install]
+WantedBy=timers.target
