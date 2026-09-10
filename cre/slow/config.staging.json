@@ -32,6 +32,7 @@
       "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.2.0",
       "referencePoolSubgraphUrl": "https://api.studio.thegraph.com/query/1758742/zentis-reference-pool-base-sepolia/v0.0.1",
       "referencePool": "0x46880b404cd35c165eddeff7421019f8dd25f4ad",
+      "volatilityMultiplierBps": 3000,
       "crowdingSubgraphUrl": "",
       "crowdingTokenA": "",
       "crowdingTokenB": "",

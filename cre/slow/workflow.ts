@@ -50,6 +50,12 @@ const legSchema = z.object({
 	referencePoolSubgraphUrl: z.string().default(''),
 	referencePool: z.string().default(''),
 	/**
+	 * Per-leg override of the volatility multiplier. A reference pool whose moves are a few large
+	 * jumps rather than a diffusion is not covered by any spread, and a one-sigma term there only
+	 * shuts the leg; measured on the indexed series before being set, never guessed.
+	 */
+	volatilityMultiplierBps: z.number().optional(),
+	/**
 	 * The standardized Aqua subgraph for the mainnet this leg corresponds to, and the pair to read
 	 * from it. Empty means no positioning data for this leg, which allocates it the full budget —
 	 * absence of evidence about crowding is not evidence of it.
@@ -439,7 +445,7 @@ const readVolatility = (runtime: TeeRuntime<Config>, leg: z.infer<typeof legSche
 	return volatilitySpreadBps(
 		samples,
 		BigInt(config.volatilityHorizonSeconds),
-		BigInt(config.volatilityMultiplierBps),
+		BigInt(leg.volatilityMultiplierBps ?? config.volatilityMultiplierBps),
 		BigInt(config.volatilityCapBps),
 	)
 }
