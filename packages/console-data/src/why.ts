@@ -11,7 +11,13 @@ import { weightPercent } from "./decompose.js";
  */
 export function why(leg: LegSnapshot): string {
   const { shift, spread, config, position } = leg;
-  if (position === null) return "this leg has no indexed position, so nothing here is priced";
+  if (position === null) {
+    // The same null means "docked and gone" and "the fills subgraph refused". Only the first is
+    // a fact about the position; the second is a fact about this read, and says when to try again.
+    return leg.sources.fills === null
+      ? "this leg has no indexed position, so nothing here is priced"
+      : `this leg could not be read (${leg.sources.fills}), so nothing here is priced from the index`;
+  }
   if (!position.active) return "this leg is docked: it holds no committed balance and quotes nothing";
   if (shift === null || spread === null) return "not every source answered, so this leg is shown as published";
 

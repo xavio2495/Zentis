@@ -13,6 +13,20 @@ import { TERM, UI, legColour } from "../theme.js";
  * four terms with their names rather than their colours alone, the room against the boundary, the
  * generated why line unclipped, and the reference the whole lot was computed from.
  */
+/**
+ * How old the leg's reference is, in seconds, or null when the leg has no reference at all.
+ *
+ * A priced leg's age is the one its spread stack was computed from, so the two agree on screen. An
+ * unread leg has no spread stack, but the slot was read from the chain and carries `updatedAt`, so
+ * its age is still known. What it must never be is zero for want of a number: the status bar reads
+ * the same slot, and "21m" beside "0s old" for one seq is the screen contradicting itself.
+ */
+export function referenceAgeSeconds(leg: LegSnapshot, nowSeconds: number): number | null {
+  if (leg.spread !== null) return leg.spread.referenceAgeSeconds;
+  if (leg.ref === null) return null;
+  return Math.max(0, nowSeconds - Number(leg.ref.updatedAt));
+}
+
 export function LegDetail({
   leg,
   width,
@@ -156,7 +170,7 @@ export function LegDetail({
         <Text color={UI.muted}>{"reference  "}</Text>
         <Text color={UI.reference}>{`seq ${ref.seq}`}</Text>
         <Text color={UI.muted}>
-          {`  ${humanDuration(spread?.referenceAgeSeconds ?? 0)} old  ·  mid ${ref.mid}`}
+          {`  ${humanDuration(referenceAgeSeconds(leg, Math.floor(Date.now() / 1000)) ?? 0)} old  ·  mid ${ref.mid}`}
         </Text>
       </>,
     );
