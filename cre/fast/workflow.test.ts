@@ -1,6 +1,6 @@
 import { describe, expect } from 'bun:test'
 import { test } from '@chainlink/cre-sdk/test'
-import type { TeeRuntime } from '@chainlink/cre-sdk'
+import { protoBigIntToBigint, type TeeRuntime } from '@chainlink/cre-sdk'
 import { encodeAbiParameters, parseAbiParameters } from 'viem'
 
 import { onCronTrigger, restrictions, type Config } from './workflow'
@@ -132,6 +132,8 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 	const logs: string[] = []
 	const reports: string[] = []
 	const calls: string[] = []
+	// The block each CallContract was pinned to: 'latest', or the block number as a string.
+	const blockTags: string[] = []
 
 	// header, slot0, safeBalances, refOf — per leg, in the order observeLeg issues them.
 	const queue: Array<() => unknown> = [
@@ -148,8 +150,14 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 
 	const don = {
 		config,
-		callCapability: ({ method }: { method: string }) => {
+		callCapability: ({ method, payload }: { method: string; payload?: unknown }) => {
 			calls.push(method)
+			if (method === 'CallContract') {
+				const tag = (payload as { blockNumber?: { absVal: Uint8Array; sign: bigint } }).blockNumber
+				blockTags.push(
+					tag && tag.sign === -1n && tag.absVal[0] === 2 ? 'latest' : String(tag ? protoBigIntToBigint(tag) : '?'),
+				)
+			}
 			if (method === 'WriteReport') return { result: () => ({}) }
 			const next = queue[i++]
 			if (!next) throw new Error(`unexpected extra capability call: ${method}`)
@@ -172,7 +180,7 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 		usingTheDons: () => don,
 	}
 
-	return { runtime: runtime as unknown as TeeRuntime<Config>, logs, reports, calls }
+	return { runtime: runtime as unknown as TeeRuntime<Config>, logs, reports, calls, blockTags }
 }
 
 describe('fast workflow', () => {
@@ -248,6 +256,22 @@ describe('fast workflow', () => {
 		expect(refB.spreadBps).toBe(config.spreadBps)
 		expect(refB.markoutBps).toBe(0)
 		expect(refB.bandEdgeBps).toBe(0)
+	})
+
+	test('the slot is read at the head; every pricing input at the pinned block', () => {
+		// Finality lags the head by around twenty minutes on every chain this position lives on. A
+		// slot read at the finalized block misses every slow write from that window, and the fast
+		// write would then carry the stale terms forward and bury the measurement for good.
+		const { runtime, blockTags } = makeRuntime()
+		onCronTrigger(runtime)
+		expect(blockTags).toEqual([
+			String(CHAIN.blockA),
+			String(CHAIN.blockA),
+			'latest',
+			String(CHAIN.blockB),
+			String(CHAIN.blockB),
+			'latest',
+		])
 	})
 
 	test('the published seq and updatedAt are shared by both legs', () => {
