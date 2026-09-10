@@ -86,7 +86,7 @@ const balancesData = (a: bigint, b: bigint) =>
 	bytes(encodeAbiParameters(parseAbiParameters('uint256, uint256'), [a, b]))
 
 /** What the registry already holds for this leg. A zero mid means nothing has been published. */
-type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number; tiltBps?: number }
+type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number; tiltBps?: number; seq?: number }
 const NOTHING_STORED: Stored = { mid: 0n, spreadBps: 0, markoutBps: 0, bandEdgeBps: 0 }
 
 const storedData = (stored: Stored) =>
@@ -101,7 +101,7 @@ const storedData = (stored: Stored) =>
 					spreadBps: stored.spreadBps,
 					tiltBps: stored.tiltBps ?? (stored.mid === 0n ? 0 : -2),
 					updatedAt: stored.mid === 0n ? 0 : 1788891000,
-					seq: stored.mid === 0n ? 0 : 1788891000,
+					seq: stored.seq ?? (stored.mid === 0n ? 0 : 1788891000),
 					refBalanceA: 0n,
 					dTiltPerA: 0n,
 					maxExtrapBps: 0,
@@ -315,6 +315,20 @@ describe('fast workflow', () => {
 		const mid = midFromSqrtPriceX96(LEG_A.sqrt)
 		const anchor = anchorTiltBps(legWeight({ balanceA: bal[0], balanceB: bal[1], mid }).weightA)
 		expect(BigInt(refA.tiltBps)).toBe(anchor < -500n ? -500n : anchor)
+	})
+
+	test('a rerun over the same pinned instant still lands: seq passes every stored seq', () => {
+		// The registry rejects a seq that does not exceed the stored one. With seq taken from the
+		// finalized timestamp alone, every run until the laggiest chain finalizes another block
+		// repeats the same seq and is rejected, so a slot changed at the head (a slow write, a
+		// budget) could not be carried for minutes at a time.
+		const stored = { mid: 1n, spreadBps: 22, markoutBps: 0, bandEdgeBps: 57, tiltBps: -2, seq: 1788891534 }
+		const { runtime, reports } = makeRuntime(withLeg(withLeg(CHAIN, 0, { stored }), 1, { stored }))
+		onCronTrigger(runtime)
+		const refs = reports.map((r) => decodeRef(r)[1])
+		expect(refs[0]!.seq).toBe(1788891535)
+		expect(refs[1]!.seq).toBe(refs[0]!.seq)
+		expect(BigInt(refs[0]!.updatedAt)).toBe(LEG_A.ts)
 	})
 
 	test('the published seq and updatedAt are shared by both legs', () => {
