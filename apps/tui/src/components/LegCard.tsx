@@ -41,21 +41,47 @@ export function legState(leg: LegSnapshot): { word: string; short: string; tone:
  * shift's direction (which side is dearer). The distance is against the reference's own mid, so a
  * leg quoting at its cap reads as a large number here rather than as an ordinary price.
  */
+/**
+ * The card's name for each refusal the quote service decodes, keyed off the contract's error name
+ * because that is stable and the service's sentence is not. An error not listed here still reads as
+ * "refused by the router", with its sentence in the detail.
+ */
+const REFUSAL_NAMES: Record<string, string> = {
+  ZentisOutsideBand: "outside the band",
+  ZentisReferenceStale: "reference too old",
+  ZentisSeqMismatch: "seq moved",
+};
+
 function side(leg: LegSnapshot, isAToB: boolean, width: number): Seg[] | null {
   const quote = isAToB ? leg.quoteAToB : leg.quoteBToA;
   const [from, to] = isAToB ? [leg.config.tokenA, leg.config.tokenB] : [leg.config.tokenB, leg.config.tokenA];
   if (quote === null) return null;
   if (quote.amountOut === null) {
     // A side the router refuses is a fact about the leg, and leaving the row out said nothing had
-    // been asked. Live, Sepolia's router answered USDC → WETH and reverted WETH → USDC.
-    const refused = quote.caveats.some((c) => c.includes("refused"));
+    // been asked. The card has room for the reason's name, keyed off the contract's error; the
+    // service's whole sentence is in the leg's detail.
+    const refused = quote.refusal !== null || quote.caveats.some((c) => c.includes("refused"));
+    const reason = quote.refusal === null ? null : (REFUSAL_NAMES[quote.refusal.error] ?? null);
+    const pair = `${from.symbol} → ${to.symbol}`;
     return fitSegments(
       [
+        ...(reason === null
+          ? []
+          : [
+              [
+                { text: `${pair}  `, color: UI.muted },
+                { text: `refused: ${reason}`, color: UI.caveat },
+              ],
+              [
+                { text: `${pair} `, color: UI.muted },
+                { text: `refused, ${reason}`, color: UI.caveat },
+              ],
+            ]),
         [
-          { text: `${from.symbol} → ${to.symbol}  `, color: UI.muted },
+          { text: `${pair}  `, color: UI.muted },
           { text: refused ? "refused by the router" : "not priced", color: UI.caveat },
         ],
-        [{ text: `${from.symbol} → ${to.symbol} ${refused ? "refused" : "unpriced"}`, color: UI.caveat }],
+        [{ text: `${pair} ${refused ? "refused" : "unpriced"}`, color: UI.caveat }],
       ],
       width,
     );

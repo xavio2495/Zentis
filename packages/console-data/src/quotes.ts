@@ -7,6 +7,21 @@ import { type Read, failed, json, ok } from "./graphql.js";
  * order and puts the question to the deployed program. That is the only number on the screen the
  * router would honour, and re-deriving it here would be a second opinion nobody trades on.
  */
+/**
+ * Why the router refused a quote, as the quote service decodes the revert.
+ *
+ * `error` is the contract's custom error name and is the stable thing to key off; `sentence` is the
+ * service's wording for an operator, written in `tokenA`/`tokenB` because the service has no symbols.
+ * Null when the leg priced, when the revert carried no data, or when it was not one of ours — the
+ * node's own message is then in `caveats`, as it always was.
+ */
+export interface Refusal {
+  readonly error: string;
+  /** decimal strings, in the error's declaration order */
+  readonly args: string[];
+  readonly sentence: string;
+}
+
 export interface LegQuote {
   readonly chainId: number;
   readonly chain: string;
@@ -19,6 +34,7 @@ export interface LegQuote {
   readonly tiltBps: number | null;
   readonly seq: number | null;
   readonly refAgeSeconds: number | null;
+  readonly refusal: Refusal | null;
   readonly caveats: string[];
 }
 
@@ -41,7 +57,32 @@ interface RawQuote {
   tiltBps: number | null;
   seq: number | null;
   refAgeSeconds: number | null;
+  /** absent from a service older than its error decoding */
+  refusal?: Refusal | null;
   caveats: string[];
+}
+
+export function parseQuote(q: RawQuote): LegQuote {
+  return {
+    chainId: q.chainId,
+    chain: q.chain,
+    amountIn: BigInt(q.amountIn),
+    amountOut: q.amountOut === null ? null : BigInt(q.amountOut),
+    tokenIn: q.tokenIn,
+    tokenOut: q.tokenOut,
+    reason: q.reason,
+    refMid: q.refMid === null ? null : BigInt(q.refMid),
+    tiltBps: q.tiltBps,
+    seq: q.seq,
+    refAgeSeconds: q.refAgeSeconds,
+    refusal: q.refusal ?? null,
+    caveats: q.caveats,
+  };
+}
+
+/** The refusal's sentence with the leg's symbols in place of the service's `tokenA` and `tokenB`. */
+export function refusalSentence(refusal: Refusal, symbolA: string, symbolB: string): string {
+  return refusal.sentence.replace(/\btokenA\b/g, symbolA).replace(/\btokenB\b/g, symbolB);
 }
 
 export const QUOTE_API_URL = process.env.ZENTIS_QUOTE_API ?? "http://localhost:8787";
@@ -59,20 +100,7 @@ export async function fetchQuotes(
   return ok({
     side,
     amountIn,
-    quotes: read.value.quotes.map((q) => ({
-      chainId: q.chainId,
-      chain: q.chain,
-      amountIn: BigInt(q.amountIn),
-      amountOut: q.amountOut === null ? null : BigInt(q.amountOut),
-      tokenIn: q.tokenIn,
-      tokenOut: q.tokenOut,
-      reason: q.reason,
-      refMid: q.refMid === null ? null : BigInt(q.refMid),
-      tiltBps: q.tiltBps,
-      seq: q.seq,
-      refAgeSeconds: q.refAgeSeconds,
-      caveats: q.caveats,
-    })),
+    quotes: read.value.quotes.map(parseQuote),
     caveats: read.value.caveats,
   });
 }

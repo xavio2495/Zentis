@@ -125,6 +125,7 @@ test("off-mid is signed against the reference's own mid and absent when a leg di
     tiltBps: ref.tiltBps,
     seq: ref.seq,
     refAgeSeconds: 0,
+    refusal: null,
     caveats: [],
   };
   expect(offMidBps(quote, true)).toBe(0);

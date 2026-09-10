@@ -92,6 +92,7 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
           tiltBps: entry.ref.tiltBps,
           seq,
           refAgeSeconds: ageSeconds,
+          refusal: null,
           caveats: [],
         };
         const inB = (150_000n * entry.ref.mid) / 10n ** 18n;

@@ -1,5 +1,13 @@
 import { Box, Text } from "ink";
-import { type LegSnapshot, humanDuration, invertMid, referenceAgeSeconds, weightPercent, why } from "@zentis/console-data";
+import {
+  type LegSnapshot,
+  humanDuration,
+  invertMid,
+  referenceAgeSeconds,
+  refusalSentence,
+  weightPercent,
+  why,
+} from "@zentis/console-data";
 import { pairPrice, priceFigure, signed, tokenAmount } from "../format.js";
 import { quoted } from "../quoted.js";
 import { plot } from "../chart.js";
@@ -189,6 +197,25 @@ export function LegDetail({
         <Text color={UI.muted}>{text}</Text>
       </>,
     );
+  }
+  // A side the router refused, in the service's own sentence with this leg's token names. The card
+  // only has room to name the reason; this is where it is told.
+  const { tokenA, tokenB } = leg.config;
+  for (const [direction, quote, from, to] of [
+    ["AtoB", leg.quoteAToB, tokenA, tokenB],
+    ["BtoA", leg.quoteBToA, tokenB, tokenA],
+  ] as const) {
+    if (quote?.refusal == null) continue;
+    const sentence = `${from.symbol} → ${to.symbol}: ${refusalSentence(quote.refusal, tokenA.symbol, tokenB.symbol)}`;
+    for (const [i, text] of wrapLines(sentence, width - 1 - LABEL, 2).entries()) {
+      line(
+        `refused${direction}${i}`,
+        <>
+          <Text color={UI.muted}>{(i === 0 ? "refused" : "").padEnd(LABEL)}</Text>
+          <Text color={UI.caveat}>{text}</Text>
+        </>,
+      );
+    }
   }
   for (const [i, caveat] of leg.caveats.entries()) {
     line(`caveat${i}`, <Text color={UI.caveat}>{trunc(`! ${caveat}`, width - 1)}</Text>);
