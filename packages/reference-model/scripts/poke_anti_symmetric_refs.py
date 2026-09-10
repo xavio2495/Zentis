@@ -34,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from reference_model.crosschain import distribute, leg_weight
+from reference_model.crosschain import leg_weight, reservation
 from reference_model.onchain import block_timestamp, eth_call
 from fetch_live_mid import CHAINS, fetch_chain
 from poke_ref_from_subgraph import POKE_REF_SIG, POSITION_ID, UINT128_MAX, read_ref, block_number_latest
@@ -43,9 +43,11 @@ DEPLOYMENTS = Path(__file__).resolve().parents[3] / "contracts" / "deployments"
 
 SAFE_BALANCES_SELECTOR = "0x65f2fe14"  # safeBalances(address,address,bytes32,address,address)
 
-# Gain: a leg holding 100% tokenA against a leg holding 0% would tilt the full 500 bps. Matches
-# ZentisPositionConfig.MAX_TILT_BPS, so the policy saturates exactly where the instruction clamps.
-KAPPA_BPS = 500
+# The two gains of the reservation policy, matching the workflow's KAPPA_BPS and KAPPA_BOOK_BPS
+# secrets. On top of the anchor, an own-leg gain of four times the basis is the plain curve and zero
+# is a curve pinned at the mid; the book gain is the cross-chain term and buys dispersion, not mean.
+KAPPA_OWN_BPS = 10_000
+KAPPA_BOOK_BPS = 5_000
 MAX_TILT_BPS = 500
 
 # Cap on how far ZentisSkew may extrapolate from the published tilt before the reference must be
@@ -101,8 +103,8 @@ def main() -> None:
         leg["inventory"] = leg_weight(balance_a, balance_b, leg["mid"])
         legs[name] = leg
 
-    policies = distribute(
-        [legs[name]["inventory"] for name in order], KAPPA_BPS, MAX_TILT_BPS
+    policies = reservation(
+        [legs[name]["inventory"] for name in order], KAPPA_OWN_BPS, KAPPA_BOOK_BPS, MAX_TILT_BPS
     )
     for name, policy in zip(order, policies):
         legs[name]["policy"] = policy

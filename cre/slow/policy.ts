@@ -346,6 +346,27 @@ export const allocateBandEdge = (
  * An empty pair returns zero rather than throwing: nothing committed is no evidence about
  * contention, and the allocation treats no evidence as "leave this leg at full budget".
  */
+/**
+ * The boundary actually published, given the allocated edge.
+ *
+ * On-chain the boundary caps the whole tilt, and under the reservation policy most of the tilt is
+ * the anchor, a correction rather than a concession. Publishing the allocated edge on its own would
+ * cap a 4% correction at half a percent and leave the leg to be picked off. So the budget is
+ * published as room beyond what is already quoted: the concession may grow by the allocated edge
+ * and no further. Never zero, because zero reads as unpublished; never past the ceiling the maker
+ * signed, because the instruction only ever lets the boundary tighten that.
+ */
+export const publishedBoundary = (
+	currentTiltBps: bigint,
+	allocatedEdgeBps: bigint,
+	minEdgeBps: bigint,
+	maxEdgeBps: bigint,
+): bigint => {
+	const magnitude = currentTiltBps < 0n ? -currentTiltBps : currentTiltBps
+	const room = magnitude + allocatedEdgeBps
+	return room < minEdgeBps ? minEdgeBps : room > maxEdgeBps ? maxEdgeBps : room
+}
+
 export const crowdingBpsOf = (totalA: bigint, totalB: bigint, mid: bigint): bigint => {
 	if (mid <= 0n) throw new Error('mid must be positive')
 	const aInB = (totalA * mid) / ONE

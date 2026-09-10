@@ -22,7 +22,7 @@ import {
 import { z } from 'zod'
 
 import {
-	allocateBandEdge,
+	allocateBandEdge, publishedBoundary,
 	BPS,
 	crowdingBpsOf,
 	markoutBps,
@@ -452,8 +452,9 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 
 	const current = config.legs.map((leg) => readRef(don, leg, positionId))
 
-	// Our own lean on each leg is the sign of the tilt already published there. A leg we lean the
-	// same way as the rest of the venue is contested, and gets a smaller share of the budget.
+	// Our own lean on each leg is the sign of the tilt already published there: the asset we are
+	// actually discounting, whether the anchor or the skew put us there. A leg where we discount the
+	// same asset as the rest of the venue is contested, and gets a smaller share of the budget.
 	const ownLeans = current.map((ref) => BigInt(ref.tiltBps))
 	const edges = allocateBandEdge(
 		edge,
@@ -470,7 +471,14 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 			positionId,
 			{
 				...ref,
-				bandEdgeBps: Number(edges[index] as bigint),
+				bandEdgeBps: Number(
+					publishedBoundary(
+						BigInt(ref.tiltBps),
+						edges[index] as bigint,
+						BigInt(config.minAllocatedEdgeBps),
+						BigInt(config.maxBandEdgeBps),
+					),
+				),
 				markoutBps: Number((signals[index] as LegSignals).markoutBps),
 				seq: ref.seq + 1,
 			},
