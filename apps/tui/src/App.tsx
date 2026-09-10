@@ -7,7 +7,7 @@ import { type Pending, landed } from "./landed.js";
 import { BookStrip } from "./components/BookStrip.js";
 import { Feed } from "./components/Feed.js";
 import { LegColumn } from "./components/LegColumn.js";
-import { Divider, FRAME } from "./components/Divider.js";
+import { Divider, useFrame } from "./components/Divider.js";
 import { SimCard } from "./components/SimCard.js";
 import { UI } from "./theme.js";
 
@@ -35,6 +35,7 @@ export function App({
   runAction: ((action: Action) => Promise<string>) | null;
 }) {
   const { exit } = useApp();
+  const frame = useFrame();
   const store = useMemo(() => createStore(), []);
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -116,7 +117,7 @@ export function App({
 
   if (snapshot === null) {
     return (
-      <Box borderStyle="round" borderColor={UI.frame} paddingX={1} {...FRAME}>
+      <Box borderStyle="round" borderColor={UI.frame} paddingX={1} width={frame.width}>
         <Text color={UI.muted}>
           {state.error === null ? "reading three chains, three subgraphs and the quote service…" : state.error}
         </Text>
@@ -125,17 +126,18 @@ export function App({
   }
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={UI.frame} paddingX={1} {...FRAME}>
-      <BookStrip snapshot={snapshot} nowSeconds={now} />
-      <Divider label="legs" />
+    <Box flexDirection="column" borderStyle="round" borderColor={UI.frame} paddingX={1} width={frame.width}>
+      <BookStrip snapshot={snapshot} nowSeconds={now} width={frame.contentWidth} />
+      <Divider label="legs" width={frame.contentWidth} />
       <Box>
         {snapshot.legs.map((leg) => (
-          <LegColumn key={leg.config.chainId} leg={leg} />
+          <LegColumn key={leg.config.chainId} leg={leg} width={frame.columnWidth} />
         ))}
       </Box>
-      <Feed snapshot={snapshot} />
-      <SimCard report={snapshot.sim} />
+      <Feed snapshot={snapshot} width={frame.contentWidth} />
+      <SimCard report={snapshot.sim} width={frame.contentWidth} />
       <Actions
+        width={frame.contentWidth}
         snapshot={snapshot}
         actions={actions}
         running={running}

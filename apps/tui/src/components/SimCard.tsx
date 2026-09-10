@@ -11,10 +11,10 @@ import { TERM, UI } from "../theme.js";
  * can rank policies against each other and cannot price either of them, and a figure that looked
  * like money would be claiming otherwise.
  */
-export function SimCard({ report }: { report: SimReport }) {
+export function SimCard({ report, width }: { report: SimReport; width: number }) {
   return (
     <Box flexDirection="column">
-      <Divider label="simulation" />
+      <Divider label="simulation" width={width} />
       <Text color={UI.heading} wrap="truncate-end">
         {headline(report)}
       </Text>

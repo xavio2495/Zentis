@@ -38,7 +38,7 @@ test("the node bundle runs the console under node and draws its first frame", ()
     cmd: [
       "sh",
       "-c",
-      `(sleep 3; printf x; sleep 2) | script -qec ${JSON.stringify(`node ${bundle} watch`)} /dev/null`,
+      `(sleep 3; printf x; sleep 2) | script -qec ${JSON.stringify(`stty cols 120 rows 44; node ${bundle} watch`)} /dev/null`,
     ],
     stdout: "pipe",
     stderr: "pipe",
@@ -67,7 +67,7 @@ test("`watch` refuses to sign even when an env file is present", () => {
     cmd: [
       "sh",
       "-c",
-      `(sleep 3; printf r; sleep 2; printf x; sleep 2) | ZENTIS_ENV=/dev/null script -qec ${JSON.stringify(`${binary} watch`)} /dev/null`,
+      `(sleep 3; printf r; sleep 2; printf x; sleep 2) | ZENTIS_ENV=/dev/null script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary} watch`)} /dev/null`,
     ],
     stdout: "pipe",
     stderr: "pipe",
@@ -100,7 +100,7 @@ test("the compiled binary finds the repository from its working directory, not f
           "sh",
           "-c",
           `cd ${JSON.stringify(cwd)} && (sleep 4; printf r; sleep 3; printf x; sleep 2) | ` +
-            `${env} script -qec ${JSON.stringify(binary)} /dev/null`,
+            `${env} script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary}`)} /dev/null`,
         ],
         stdout: "pipe",
         stderr: "pipe",

@@ -141,14 +141,27 @@ export function clampToRows(text: string, columns: number, rows: number): string
 }
 
 /**
- * The spread row, laid out so that Ink never has to shorten it.
+ * The widest of several renderings that fits, or the shortest one visibly cut.
  *
- * Ink squeezes an overlong row by dropping characters out of the middle of it, and on a row of
- * numbers that is silent corruption: `10+49+0+200` came out as `10+4+0+20`, which still reads as a
- * decomposition and no longer sums to its own total. So the numeric part is built first and is
- * always short enough to fit, and the explanatory note is added only if what remains of the column
- * will hold all of it. A note is dropped whole rather than clipped, because half of `2/m × 248m`
- * reads as a rate or an age that is not the one the program is applying.
+ * Every row that carries numbers goes through here. Ink shortens an overlong row by deleting
+ * characters from *inside* it, so `10+49+0+200` becomes `10+4+0+20` — a smaller number that still
+ * looks like a number and no longer sums to its own total. A row must therefore never be handed to
+ * Ink wider than its column. Callers give the same row at decreasing levels of detail, and detail is
+ * what gets dropped; a trailing ellipsis is the last resort and is at least visible.
+ */
+export function chooseFit(renderings: string[], width: number): string {
+  for (const rendering of renderings) {
+    if (rendering.length <= width) return rendering
+  }
+  const shortest = renderings[renderings.length - 1] ?? ''
+  return width <= 1 ? '…'.slice(0, Math.max(0, width)) : `${shortest.slice(0, width - 1)}…`
+}
+
+/**
+ * The spread row: the terms are never dropped, the explanation around them is.
+ *
+ * In order of what goes first: the age arithmetic, then the word `spread`, then the total. The four
+ * terms and their `+` signs are what the row exists to show and survive to the narrowest column.
  */
 export function spreadRow(
   stack: {
@@ -162,11 +175,85 @@ export function spreadRow(
   ageMinutes: number,
   width: number,
 ): { numbers: string; note: string } {
-  const numbers =
-    `spread ${stack.totalBps} ` +
-    `${stack.baseBps}+${stack.volatilityBps}+${stack.markoutBps}+${stack.stalenessBps}`
+  const terms = `${stack.baseBps}+${stack.volatilityBps}+${stack.markoutBps}+${stack.stalenessBps}`
+  const numbers = chooseFit(
+    [`spread ${stack.totalBps} ${terms}`, `spread ${terms}`, `${stack.totalBps} ${terms}`, terms],
+    width,
+  )
   if (stack.stalenessBps === 0) return { numbers, note: '' }
 
   const note = ` (${widenBpsPerMinute}/m × ${ageMinutes}m)`
   return { numbers, note: numbers.length + note.length <= width ? note : '' }
+}
+
+/**
+ * The shift row, which has to explain why its own numbers do not add up.
+ *
+ * `-1631 + 1131` is `-500` only because the maker's signed cap intervened. Printed bare, the three
+ * numbers read as arithmetic that does not work — worse than printing nothing, because the reader
+ * concludes the screen is broken rather than that the policy was clamped.
+ */
+export function shiftRow(
+  tiltBps: bigint,
+  correction: bigint,
+  concession: bigint,
+  capped: boolean,
+  width: number,
+): string {
+  const total = capped ? `shift ${signed(tiltBps)} (capped)` : `shift ${signed(tiltBps)}`
+  const split = `corr ${signed(correction)} | conc ${signed(concession)}`
+  return chooseFit(
+    [
+      capped ? `${total} = ${split} before cap` : `${total}  ${split}`,
+      `${total}  ${split}`,
+      `shift ${signed(tiltBps)} ${split}`,
+      total,
+      `shift ${signed(tiltBps)}`,
+    ],
+    width,
+  )
+}
+
+/**
+ * A raw token amount as the token, with three significant digits.
+ *
+ * The screen used to print `4.13e14` for a WETH balance, which is wrong twice over: it is the raw
+ * unit rather than the token, and scientific notation of an eighteen-decimal integer is not a
+ * quantity anyone can size at a glance. Three significant digits rather than a fixed number of
+ * places, because the amounts here span a taker's 0.15 USDC and a maker's 0.000004 WETH and a fixed
+ * precision renders one of them as zero.
+ */
+export function tokenAmount(raw: bigint, decimals: number, significant = 3): string {
+  if (raw === 0n) return '0'
+  const negative = raw < 0n
+  const value = negative ? -raw : raw
+  const scale = 10n ** BigInt(decimals)
+  const whole = value / scale
+  const sign = negative ? '-' : ''
+  const grouped = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
+  if (whole > 0n) {
+    // Above one unit the integer part already carries the magnitude; the fraction only refines it.
+    const spare = Math.max(0, significant - whole.toString().length)
+    if (spare === 0) return `${sign}${grouped}`
+    const fraction = (value % scale).toString().padStart(decimals, '0').slice(0, spare).replace(/0+$/, '')
+    return fraction === '' ? `${sign}${grouped}` : `${sign}${grouped}.${fraction}`
+  }
+
+  // Below one unit, count places from the first digit that is not a leading zero, so a very small
+  // balance keeps its precision instead of rounding away.
+  const fraction = (value % scale).toString().padStart(decimals, '0')
+  const firstSignificant = fraction.search(/[1-9]/)
+  const kept = fraction.slice(0, firstSignificant + significant).replace(/0+$/, '')
+  return `${sign}0.${kept}`
+}
+
+/** A duration as an operator says it, at any scale: seconds, then minutes, then hours and minutes. */
+export function duration(seconds: number): string {
+  if (seconds < 60) return `${Math.max(0, Math.round(seconds))}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours}h` : `${hours}h${rest}m`
 }

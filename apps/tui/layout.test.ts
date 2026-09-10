@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { FEED_ROWS } from "@zentis/console-data";
-import { CONTENT_WIDTH, FRAME } from "./src/components/Divider.js";
+import { DESIGN_WIDTH } from "./src/components/Divider.js";
 import { clampToRows } from "./src/format.js";
 
 /**
@@ -33,17 +33,18 @@ test("the whole screen fits in 40 rows", () => {
   expect(HEIGHT).toBeLessThanOrEqual(40);
 });
 
-test("three leg columns and their padding fit the frame's width", () => {
-  const columns = 3;
-  const columnWidth = 38;
-  expect(columns * columnWidth).toBeLessThanOrEqual(CONTENT_WIDTH);
-  expect(FRAME.width).toBe(120);
-  // A rule that overruns the content width wraps, and a wrapped rule costs a row everywhere.
-  expect(CONTENT_WIDTH).toBe(FRAME.width - 4); // a rounded border and one column of padding a side
-});
-
-test("the frame has no fixed height, because Ink drops overflow rather than clipping it", () => {
-  expect("height" in FRAME).toBe(false);
+test("the leg columns divide whatever the terminal gives, and never exceed it", () => {
+  // The frame is never wider than the terminal, because Ink squeezes an overlong row by deleting
+  // characters from inside it: a 120-column layout in a 100-column terminal corrupts numbers rather
+  // than merely looking wrong.
+  for (const terminal of [80, 100, 120, 190]) {
+    const width = Math.max(40, Math.min(DESIGN_WIDTH, terminal));
+    const contentWidth = width - 4;
+    const columnWidth = Math.floor(contentWidth / 3);
+    expect(width).toBeLessThanOrEqual(terminal);
+    expect(3 * columnWidth).toBeLessThanOrEqual(contentWidth);
+    expect(columnWidth).toBeGreaterThan(8); // still wide enough for a gauge and a number
+  }
 });
 
 test("the why line is clamped to whole rows, and clamps on a word where it can", () => {

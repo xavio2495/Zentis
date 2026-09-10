@@ -6,6 +6,7 @@ import { type LegQuote, type QuoteSet, fetchQuotes } from "./quotes.js";
 import { type Finality, type StoredRef, fetchFinality, fetchRef } from "./registry.js";
 import { type SpreadStack, midOf, recomputeVolatility, spreadStack } from "./spread.js";
 import { type SimReport, loadSimReport } from "./sim.js";
+import { humanDuration } from "./duration.js";
 
 /** Everything one column needs, with the reasons any of it is missing. */
 export interface LegSnapshot {
@@ -105,7 +106,8 @@ export async function takeSnapshot(quoteSize = QUOTE_SIZE_A): Promise<Snapshot> 
         : null;
     if (spread?.tooStaleToQuote === true) {
       legCaveats.push(
-        `the reference is ${spread.referenceAgeSeconds}s old, past this leg's limit of ${position!.maxStalenessSeconds}s, so the router will refuse to price`,
+        `the reference is ${humanDuration(spread.referenceAgeSeconds)} old, past this leg's limit of ` +
+          `${humanDuration(position!.maxStalenessSeconds)}, so the router refuses to price`,
       );
     }
 

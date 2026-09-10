@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import type { FeedRow, Snapshot } from "@zentis/console-data";
-import { clock, signed, weiish } from "../format.js";
+import { clock, duration, signed, tokenAmount } from "../format.js";
 import { Divider } from "./Divider.js";
 import { UI } from "../theme.js";
 
@@ -49,18 +49,18 @@ function Row({ row, snapshot }: { row: FeedRow; snapshot: Snapshot }) {
         <>
           <Text color={UI.fill}>fill </Text>
           <Text color={UI.heading}>
-            {weiish(row.amountIn, (row.isAToB ? leg?.config.tokenA.decimals : leg?.config.tokenB.decimals) ?? 18)}{" "}
+            {tokenAmount(row.amountIn, (row.isAToB ? leg?.config.tokenA.decimals : leg?.config.tokenB.decimals) ?? 18)}{" "}
             {row.isAToB ? leg?.config.tokenA.symbol : leg?.config.tokenB.symbol}
           </Text>
           <Text color={UI.muted}> → </Text>
           <Text color={UI.heading}>
-            {weiish(row.amountOut, (row.isAToB ? leg?.config.tokenB.decimals : leg?.config.tokenA.decimals) ?? 18)}{" "}
+            {tokenAmount(row.amountOut, (row.isAToB ? leg?.config.tokenB.decimals : leg?.config.tokenA.decimals) ?? 18)}{" "}
             {row.isAToB ? leg?.config.tokenB.symbol : leg?.config.tokenA.symbol}
           </Text>
           <Text color={UI.muted}>
             {row.refTiltBps === null
               ? "  (no reference had been published)"
-              : `  at shift ${signed(row.refTiltBps)}, on a reference ${row.refAgeSeconds}s old`}
+              : `  at shift ${signed(row.refTiltBps)}, on a reference ${duration(Number(row.refAgeSeconds ?? 0n))} old`}
           </Text>
         </>
       ) : (
@@ -73,10 +73,10 @@ function Row({ row, snapshot }: { row: FeedRow; snapshot: Snapshot }) {
   );
 }
 
-export function Feed({ snapshot }: { snapshot: Snapshot }) {
+export function Feed({ snapshot, width }: { snapshot: Snapshot; width: number }) {
   return (
     <Box flexDirection="column">
-      <Divider label="feed" />
+      <Divider label="feed" width={width} />
       {snapshot.feed.length === 0 && <Text color={UI.muted}>nothing indexed yet</Text>}
       {snapshot.feed.map((row, i) => (
         <Row key={`${row.kind}-${i}`} row={row} snapshot={snapshot} />

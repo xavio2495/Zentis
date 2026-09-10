@@ -34,12 +34,14 @@ function Finality({ snapshot }: { snapshot: Snapshot }) {
 }
 
 export function Actions({
+  width,
   snapshot,
   actions,
   running,
   pending,
   lastResult,
 }: {
+  width: number;
   snapshot: Snapshot;
   actions: Action[];
   running: string | null;
@@ -49,7 +51,7 @@ export function Actions({
   const watchOnly = actions.every((a) => a.disabledReason !== null || a.key === "q");
   return (
     <Box flexDirection="column">
-      <Divider label="actions" />
+      <Divider label="actions" width={width} />
       <Box>
         {actions.map((action) => (
           <Box key={action.key}>

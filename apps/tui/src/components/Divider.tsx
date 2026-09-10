@@ -1,23 +1,25 @@
-import { Text } from "ink";
+import { Text, useStdout } from "ink";
 import { UI } from "../theme.js";
 
 /**
- * The frame is 120 columns, a rounded border takes one each side and the padding takes one more, so
- * a rule has 116 to fill. Written down once because a rule that overruns wraps, and a wrapped rule
- * pushes every panel below it down a line — which is how a 40-row layout stops being a 40-row layout.
- */
-export const CONTENT_WIDTH = 116;
-
-/**
- * The frame is 120 columns wide and as tall as its content.
+ * The frame's dimensions, taken from the terminal rather than assumed.
  *
- * Not a fixed height: Ink does not clip a box whose content overruns it, it drops the overflow, and
- * a `why` line that wraps to three rows is enough to lose a whole column's heading. The layout is
- * built to come in under 40 rows and is asserted to; pinning the height would hide the day it does
- * not rather than prevent it.
+ * The layout is designed for 120 columns, but a frame wider than the terminal does not merely look
+ * wrong: Ink squeezes every overlong row by deleting characters from inside it, so a 120-column
+ * layout in a 100-column terminal silently corrupts numbers. The frame is therefore never wider
+ * than the terminal, and the leg columns divide whatever is left.
  */
-export const FRAME = { width: 120 } as const;
+export const DESIGN_WIDTH = 120;
 
-export const Divider = ({ label }: { label: string }) => (
-  <Text color={UI.frame}>{`─ ${label} `.padEnd(CONTENT_WIDTH, "─")}</Text>
+export function useFrame(): { width: number; contentWidth: number; columnWidth: number } {
+  const { stdout } = useStdout();
+  const available = stdout?.columns ?? DESIGN_WIDTH;
+  // Two for the rounded border, two for the padding.
+  const width = Math.max(40, Math.min(DESIGN_WIDTH, available));
+  const contentWidth = width - 4;
+  return { width, contentWidth, columnWidth: Math.floor(contentWidth / 3) };
+}
+
+export const Divider = ({ label, width }: { label: string; width: number }) => (
+  <Text color={UI.frame}>{`─ ${label} `.padEnd(width, "─").slice(0, width)}</Text>
 );
