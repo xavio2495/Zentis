@@ -19,7 +19,8 @@ const config: Config = {
 	maxTiltBps: 500,
 	maxExtrapBps: 100,
 	maker: '0x4887B4695dEe830A341304bFEb14538E2442DD55',
-	legA: {
+	legs: [
+	{
 		chainSelector: '10344971235874465080',
 		pool: '0x46880b404CD35c165EDdefF7421019F8dD25F4Ad',
 		aqua: '0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9',
@@ -29,7 +30,7 @@ const config: Config = {
 		tokenB: '0x4200000000000000000000000000000000000006',
 		registry: '0x2FE4cCe316287505ce114101b9d58c1f56d8E910',
 	},
-	legB: {
+	{
 		chainSelector: '3478487238524512106',
 		pool: '0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf',
 		aqua: '0x8F4f807C72a2BfAB4024e783f68Fc714d0Ce2bbe',
@@ -39,7 +40,20 @@ const config: Config = {
 		tokenB: '0x980B62Da83eFf3D4576C647993b0c1D7faf17c73',
 		registry: '0xB7e37E396bBB785c346D1909231a9B3D2707Cd32',
 	},
+	],
 }
+
+const SEPOLIA_LEG = {
+	chainSelector: '16015286601757825753',
+	pool: '0x6418eec70f50913ff0d756b48d32ce7c02b47c47',
+	aqua: '0xF86CdAeE90DB9901a5F104172294161085070C5A',
+	app: '0x57706A10f41d4649fE65de6D38c3eCe429D2d147',
+	strategyHash: `0x${'33'.repeat(32)}`,
+	tokenA: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+	tokenB: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+	registry: '0xA5dCB9B329b17253FF35202dEb7a2093d06fd7b0',
+}
+const configWithThreeLegs: Config = { ...config, legs: [...config.legs, SEPOLIA_LEG] }
 
 const bytes = (hex: string) => {
 	const clean = hex.replace(/^0x/, '')
@@ -102,33 +116,39 @@ const storedData = (stored: Stored) =>
  * A chain that never changes: both legs' finalized block, pool price and Aqua balances are fixed.
  * Every determinism claim in this file rests on the handler being a pure function of these.
  */
-type ChainState = {
-	blockA: bigint
-	tsA: bigint
-	sqrtA: bigint
-	balA: [bigint, bigint]
-	blockB: bigint
-	tsB: bigint
-	sqrtB: bigint
-	balB: [bigint, bigint]
-	storedA: Stored
-	storedB: Stored
+type LegState = { block: bigint; ts: bigint; sqrt: bigint; bal: [bigint, bigint]; stored: Stored }
+type ChainState = { legs: LegState[] }
+
+const LEG_A: LegState = {
+	block: 46561623n,
+	ts: 1788891534n,
+	sqrt: 1315805077060885543498123125042033n,
+	bal: [15_000_000n, 4137282795001288n],
+	stored: NOTHING_STORED,
+}
+const LEG_B: LegState = {
+	block: 306809662n,
+	ts: 1788891600n,
+	sqrt: 1782527366555253651198357277536396n,
+	bal: [15_000_000n, 7592844468186735n],
+	stored: NOTHING_STORED,
+}
+// Sepolia's reference pool, at the price the third leg was shipped against.
+const LEG_C: LegState = {
+	block: 11673302n,
+	ts: 1788891580n,
+	sqrt: 416770674707369483170269580145195n,
+	bal: [15_000_000n, 415074829001483n],
+	stored: NOTHING_STORED,
 }
 
-const CHAIN: ChainState = {
-	blockA: 46561623n,
-	tsA: 1788891534n,
-	sqrtA: 1315805077060885543498123125042033n,
-	balA: [15_000_000n, 4137282795001288n],
-	blockB: 306809662n,
-	tsB: 1788891600n,
-	sqrtB: 1782527366555253651198357277536396n,
-	balB: [15_000_000n, 7592844468186735n],
-	storedA: NOTHING_STORED,
-	storedB: NOTHING_STORED,
-}
+const CHAIN: ChainState = { legs: [LEG_A, LEG_B] }
+const THREE: ChainState = { legs: [LEG_A, LEG_B, LEG_C] }
+const withLeg = (chain: ChainState, index: number, patch: Partial<LegState>): ChainState => ({
+	legs: chain.legs.map((leg, i) => (i === index ? { ...leg, ...patch } : leg)),
+})
 
-const makeRuntime = (chain: ChainState = CHAIN) => {
+const makeRuntime = (chain: ChainState = CHAIN, cfg: Config = config) => {
 	const logs: string[] = []
 	const reports: string[] = []
 	const calls: string[] = []
@@ -136,20 +156,16 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 	const blockTags: string[] = []
 
 	// header, slot0, safeBalances, refOf — per leg, in the order observeLeg issues them.
-	const queue: Array<() => unknown> = [
-		() => ({ header: { blockNumber: protoBigInt(chain.blockA), timestamp: chain.tsA } }),
-		() => ({ data: slot0Data(chain.sqrtA) }),
-		() => ({ data: balancesData(chain.balA[0], chain.balA[1]) }),
-		() => ({ data: storedData(chain.storedA) }),
-		() => ({ header: { blockNumber: protoBigInt(chain.blockB), timestamp: chain.tsB } }),
-		() => ({ data: slot0Data(chain.sqrtB) }),
-		() => ({ data: balancesData(chain.balB[0], chain.balB[1]) }),
-		() => ({ data: storedData(chain.storedB) }),
-	]
+	const queue: Array<() => unknown> = chain.legs.flatMap((leg) => [
+		() => ({ header: { blockNumber: protoBigInt(leg.block), timestamp: leg.ts } }),
+		() => ({ data: slot0Data(leg.sqrt) }),
+		() => ({ data: balancesData(leg.bal[0], leg.bal[1]) }),
+		() => ({ data: storedData(leg.stored) }),
+	])
 	let i = 0
 
 	const don = {
-		config,
+		config: cfg,
 		callCapability: ({ method, payload }: { method: string; payload?: unknown }) => {
 			calls.push(method)
 			if (method === 'CallContract') {
@@ -172,7 +188,7 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 	}
 
 	const runtime = {
-		config,
+		config: cfg,
 		getSecret: ({ id }: { id: string }) => ({
 			result: () => ({ value: id === 'KAPPA_BOOK_BPS' ? KAPPA_BOOK : KAPPA }),
 		}),
@@ -204,7 +220,7 @@ describe('fast workflow', () => {
 
 		// Same everything except one leg's inventory: the reports must diverge, or the test above
 		// would pass for a handler that ignores its inputs entirely.
-		const moved = makeRuntime({ ...CHAIN, balA: [20_000_000n, 4137282795001288n] })
+		const moved = makeRuntime(withLeg(CHAIN, 0, { bal: [20_000_000n, 4137282795001288n] }))
 		onCronTrigger(moved.runtime)
 
 		expect(moved.reports).not.toEqual(base.reports)
@@ -222,10 +238,7 @@ describe('fast workflow', () => {
 		// price already sits below the mid, so the anchor makes tokenA dear there: a negative tilt.
 		// Leg B is even, but the book as a whole holds excess tokenA, so the book skew has it
 		// discount tokenA a little: a small positive tilt.
-		const { runtime, reports } = makeRuntime({
-			...CHAIN,
-			balA: [25_000_000n, 4137282795001288n],
-		})
+		const { runtime, reports } = makeRuntime(withLeg(CHAIN, 0, { bal: [25_000_000n, 4137282795001288n] }))
 		onCronTrigger(runtime)
 
 		const refOf = (payload: string) => decodeRef(payload)[1]
@@ -242,10 +255,9 @@ describe('fast workflow', () => {
 		// The slow workflow measures the spread, the markout and the boundary and writes them into
 		// the same slot. If this workflow rebuilt the slot from its config every minute, an hour's
 		// measurement would live for at most sixty seconds.
-		const { runtime, reports } = makeRuntime({
-			...CHAIN,
-			storedA: { mid: 1n, spreadBps: 22, markoutBps: 37, bandEdgeBps: 54 },
-		})
+		const { runtime, reports } = makeRuntime(
+			withLeg(CHAIN, 0, { stored: { mid: 1n, spreadBps: 22, markoutBps: 37, bandEdgeBps: 54 } }),
+		)
 		onCronTrigger(runtime)
 		const [, refA] = decodeRef(reports[0]!)
 		const [, refB] = decodeRef(reports[1]!)
@@ -265,11 +277,11 @@ describe('fast workflow', () => {
 		const { runtime, blockTags } = makeRuntime()
 		onCronTrigger(runtime)
 		expect(blockTags).toEqual([
-			String(CHAIN.blockA),
-			String(CHAIN.blockA),
+			String(LEG_A.block),
+			String(LEG_A.block),
 			'latest',
-			String(CHAIN.blockB),
-			String(CHAIN.blockB),
+			String(LEG_B.block),
+			String(LEG_B.block),
 			'latest',
 		])
 	})
@@ -282,15 +294,33 @@ describe('fast workflow', () => {
 		expect(refA.seq).toBe(refB.seq)
 		expect(refA.updatedAt).toBe(refB.updatedAt)
 		// never fresher than the laggier leg
-		expect(BigInt(refA.updatedAt)).toBe(CHAIN.tsA < CHAIN.tsB ? CHAIN.tsA : CHAIN.tsB)
+		expect(BigInt(refA.updatedAt)).toBe(LEG_A.ts < LEG_B.ts ? LEG_A.ts : LEG_B.ts)
+	})
+
+	test('a third leg is observed, priced with the rest of the book, and written', () => {
+		// Leg C holds excess tokenA against its own mid and is repriced dear; the other two legs
+		// shed a little through the book term, and all three share one instant.
+		const { runtime, reports, blockTags } = makeRuntime(
+			withLeg(THREE, 2, { bal: [25_000_000n, 415074829001483n] }),
+			configWithThreeLegs,
+		)
+		onCronTrigger(runtime)
+		expect(reports).toHaveLength(3)
+		expect(blockTags).toHaveLength(9)
+		const refs = reports.map((r) => decodeRef(r)[1])
+		expect(refs[2]!.tiltBps).toBeLessThan(0)
+		expect(refs[0]!.tiltBps).toBeGreaterThan(0)
+		expect(refs[1]!.tiltBps).toBeGreaterThan(0)
+		expect(new Set(refs.map((r) => r.seq)).size).toBe(1)
+		expect(BigInt(refs[0]!.updatedAt)).toBe(LEG_A.ts)
 	})
 
 	test('the capability budget covers the calls actually made, with headroom', () => {
-		const { runtime, calls } = makeRuntime()
+		const { runtime, calls } = makeRuntime(THREE, configWithThreeLegs)
 		onCronTrigger(runtime)
 
 		const made = (m: string) => calls.filter((c) => c === m).length
-		const budget = restrictions(config).capabilities.restrictions
+		const budget = restrictions(configWithThreeLegs).capabilities.restrictions
 		const allowed = (m: string) =>
 			budget
 				.filter((r) => r.method?.method === m)
