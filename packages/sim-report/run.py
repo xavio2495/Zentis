@@ -47,8 +47,15 @@ def _drift(r) -> float:
     return max(abs(sum(t["weights"]) / len(t["weights"]) / 1e18 - 0.5) for t in r.ticks)
 
 
+def _book_in_a(book: Book) -> int:
+    """The opening book in raw tokenA: every leg is shipped balanced at its mid, so its tokenB side
+    is worth its tokenA side, and the book is twice the tokenA across the legs."""
+    return 2 * book.balance_a * book.legs
+
+
 def _regime(name: str, params: dict) -> dict:
     book = Book(**BOOK)
+    book_in_a = _book_in_a(book)
     control = Book(**{**BOOK, "signal": "cross_leg"})
     diffs, drifts, fills, refused, transfers, static_pnl = [], [], [], [], [], []
     for seed in SEEDS:
@@ -67,6 +74,8 @@ def _regime(name: str, params: dict) -> dict:
         "volBpsPerTick": params["vol_bps"],
         "seeds": len(SEEDS),
         "meanVsStatic": round(st.mean(diffs)),
+        "meanVsStaticBpsOfBook": round(st.mean(diffs) * 10_000 / book_in_a, 1),
+        "worstVsStaticBpsOfBook": round(min(diffs) * 10_000 / book_in_a, 1),
         "sdVsStatic": round(st.pstdev(diffs)),
         "worstVsStatic": min(diffs),
         "seedsAhead": sum(d > 0 for d in diffs),
@@ -85,6 +94,7 @@ def main() -> None:
         "modelCommit": commit,
         "unit": "raw tokenA (6dp), trading PnL with the hold removed, reservation policy minus static",
         "book": BOOK,
+        "bookInA": _book_in_a(Book(**BOOK)),
         "series": {"ticks": Series().ticks, "seeds": SEEDS[0], "seedsTo": SEEDS[-1]},
         "regimes": [_regime(name, params) for name, params in REGIMES.items()],
     }
