@@ -38,15 +38,13 @@ export const configSchema = z.object({
 	markoutBps: z.number(),
 	maxTiltBps: z.number(),
 	maxExtrapBps: z.number(),
-	// The maker is the same on both legs, so it lives here rather than twice below. That is not
-	// tidiness: the CRE runtime delivers a TRUNCATED config to the workflow once the total number of
-	// leaf values crosses roughly 27, failing as
-	// "Failed to parse configuration: Unexpected end of JSON input". It is a count cliff, not a size
-	// one — a 1.7kB config with 18 leaves is fine, a 541-byte config with 27 is not, dropping any one
-	// field fixes it, and shortening a value does not. Keep this schema under ~24 leaves.
+	// The maker is the same on every leg, so it lives here rather than once per leg. (An earlier
+	// note here claimed the runtime truncates configs past ~27 leaves. It does not: that was the
+	// pre-hook parse failure wearing a different face, and the slow workflow runs with far more.)
 	maker: z.string(),
-	legA: legSchema,
-	legB: legSchema,
+	// One leg per chain the position lives on. Two is the minimum for a tilt to mean anything; the
+	// policy and every loop below are written for N.
+	legs: z.array(legSchema).min(2),
 })
 
 export type Config = z.infer<typeof configSchema>
@@ -251,7 +249,7 @@ const observeLeg = (
 }
 
 /**
- * The fast reference: mid, tilt and spread for both legs of one cross-chain position.
+ * The fast reference: mid, tilt and slope for every leg of one cross-chain position.
  *
  * What the enclave actually keeps confidential is the pair of gains that turn inventory into a quote
  * concession: one on the leg's own weight, one on the whole book's. Those numbers are the maker's
@@ -271,24 +269,23 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const don = runtime.usingTheDons()
 
 	const maker = config.maker as Address
-	const observed = [
-		observeLeg(don, config.legA, maker, config.positionId as Hex, 'legA'),
-		observeLeg(don, config.legB, maker, config.positionId as Hex, 'legB'),
-	] as [Observation, Observation]
+	const observed = config.legs.map((leg, i) =>
+		observeLeg(don, leg, maker, config.positionId as Hex, `leg${i}`),
+	)
 	const policies = reservation(
-		[observed[0].weight, observed[1].weight],
+		observed.map((o) => o.weight),
 		kappaOwnBps,
 		kappaBookBps,
 		BigInt(config.maxTiltBps),
 	)
 
-	// One updatedAt and one seq across both legs: they describe a single cross-chain instant, and a
+	// One updatedAt and one seq across every leg: they describe a single cross-chain instant, and a
 	// reader must be able to tell they came from one observation by comparing seq. The combined
-	// reference is never fresher than its laggier leg, hence the min.
-	const updatedAt =
-		observed[0].pinnedTimestamp < observed[1].pinnedTimestamp
-			? observed[0].pinnedTimestamp
-			: observed[1].pinnedTimestamp
+	// reference is never fresher than its laggiest leg, hence the min.
+	const updatedAt = observed.reduce(
+		(oldest, o) => (o.pinnedTimestamp < oldest ? o.pinnedTimestamp : oldest),
+		observed[0]!.pinnedTimestamp,
+	)
 	const seq = updatedAt
 
 	const written = observed.map((o, i) => {
@@ -353,8 +350,8 @@ export function initWorkflow(config: Config) {
 export const restrictions = (config: Config) => ({
 	capabilities: {
 		type: 'CAPABILITY_RESTRICTION_TYPE_OPEN' as const,
-		maxTotalCalls: 20,
-		restrictions: [config.legA, config.legB].flatMap((leg) => {
+		maxTotalCalls: 10 * config.legs.length,
+		restrictions: config.legs.flatMap((leg) => {
 			const r = new cre.restrictors.EVMRestrictor(BigInt(leg.chainSelector))
 			return [r.limitHeaderByNumber(2), r.limitCallContract(6), r.limitWriteReport(2)]
 		}),
