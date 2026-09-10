@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BOOK, LEGS } from "../src/config.js";
 import { historyQuery } from "../src/fills.js";
@@ -108,3 +108,47 @@ if (chosen.length === LEGS.length) {
 } else {
   console.log("partial run: recorded-at left as it was");
 }
+
+/**
+ * Check what was just written, and say so in one line.
+ *
+ * This runs unattended from a timer at an hour nobody is watching, and its output is read hours
+ * later. A run that half-succeeded — an endpoint that answered with an empty `position`, a file
+ * written truncated — would otherwise look identical in the log to one that worked, and the failure
+ * would surface as a broken test the next morning with no clue which leg was at fault.
+ */
+const problems: string[] = [];
+for (const leg of chosen) {
+  for (const [name, expect] of [
+    [`history-${leg.name}`, (d: Record<string, unknown>) => d["position"] != null],
+    [`pool-${leg.name}`, (d: Record<string, unknown>) => Array.isArray(d["swaps"]) && (d["swaps"] as unknown[]).length > 0],
+    [`ref-${leg.name}`, (d: Record<string, unknown>) => Number(d["seq"]) > 0],
+  ] as const) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(dir, `${name}.json`), "utf8")) as Record<string, unknown>;
+      if (!expect(parsed)) problems.push(`${name}: written but does not carry what it should`);
+    } catch (cause) {
+      problems.push(`${name}: ${String(cause)}`);
+    }
+  }
+}
+
+const seqs = new Set(
+  chosen.map((leg) =>
+    Number(
+      (JSON.parse(readFileSync(join(dir, `ref-${leg.name}.json`), "utf8")) as { seq: number }).seq,
+    ),
+  ),
+);
+if (chosen.length === LEGS.length && seqs.size !== 1) {
+  // The fixture set is meant to be one moment across three legs; the first thing the tests assert
+  // is a shared seq. Catching it here names the run that produced it.
+  problems.push(`legs are on different seqs (${[...seqs].join(", ")}), so this is not one moment`);
+}
+
+if (problems.length > 0) {
+  console.error(`FAILED: ${problems.length} problem(s)`);
+  for (const problem of problems) console.error(`  ${problem}`);
+  process.exit(1);
+}
+console.log(`OK: recorded ${chosen.length} leg(s), seq ${[...seqs].join(", ")}`);
