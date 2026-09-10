@@ -21,7 +21,10 @@ library ZentisPositionConfig {
 
     // The reference is republished far more often than this; an hour is the go-dark boundary.
     uint32 internal constant MAX_STALENESS = 1 hours;
-    uint16 internal constant WIDEN_BPS_PER_MINUTE = 10;
+    // A reference is published at its finalized block, sixteen to twenty minutes behind the head, so
+    // at 10 bps a minute every quote opened at or near the 200 bps cap. At 2 the ramp is ~36 bps at
+    // publish and reaches 120 at the hour, where the position goes dark anyway.
+    uint16 internal constant WIDEN_BPS_PER_MINUTE = 2;
     uint16 internal constant SKEW_MAX_WIDEN_BPS = 200;
 
     uint16 internal constant MAX_TILT_BPS = 500;
