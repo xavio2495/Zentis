@@ -1,23 +1,21 @@
 import type { PriceSample } from "@zentis/strategy-sdk";
 
 /**
- * A line chart drawn in braille cells, by hand.
+ * A line chart drawn in box-drawing characters, by hand.
  *
- * No charting library: one would be a dependency the binary carries for a picture it can draw in
- * sixty lines. Braille gives four vertical sub-rows per terminal row, which is the difference
- * between a line and a staircase at the eight or ten rows this region gets.
+ * No charting library: one would be a dependency the binary carries for a picture it can draw in a
+ * page. The first version used braille for its four sub-rows per cell, and in the fonts people
+ * actually run terminals in braille renders as scattered dots with gaps between them — a line that
+ * reads as noise. `─ │ ╭ ╮ ╰ ╯` join cell to cell in any monospace font, so the line is a line.
+ *
+ * It is drawn as steps, not slopes, because that is what a pool's price is: it holds between swaps
+ * and jumps at each one. A diagonal between two swaps would draw prices nobody could have traded.
  *
  * Three series share one axis by being **normalised to their own first sample**, so what the chart
  * compares is how far each leg's reference pool has moved, not what its mid happens to be — three
  * mids that differ by orders of magnitude would otherwise put two lines flat against the frame.
  */
 
-/** Braille dot bits, by (column 0-1, row 0-3), as the Unicode block orders them. */
-const DOTS = [
-  [0x01, 0x02, 0x04, 0x40],
-  [0x08, 0x10, 0x20, 0x80],
-];
-const BRAILLE_BASE = 0x2800;
 
 export interface Series {
   readonly key: string;
@@ -113,60 +111,52 @@ export function plot(
   const to = times.reduce((a, b) => (a > b ? a : b));
   const span = to - from === 0n ? 1n : to - from;
 
-  const subRows = height * 4;
-  const subCols = width * 2;
-
   for (const s of series) {
     const pts = points.get(s.key) ?? [];
-    const grid = Array.from({ length: height }, () => new Array<number>(width).fill(0));
 
-    // Column-major: each sub-column takes the mean of the samples that land in it, and consecutive
-    // sub-columns are joined vertically so the line is continuous rather than a scatter.
-    const column = new Array<number | null>(subCols).fill(null);
+    // One value per column: the last price seen in that column, carried forward across columns with
+    // no swap in them. Carrying forward is the step function the pool actually is.
+    const column = new Array<number | null>(width).fill(null);
     for (const p of pts) {
-      const x = Math.min(subCols - 1, Number(((p.t - from) * BigInt(subCols - 1)) / span));
+      const x = Math.min(width - 1, Number(((p.t - from) * BigInt(Math.max(1, width - 1))) / span));
       // Clamped, not dropped: a point beyond the band still says "this leg went off the top".
       const scaled =
-        ((Math.log(Math.max(p.ratio, Number.MIN_VALUE)) - logLo) / logSpan) * (subRows - 1);
-      const y = Math.round(Math.max(0, Math.min(subRows - 1, scaled)));
-      column[x] = column[x] === null ? y : Math.round((column[x]! + y) / 2);
+        ((Math.log(Math.max(p.ratio, Number.MIN_VALUE)) - logLo) / logSpan) * (height - 1);
+      column[x] = Math.round(Math.max(0, Math.min(height - 1, scaled)));
     }
-    const ink = (x: number, y: number) => {
-      const row = height - 1 - Math.floor(y / 4);
-      const cell = Math.floor(x / 2);
-      if (row < 0 || row >= height || cell < 0 || cell >= width) return;
-      grid[row]![cell]! |= DOTS[x % 2]![y % 4]!;
+    let carried: number | null = null;
+    for (let x = 0; x < width; x += 1) {
+      if (column[x] === null) column[x] = carried;
+      else carried = column[x]!;
+    }
+
+    // Rows are counted from the bottom here and flipped when written, so "up" means up.
+    const grid = Array.from({ length: height }, () => new Array<string>(width).fill(" "));
+    const put = (x: number, level: number, glyph: string) => {
+      const row = height - 1 - level;
+      if (row >= 0 && row < height && x >= 0 && x < width) grid[row]![x] = glyph;
     };
 
-    // Joined, not scattered. Swaps are sparse — a week of them across a few hundred sub-columns —
-    // so plotting only the columns that carry a sample leaves gaps between them and the result reads
-    // as noise rather than as a series. Consecutive samples are connected by interpolating across
-    // the empty columns between them, which is what makes three legs legible as three lines.
-    let previous: { x: number; y: number } | null = null;
-    for (let x = 0; x < subCols; x += 1) {
-      const y = column[x];
-      if (y === null || y === undefined) continue;
-      if (previous === null) {
-        ink(x, y);
+    let previous: number | null = null;
+    for (let x = 0; x < width; x += 1) {
+      const level = column[x];
+      if (level === null || level === undefined) continue;
+      if (previous === null || level === previous) {
+        put(x, level, "─");
+      } else if (level > previous) {
+        put(x, previous, "╯");
+        for (let between = previous + 1; between < level; between += 1) put(x, between, "│");
+        put(x, level, "╭");
       } else {
-        const run = x - previous.x;
-        for (let step = 1; step <= run; step += 1) {
-          const at = previous.x + step;
-          const between = Math.round(previous.y + ((y - previous.y) * step) / run);
-          // The vertical run at each step keeps the line continuous where it is steep, rather than
-          // leaving a dotted diagonal.
-          const from = step === 1 ? previous.y : Math.round(previous.y + ((y - previous.y) * (step - 1)) / run);
-          const [top, bottom] = from <= between ? [from, between] : [between, from];
-          for (let fill = top; fill <= bottom; fill += 1) ink(at, fill);
-        }
+        put(x, previous, "╮");
+        for (let between = level + 1; between < previous; between += 1) put(x, between, "│");
+        put(x, level, "╰");
       }
-      previous = { x, y };
+      previous = level;
     }
 
     byKey.set(s.key, {
-      rows: grid.map((row) =>
-        row.map((bits) => (bits === 0 ? " " : String.fromCharCode(BRAILLE_BASE + bits))).join(""),
-      ),
+      rows: grid.map((row) => row.join("")),
       minRatio: lo,
       maxRatio: hi,
       clipped: pts.filter((p) => p.ratio < lo || p.ratio > hi).length,

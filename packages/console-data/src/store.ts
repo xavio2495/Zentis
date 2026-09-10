@@ -1,4 +1,5 @@
 import { FORCED_ON_REFRESH, type Cache, createCache } from "./cache.js";
+import { createPriceReader } from "./prices.js";
 import { type Snapshot, QUOTE_SIZE_A, takeSnapshot } from "./snapshot.js";
 
 /**
@@ -38,6 +39,9 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
   // One cache for the store's lifetime: it is what makes a poll cheap, by asking each source only as
   // often as that source is worth asking, and what keeps the screen populated when one refuses.
   const cache: Cache = createCache();
+  // Lives as long as the store: it holds each leg's history and the last block read, which is what
+  // makes every read after the first a single small `eth_getLogs` rather than a week-long backfill.
+  const prices = createPriceReader();
   let state: StoreState = { snapshot: null, loading: false, error: null, lastPollSeconds: null };
   const listeners = new Set<() => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -54,7 +58,7 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
     // held down would fan out into overlapping snapshots that finish out of order.
     if (inFlight !== null) return inFlight;
     set({ loading: true });
-    inFlight = takeSnapshot(quoteSize, cache)
+    inFlight = takeSnapshot(quoteSize, cache, prices)
       .then((snapshot) => {
         set({ snapshot, error: null, loading: false, lastPollSeconds: Math.floor(Date.now() / 1000) });
       })

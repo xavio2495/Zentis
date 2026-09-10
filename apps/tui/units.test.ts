@@ -36,3 +36,16 @@ test("a week-long window reads in days, not in hundreds of hours", () => {
   expect(duration(600000)).toBe("6d22h");
   expect(duration(86400)).toBe("1d");
 });
+
+import { pairPrice } from "./src/format.js";
+
+test("a pool's mid reads as a price a person would quote: one unit of the dearer token in the other", () => {
+  // mid is raw tokenB per 1e18 raw tokenA. For USDC(6)/WETH(18), a WETH at 2,500 USDC is
+  // 1e18 raw WETH for 2.5e9 raw USDC, so 1e18 raw USDC buys 4e26 raw WETH.
+  const usdc = { symbol: "USDC", decimals: 6 };
+  const weth = { symbol: "WETH", decimals: 18 };
+  expect(pairPrice(4n * 10n ** 26n, usdc, weth)).toBe("1 WETH = 2,500 USDC");
+  // The Sepolia reference pool's own mid, which really does sit far from the feed.
+  expect(pairPrice(27576758040135728918671112n, usdc, weth)).toBe("1 WETH = 36,262 USDC");
+  expect(pairPrice(0n, usdc, weth)).toBe("no price");
+});

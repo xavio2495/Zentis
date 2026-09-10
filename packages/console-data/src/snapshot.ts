@@ -2,10 +2,11 @@ import { ASSUMED_GAINS, BOOK, LEGS, PAIR, type LegConfig } from "./config.js";
 import { CADENCE_MS, type Cache, createCache } from "./cache.js";
 import { type LegDecomposition, decomposeBook } from "./decompose.js";
 import { FEED_ROWS, type FeedRow, type IndexedPosition, type LegHistory, collapseFeed, fetchHistory, mergeFeed } from "./fills.js";
-import { type PoolSeries, fetchSeries } from "./pool.js";
+import type { PoolSeries } from "./pool.js";
+import { type PriceReader, createPriceReader } from "./prices.js";
 import { type LegQuote, type QuoteSet, fetchQuotes } from "./quotes.js";
 import { type Finality, type StoredRef, fetchFinality, fetchRef } from "./registry.js";
-import { type SpreadStack, midOf, recomputeVolatility, spreadStack } from "./spread.js";
+import { type SpreadStack, recomputeVolatility, spreadStack } from "./spread.js";
 import { type SimReport, loadSimReport } from "./sim.js";
 import { humanDuration } from "./duration.js";
 
@@ -65,6 +66,7 @@ export const QUOTE_SIZE_A = 150_000n;
 export async function takeSnapshot(
   quoteSize = QUOTE_SIZE_A,
   cache: Cache = createCache(),
+  prices: PriceReader = createPriceReader(),
 ): Promise<Snapshot> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -79,7 +81,14 @@ export async function takeSnapshot(
       LEGS.map((leg) => cache.get(`ref:${leg.chainId}`, CADENCE_MS.registry, () => fetchRef(leg, BOOK.positionId))),
     ),
     Promise.all(
-      LEGS.map((leg) => cache.get(`pool:${leg.chainId}`, CADENCE_MS.pool, () => fetchSeries(leg, midOf))),
+      // Read from the chain, not the reference-pools subgraph: `slot0()` for the price and the pool's
+      // own `Swap` logs for the history. The subgraph's allowance is shared with the fills and both
+      // workflows, and a price chart has no business spending it.
+      LEGS.map((leg) =>
+        cache.get(`pool:${leg.chainId}`, CADENCE_MS.pool, () =>
+          prices.read(leg, BigInt(BOOK.volatilityWindowSeconds)),
+        ),
+      ),
     ),
     Promise.all(
       LEGS.map((leg) => cache.get(`finality:${leg.chainId}`, CADENCE_MS.finality, () => fetchFinality(leg))),

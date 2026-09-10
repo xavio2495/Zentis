@@ -263,3 +263,28 @@ export function duration(seconds: number): string {
   const restHours = hours % 24
   return restHours === 0 ? `${days}d` : `${days}d${restHours}h`
 }
+
+/**
+ * A pool's mid as the price a person would quote: one whole unit of tokenB, in tokenA.
+ *
+ * `mid` is raw tokenB per 1e18 raw tokenA — the unit the policy computes in, and one nobody reads.
+ * For USDC/WETH that is the number of wei a millionth of a dollar buys; the screen says what a WETH
+ * costs instead. Rounded half-up to the whole unit, because a price is a quotation rather than a
+ * balance, and a quotation that floors reads as wrong by one against any other source.
+ */
+export function pairPrice(
+  mid: bigint,
+  tokenA: { symbol: string; decimals: number },
+  tokenB: { symbol: string; decimals: number },
+): string {
+  if (mid <= 0n) return "no price";
+  // raw tokenA per one whole tokenB = 1e18 * 10^decB / mid, then shown at tokenA's decimals.
+  const rawA = (10n ** 18n * 10n ** BigInt(tokenB.decimals) + mid / 2n) / mid;
+  const scale = 10n ** BigInt(tokenA.decimals);
+  const whole = (rawA + scale / 2n) / scale;
+  const shown =
+    whole >= 100n
+      ? whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+      : tokenAmount(rawA, tokenA.decimals, 4);
+  return `1 ${tokenB.symbol} = ${shown} ${tokenA.symbol}`;
+}

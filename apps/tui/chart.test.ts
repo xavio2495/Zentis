@@ -157,3 +157,28 @@ test("sparse samples are joined into a line rather than left as scattered dots",
   const last = columns.lastIndexOf(true);
   expect(columns.slice(first, last + 1).every(Boolean)).toBe(true);
 });
+
+test("the line is drawn in box-drawing characters that join, never in braille dots", () => {
+  // Braille renders as scattered dots in common terminal fonts; the user's screenshot showed the
+  // chart as a dotted trail. Box-drawing characters join cell to cell in any monospace font.
+  const rows = plot([{ key: "a", samples: ramp(40, 1, 1.3) }], 30, 6, WINDOW).byKey.get("a")!.rows;
+  const glyphs = new Set(rows.join("").replace(/ /g, ""));
+  for (const glyph of glyphs) expect("─│╭╮╰╯").toContain(glyph);
+  expect([...rows.join("")].some((c) => c.charCodeAt(0) >= 0x2800 && c.charCodeAt(0) <= 0x28ff)).toBe(false);
+});
+
+test("a price that holds between swaps is drawn flat, and a swap is a vertical step", () => {
+  // A pool's price is a step function. A slope between two swaps would draw prices nobody traded.
+  const step = [
+    { timestamp: 2000n, mid: 2n * 10n ** 18n },
+    { timestamp: 1500n, mid: 2n * 10n ** 18n },
+    { timestamp: 1400n, mid: 10n ** 18n },
+    { timestamp: 1000n, mid: 10n ** 18n },
+  ];
+  const rows = plot([{ key: "a", samples: step }], 20, 5, WINDOW).byKey.get("a")!.rows;
+  const text = rows.join("\n");
+  expect(text).toContain("╯"); // the swap turns up out of the low run
+  expect(text).toContain("╭"); // and into the high one
+  expect(rows[0]!.includes("─")).toBe(true); // the high price holds along the top row
+  expect(rows[rows.length - 1]!.includes("─")).toBe(true); // the low one along the bottom
+});

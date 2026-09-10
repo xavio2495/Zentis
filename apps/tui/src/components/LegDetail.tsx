@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import { type LegSnapshot, humanDuration, weightPercent, why } from "@zentis/console-data";
-import { signed, tokenAmount } from "../format.js";
+import { pairPrice, signed, tokenAmount } from "../format.js";
 import { plot } from "../chart.js";
 import { padRows, trunc, wrapLines } from "../layout.js";
 import { TERM, UI, legColour } from "../theme.js";
@@ -136,7 +136,8 @@ export function LegDetail({
       "pool",
       <>
         <Text color={UI.muted}>{"pool       "}</Text>
-        <Text color={UI.heading}>{`${leg.config.referencePool.slice(0, 10)}…${leg.config.referencePool.slice(-6)}`}</Text>
+        <Text color={UI.heading}>{pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB)}</Text>
+        <Text color={UI.muted}>{`  ${leg.config.referencePool.slice(0, 10)}…${leg.config.referencePool.slice(-6)}`}</Text>
         <Text color={UI.muted}>
           {`  liquidity ${leg.series.liquidity}  ·  last swap ${humanDuration(
             Math.max(0, Math.floor(Date.now() / 1000) - Number(leg.series.updatedAtTimestamp)),

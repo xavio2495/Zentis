@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { type LegSnapshot, humanDuration } from "@zentis/console-data";
-import { chooseFit, duration, signed, tokenAmount } from "../format.js";
+import { BACKFILLING, type LegSnapshot, humanDuration } from "@zentis/console-data";
+import { chooseFit, duration, pairPrice, signed, tokenAmount } from "../format.js";
 import { plot } from "../chart.js";
 import { Panel, panelInner } from "./Panel.js";
 import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
@@ -144,13 +144,18 @@ export function LegCard({
     const p = plot([{ key: "s", samples: leg.series.samples }], inner, sparkRows, windowSeconds)
       .byKey.get("s")!;
     for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
+    const price = pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB);
+    const over = duration(Number((p.to ?? 0n) - (p.from ?? 0n)));
     rows.push(
       <Text color={UI.muted}>
-        {trunc(`×${p.minRatio.toFixed(2)}–×${p.maxRatio.toFixed(2)} over ${duration(Number((p.to ?? 0n) - (p.from ?? 0n)))}`, inner)}
+        {chooseFit([`${price} · ${over}`, price, `×${p.minRatio.toFixed(2)}–×${p.maxRatio.toFixed(2)}`], inner)}
       </Text>,
     );
   } else if (sparkRows > 0 && leg.sources.pool !== null) {
-    rows.push(<Text color={UI.caveat}>{trunc(`price history: ${leg.sources.pool}`, inner)}</Text>);
+    const reading = leg.sources.pool === BACKFILLING;
+    rows.push(
+      <Text color={reading ? UI.muted : UI.caveat}>{trunc(`price history: ${leg.sources.pool}`, inner)}</Text>,
+    );
   }
 
   return (

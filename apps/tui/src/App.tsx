@@ -11,6 +11,7 @@ import { Panel, panelInner } from "./components/Panel.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { extentOf } from "./components/Graphs.js";
 import { type Pending, landed } from "./landed.js";
+import { pairPrice } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
 import { resolve } from "./keymap.js";
 import { LEG_ORDER, UI, legColour } from "./theme.js";
@@ -250,7 +251,12 @@ export function App({
             </Panel>
           ) : rotating === undefined ? null : (
             <Panel
-              title={`market price · ${rotating.config.label.split(" ")[0]}`}
+              title={
+                `market price · ${rotating.config.label.split(" ")[0]}` +
+                (rotating.series === null
+                  ? ""
+                  : ` · ${pairPrice(rotating.series.mid, rotating.config.tokenA, rotating.config.tokenB)}`)
+              }
               right={
                 extentOf(rotating, graphInner.width, graphInner.height, BigInt(BOOK.volatilityWindowSeconds)) ||
                 `${(shown % ordered.length) + 1}/${ordered.length}`

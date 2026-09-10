@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import type { LegSnapshot, Snapshot } from "@zentis/console-data";
+import { BACKFILLING, type LegSnapshot, type Snapshot } from "@zentis/console-data";
 import { axisMarks, plot } from "../chart.js";
 import { duration } from "../format.js";
 import { trunc } from "../layout.js";
@@ -35,13 +35,18 @@ export function Graphs({
   // subgraph that would say so refused, and saying which one and until when is the difference
   // between a console that is broken and one that is waiting.
   if (leg.series === null) {
+    // Reading a week of swaps on first start is not a failure, and colouring it like one would make
+    // every launch look broken for its first fifteen seconds.
+    const reading = leg.sources.pool === BACKFILLING;
     return (
       <Box flexDirection="column" width={width} height={height} overflow="hidden">
-        <Text color={UI.caveat}>
+        <Text color={reading ? UI.muted : UI.caveat}>
           {trunc(
             leg.sources.pool === null
-              ? `no reference-pool history indexed for ${leg.config.label} yet`
-              : `price history unavailable: ${leg.sources.pool}`,
+              ? `no price history for ${leg.config.label} yet`
+              : reading
+                ? `price history: ${leg.sources.pool}`
+                : `price history unavailable: ${leg.sources.pool}`,
             width,
           )}
         </Text>

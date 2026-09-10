@@ -117,17 +117,20 @@ export function createCache(now: () => number = Date.now): Cache {
  * registry and block heights are ordinary RPC and the quotes come from a local service, so those
  * stay on every poll and are what keeps the screen feeling live.
  *
- * At a twenty-second poll this is 180 fills queries an hour plus 18 pool queries, against about a
- * thousand an hour available. Before per-source cadence it was 1,080, which is what exhausted the
+ * The reference pools no longer touch Studio at all — their price and history come from the chain
+ * over RPC — so the console's whole Studio cost is the fills read: 180 queries an hour, against
+ * about a thousand available. Before per-source cadence it was 1,080, which is what exhausted the
  * allowance and left every endpoint answering 429.
  */
 export const CADENCE_MS = {
   fills: 60_000,
-  pool: 600_000,
+  // RPC now, and incremental: after the first backfill a read is one small `eth_getLogs` plus
+  // `slot0()`. Thirty seconds keeps the market price live without leaning on the public RPCs.
+  pool: 30_000,
   registry: 0,
   finality: 0,
   quotes: 0,
 } as const;
 
 /** The sources a manual refresh forces: the cheap ones that carry what an action changed. */
-export const FORCED_ON_REFRESH = ["fills:", "quotes:"] as const;
+export const FORCED_ON_REFRESH = ["fills:", "quotes:", "pool:"] as const;
