@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { BACKFILLING, type LegSnapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
+import { BACKFILLING, BOOK, type LegSnapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
 import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weightBar } from "../format.js";
 import { plot } from "../chart.js";
 import { quoted } from "../quoted.js";
@@ -43,8 +43,23 @@ export function legState(leg: LegSnapshot): { word: string; short: string; tone:
  */
 function side(leg: LegSnapshot, isAToB: boolean, width: number): Seg[] | null {
   const quote = isAToB ? leg.quoteAToB : leg.quoteBToA;
-  if (quote?.amountOut == null) return null;
   const [from, to] = isAToB ? [leg.config.tokenA, leg.config.tokenB] : [leg.config.tokenB, leg.config.tokenA];
+  if (quote === null) return null;
+  if (quote.amountOut === null) {
+    // A side the router refuses is a fact about the leg, and leaving the row out said nothing had
+    // been asked. Live, Sepolia's router answered USDC → WETH and reverted WETH → USDC.
+    const refused = quote.caveats.some((c) => c.includes("refused"));
+    return fitSegments(
+      [
+        [
+          { text: `${from.symbol} → ${to.symbol}  `, color: UI.muted },
+          { text: refused ? "refused by the router" : "not priced", color: UI.caveat },
+        ],
+        [{ text: `${from.symbol} → ${to.symbol} ${refused ? "refused" : "unpriced"}`, color: UI.caveat }],
+      ],
+      width,
+    );
+  }
   const inText = `${tokenAmount(quote.amountIn, from.decimals)} ${from.symbol}`;
   const outText = `${tokenAmount(quote.amountOut, to.decimals)} ${to.symbol}`;
   const off = offMidBps(quote, isAToB);
@@ -157,6 +172,23 @@ export function LegCard({
   if (leg.sources.fills === null && leg.quoteAToB?.amountOut == null && position !== null) {
     const reason = spread?.tooStaleToQuote === true ? "reference too stale to quote" : "not priced";
     rows.push(<Text color={UI.muted}>{trunc(`quote — ${reason}`, inner)}</Text>);
+  }
+
+  if (shift === null && leg.ref !== null) {
+    // The decomposition is withheld when any leg is unread — it reads every leg — but the shift the
+    // enclave published comes from the registry over RPC and is known. Saying it, and saying it is
+    // the published number rather than one recomputed here, keeps the product's own figure on the
+    // card in exactly the state where a viewer most wants it.
+    const cap = position?.maxTiltBps ?? BOOK.maxTiltBps;
+    const atCap = Math.abs(leg.ref.tiltBps) >= cap ? " at cap" : "";
+    rows.push(
+      <Text color={UI.heading}>
+        {chooseFit(
+          [`shift ${signed(leg.ref.tiltBps)}${atCap} · published`, `shift ${signed(leg.ref.tiltBps)}${atCap}`],
+          inner,
+        )}
+      </Text>,
+    );
   }
 
   if (shift !== null) {

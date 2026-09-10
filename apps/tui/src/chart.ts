@@ -122,6 +122,15 @@ export function plot(
   const extreme = full.hi / full.lo > 4;
   let lo = extreme ? at(0.05) : full.lo;
   let hi = extreme ? at(0.95) : full.hi;
+  // The newest price of every series is always inside the band. Banding a 20x range to its bulk
+  // otherwise clipped the current price off the top, and the title — which quotes that price — sat
+  // outside the axis it labels.
+  for (const pts of points.values()) {
+    const newest = pts[pts.length - 1];
+    if (newest === undefined || newest.ratio <= 0) continue;
+    lo = Math.min(lo, newest.ratio);
+    hi = Math.max(hi, newest.ratio);
+  }
   if (hi / lo < 1.000001) {
     lo *= 0.9995;
     hi *= 1.0005;
