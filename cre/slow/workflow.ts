@@ -3,7 +3,7 @@ import {
 	bytesToHex,
 	cre,
 	encodeCallMsg,
-	LAST_FINALIZED_BLOCK_NUMBER,
+	LATEST_BLOCK_NUMBER,
 	ok,
 	prepareReportRequest,
 	protoBigIntToBigint,
@@ -446,13 +446,14 @@ const readVolatility = (runtime: TeeRuntime<Config>, leg: z.infer<typeof legSche
 	)
 }
 
+/**
+ * The slot as it stands at the head, not at the finalized block. The registry's seq guard compares
+ * against the head, and finality lags it by around twenty minutes on every chain this position
+ * lives on, while the fast workflow writes every minute. A read-modify-write against the finalized
+ * slot would therefore be stale on every run, and rejected on every run.
+ */
 const readRef = (don: Runtime<Config>, leg: z.infer<typeof legSchema>, positionId: Hex): StoredRef => {
 	const client = new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
-	const header = client
-		.headerByNumber(don, { blockNumber: LAST_FINALIZED_BLOCK_NUMBER })
-		.result().header
-	if (!header?.blockNumber) throw new Error('no finalized header')
-
 	const reply = client
 		.callContract(don, {
 			call: encodeCallMsg({
@@ -460,7 +461,7 @@ const readRef = (don: Runtime<Config>, leg: z.infer<typeof legSchema>, positionI
 				to: leg.registry as Address,
 				data: encodeFunctionData({ abi: REF_OF_ABI, functionName: 'refOf', args: [positionId] }),
 			}),
-			blockNumber: bigintToProtoBigInt(protoBigIntToBigint(header.blockNumber)),
+			blockNumber: LATEST_BLOCK_NUMBER,
 		})
 		.result()
 

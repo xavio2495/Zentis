@@ -5,6 +5,7 @@ import {
 	encodeCallMsg,
 	hexToBase64,
 	LAST_FINALIZED_BLOCK_NUMBER,
+	LATEST_BLOCK_NUMBER,
 	prepareReportRequest,
 	protoBigIntToBigint,
 	type Runtime,
@@ -210,9 +211,12 @@ const observeLeg = (
 
 	const mid = midFromSqrtPriceX96(sqrtPriceX96 as bigint)
 
-	// Read at the same pinned block as everything else, so the run stays a pure function of that
-	// block. A slow write landing after the finalized block is carried forward on the next run, so
-	// it can be shadowed for one cadence but never lost.
+	// The one read that is NOT pinned. Finality lags the head by around twenty minutes on every
+	// chain this position lives on, and the slow workflow writes into the same slot at the head. A
+	// slot read at the finalized block would miss every slow write from that window; this write
+	// would then carry the stale terms forward, and the next finalized block would contain that
+	// stale rewrite rather than the measurement. Read at the head, the terms survive; the pricing
+	// inputs above stay pinned, and the report is still a pure function of them plus this slot.
 	const slot = client
 		.callContract(don, {
 			call: encodeCallMsg({
@@ -224,7 +228,7 @@ const observeLeg = (
 					args: [positionId],
 				}),
 			}),
-			blockNumber: at,
+			blockNumber: LATEST_BLOCK_NUMBER,
 		})
 		.result()
 	const [current] = decodeAbiParameters(STORED_TUPLE, bytesToHex(slot.data))
