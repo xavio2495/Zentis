@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import vectors from './allocation_vectors.json'
-import { allocateBandEdge, contestedBps } from './policy'
+import { allocateBandEdge, contestedBps, publishedBoundary } from './policy'
 
 /**
  * The allocation in the workflow has to agree with the Python reference model exactly, because the
@@ -71,5 +71,23 @@ describe('the properties the allocation must not lose', () => {
 
 	test('a floor of zero is refused, because zero means unpublished', () => {
 		expect(() => allocateBandEdge(57n, [1n], [0n], strength, 0n, maxEdge)).toThrow()
+	})
+})
+
+describe('the published boundary is room beyond the tilt currently quoted', () => {
+	// On-chain the boundary caps the whole tilt, and under the reservation policy most of the tilt is
+	// the anchor, a correction rather than a concession. So the budget is published as room beyond
+	// what is already quoted: the concession may grow by the allocated edge, and no further.
+	test('adds the allocated edge to the magnitude of the current tilt', () => {
+		expect(publishedBoundary(-312n, 40n, 1n, 500n)).toBe(352n)
+		expect(publishedBoundary(120n, 40n, 1n, 500n)).toBe(160n)
+	})
+
+	test('never publishes zero, because zero reads as unpublished', () => {
+		expect(publishedBoundary(0n, 0n, 1n, 500n)).toBe(1n)
+	})
+
+	test('is capped at the ceiling the maker signed', () => {
+		expect(publishedBoundary(-480n, 40n, 1n, 500n)).toBe(500n)
 	})
 })
