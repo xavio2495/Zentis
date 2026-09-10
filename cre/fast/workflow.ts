@@ -95,9 +95,13 @@ type Stored = {
 	seq: number
 }
 
-/** Shift plus room, never zero once a boundary exists, never past the cap the maker signed. */
-const boundaryFor = (tiltBps: bigint, room: bigint | null, maxTiltBps: bigint): number => {
-	if (room === null) return 0
+/**
+ * Shift plus room, never zero once a boundary exists, never past the cap the maker signed. When the
+ * room cannot be read back (nothing published, or a boundary on the cap) the stored boundary is
+ * carried as it is: zero stays "unpublished", the cap stays the cap, until the slow workflow writes.
+ */
+const boundaryFor = (tiltBps: bigint, room: bigint | null, storedBoundary: number, maxTiltBps: bigint): number => {
+	if (room === null) return storedBoundary
 	const magnitude = tiltBps < 0n ? -tiltBps : tiltBps
 	const boundary = magnitude + room
 	return Number(boundary < 1n ? 1n : boundary > maxTiltBps ? maxTiltBps : boundary)
@@ -333,7 +337,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 				// The instruction caps the whole shift at this boundary, and the slow workflow only
 				// republishes it hourly, so it has to follow the shift here or a large correction would
 				// be clamped to a stale one. The room stays what the slow workflow allocated.
-				bandEdgeBps: boundaryFor(policies[i]!.tiltBps, room[i] ?? null, BigInt(config.maxTiltBps)),
+				bandEdgeBps: boundaryFor(policies[i]!.tiltBps, room[i] ?? null, o.stored.bandEdgeBps, BigInt(config.maxTiltBps)),
 			},
 		])
 
