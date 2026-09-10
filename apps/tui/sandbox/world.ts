@@ -135,7 +135,16 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
               quoteBToA: {
                 ...leg.quoteBToA,
                 amountOut: null,
-                caveats: ["the router refused this quote: execution reverted"],
+                // As the quote service words it since it decodes the contract's errors: the sentence
+                // names tokenA and tokenB, because the service has no symbols.
+                refusal: {
+                  error: "ZentisOutsideBand",
+                  args: ["29720000000000000000000000", "30730000000000000000000000", "false"],
+                  sentence: "outside the band: the maker would sell tokenA for 322 bps less tokenB than the floor allows",
+                },
+                caveats: [
+                  "the router refused this quote: outside the band: the maker would sell tokenA for 322 bps less tokenB than the floor allows",
+                ],
               },
             },
       ),

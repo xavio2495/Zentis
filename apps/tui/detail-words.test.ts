@@ -36,3 +36,10 @@ test("the why line is labelled in the same column as pool and reference", async 
   expect(valueColumn(whyRow!)).toBe(valueColumn(poolRow));
   expect(col("why")).toBeGreaterThan(-1);
 });
+
+test("the detail carries the refusal's whole sentence, in the leg's own token names", async () => {
+  const detail = detailOf((await drive(120, 40, { scenario: "refused", keys: ["1"] })).lines).join(" ");
+  expect(detail).toContain("WETH → USDC");
+  expect(detail.replace(/\s+/g, " ")).toContain("the maker would sell USDC for 322 bps less WETH than the floor allows");
+  expect(detail).not.toContain("tokenA");
+});

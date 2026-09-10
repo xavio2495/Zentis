@@ -64,3 +64,8 @@ test("a side the router refuses is shown as refused, not silently left out", asy
   expect(card).toMatch(/USDC → .*WETH/);
   expect(card).toMatch(/WETH → USDC.*refused|refused.*WETH/);
 });
+
+test("a refusal the service decoded is named on the card by the contract's reason", async () => {
+  const card = cardOf((await drive(120, 40, { scenario: "refused" })).lines, "1 Sepolia").join("\n");
+  expect(card).toMatch(/WETH → USDC.*outside the band/);
+});
