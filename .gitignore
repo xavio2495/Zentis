@@ -72,3 +72,5 @@ __pycache__/
 
 # Local Claude Code session config/state, not project source
 .claude/
+# Compiled TUI binary
+/apps/tui/zentis
