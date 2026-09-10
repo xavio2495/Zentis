@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { type LegSnapshot, humanDuration, weightPercent, why } from "@zentis/console-data";
+import { type LegSnapshot, humanDuration, referenceAgeSeconds, weightPercent, why } from "@zentis/console-data";
 import { pairPrice, signed, tokenAmount } from "../format.js";
 import { plot } from "../chart.js";
 import { padRows, trunc, wrapLines } from "../layout.js";
@@ -21,11 +21,9 @@ import { TERM, UI, legColour } from "../theme.js";
  * its age is still known. What it must never be is zero for want of a number: the status bar reads
  * the same slot, and "21m" beside "0s old" for one seq is the screen contradicting itself.
  */
-export function referenceAgeSeconds(leg: LegSnapshot, nowSeconds: number): number | null {
-  if (leg.spread !== null) return leg.spread.referenceAgeSeconds;
-  if (leg.ref === null) return null;
-  return Math.max(0, nowSeconds - Number(leg.ref.updatedAt));
-}
+// The rule lives in the data layer now, shared with the status bar; re-exported so callers of this
+// module keep working.
+export { referenceAgeSeconds };
 
 export function LegDetail({
   leg,

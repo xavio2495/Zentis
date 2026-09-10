@@ -65,7 +65,8 @@ export function App({
   const [windowChoice, setWindowChoice] = useState<number | null>(null);
   const [confirming, setConfirming] = useState<Action | null>(null);
   const [running, setRunning] = useState<string | null>(null);
-  const [transient, setTransient] = useState<string | null>(null);
+  const [transient, setTransient] = useState<{ text: string; quiet: boolean } | null>(null);
+  const say = (text: string, quiet = false) => setTransient({ text, quiet });
   const [awaiting, setAwaiting] = useState<Pending | null>(null);
 
   useEffect(() => {
@@ -89,12 +90,14 @@ export function App({
   }, [overlay, stepped]);
 
   const snapshot = state.snapshot;
+  // Read every render; the one-second tick above is what makes "polled 12s ago" count up.
+  const now = Math.floor(Date.now() / 1000);
   const armed = actions.some((a) => a.disabledReason === null && a.command !== null);
 
   const landing = running === null ? landed(awaiting, snapshot?.seq ?? null) : null;
   useEffect(() => {
     if (landing === null) return;
-    setTransient(landing);
+    say(landing);
     setAwaiting(null);
   }, [landing]);
 
@@ -107,15 +110,15 @@ export function App({
       const action = confirming;
       setConfirming(null);
       if (binding?.id !== "confirm" || action.command === null || runAction === null) {
-        setTransient(`${action.label} cancelled`);
+        say(`${action.label} cancelled`, true);
         return;
       }
       setRunning(action.label);
-      setTransient(`running ${action.label}…`);
+      say(`running ${action.label}…`);
       setAwaiting({ label: action.label, seqBefore: snapshot?.seq ?? null });
       void runAction(action)
-        .then(setTransient)
-        .catch((cause: unknown) => setTransient(`${action.label} could not start: ${String(cause)}`))
+        .then((line) => say(line))
+        .catch((cause: unknown) => say(`${action.label} could not start: ${String(cause)}`))
         .finally(() => {
           setRunning(null);
           void store.refresh(true);
@@ -160,13 +163,17 @@ export function App({
         const action = actions.find((a) => a.key === input);
         if (action === undefined) return;
         if (action.disabledReason !== null) {
-          setTransient(action.disabledReason);
+          // Watch-only is a choice, not a fault, so pressing a signing key there gets a quiet note
+          // pointing at the help overlay. A missing repository is something the operator can fix,
+          // so its reason is said in full.
+          if (action.blocker === "env") say(`${action.label} is off in watch-only · ? says how to arm it`, true);
+          else say(action.disabledReason);
           return;
         }
         setConfirming(action);
         // The key comes first: this line is truncated to the status bar's width, and a prompt whose
         // instruction falls off the end is a prompt that has not been given.
-        setTransient(`press y to broadcast — ${action.label}: ${action.describe}`);
+        say(`press y to broadcast — ${action.label}: ${action.describe}`);
       }
     }
   });
@@ -231,6 +238,8 @@ export function App({
             rows={regions.statusRows}
             width={panelInner(regions.rightWidth, regions.statusRows + 2).width}
             transient={transient}
+            polledAgo={state.lastPollSeconds === null ? null : Math.max(0, now - state.lastPollSeconds)}
+            loading={state.loading}
           />
         </Panel>
 
@@ -244,6 +253,7 @@ export function App({
             >
               <Help
                 report={snapshot.sim}
+                actions={actions}
                 {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)}
               />
             </Panel>

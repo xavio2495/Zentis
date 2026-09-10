@@ -32,13 +32,14 @@ const HOME_AND_CLEAR = "\u001b[H\u001b[2J";
 const WATCH_ONLY = "this is the public console, which watches and never signs";
 
 const watchActions: Action[] = [
-  { key: "r", label: "republish fast", disabledReason: WATCH_ONLY, command: null, describe: "" },
-  { key: "s", label: "republish slow", disabledReason: WATCH_ONLY, command: null, describe: "" },
-  { key: "f", label: "fill sepolia", disabledReason: WATCH_ONLY, command: null, describe: "" },
+  { key: "r", label: "republish fast", disabledReason: WATCH_ONLY, blocker: "env", command: null, describe: "" },
+  { key: "s", label: "republish slow", disabledReason: WATCH_ONLY, blocker: "env", command: null, describe: "" },
+  { key: "f", label: "fill sepolia", disabledReason: WATCH_ONLY, blocker: "env", command: null, describe: "" },
   {
     key: "q",
     label: "re-quote",
     disabledReason: null,
+    blocker: null,
     command: null,
     describe: "re-reads every source and asks the router for a fresh quote",
   },

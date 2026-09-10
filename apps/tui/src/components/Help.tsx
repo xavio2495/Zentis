@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import { type SimReport, headline } from "@zentis/console-data";
 import { BINDINGS } from "../keymap.js";
+import type { Action } from "../action-types.js";
 import { padRows, trunc, wrapLines } from "../layout.js";
 import { TERM, UI } from "../theme.js";
 
@@ -51,10 +52,12 @@ function simLines(report: SimReport, width: number): string[] {
 
 export function Help({
   report,
+  actions,
   width,
   height,
 }: {
   report: SimReport;
+  actions: Action[];
   width: number;
   height: number;
 }) {
@@ -118,6 +121,30 @@ export function Help({
         {text}
       </Text>,
     );
+  }
+
+  // How to arm the console, here rather than in the status bar: it is not a warning to someone who
+  // only wants to watch, and someone who wants to act will look here.
+  const off = actions.filter((a) => a.disabledReason !== null);
+  if (off.length > 0) {
+    push(<Text key="sp0"> </Text>);
+    push(
+      <Text key="t0" color={UI.heading} bold>
+        acting, not just watching
+      </Text>,
+    );
+    for (const [i, text] of wrapLines(
+      `${off.map((a) => a.key).join(", ")} are off: ${off[0]!.disabledReason}. ` +
+        "The console never reads the file; it hands the path to the commands it runs.",
+      width,
+      4,
+    ).entries()) {
+      push(
+        <Text key={`a${i}`} color={UI.muted}>
+          {text}
+        </Text>,
+      );
+    }
   }
 
   push(<Text key="sp1"> </Text>);

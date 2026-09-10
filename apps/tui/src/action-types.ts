@@ -17,6 +17,12 @@ export interface Action {
   readonly label: string
   /** null when the action can run; otherwise why it cannot, said plainly */
   readonly disabledReason: string | null
+  /**
+   * What is in the way, so the screen can pitch it. `env` is watch-only by choice — no signing key
+   * was given — and is not a warning to someone who only wants to watch. `repo` is an operator who
+   * did give a key but is running from somewhere the scripts cannot be found, and is worth saying.
+   */
+  readonly blocker: "env" | "repo" | null
   /** null for actions the console performs itself rather than shelling out for */
   readonly command: ActionCommand | null
   readonly describe: string

@@ -89,7 +89,9 @@ export function fit(cols: number, rows: number): Regions {
   // for the second, in which case the hints are what goes — `?` still reaches them.
   // Every region is a bordered panel now, and a border costs two rows. The status bar's own content
   // is one or two lines inside that.
-  const statusRows = draw >= 22 ? 2 : 1;
+  // Three when there is room — the state, the keys, and what the last action said — so a note never
+  // has to displace the keys. Two on a short terminal, one on the smallest.
+  const statusRows = draw >= 30 ? 3 : draw >= 22 ? 2 : 1;
 
   const BORDER = 2;
   const rightBody = Math.max(0, draw - statusRows - BORDER);

@@ -11,7 +11,8 @@ import type { Snapshot, Store } from "@zentis/console-data";
  * re-render.
  */
 export const fixedStore = (snapshot: Snapshot) => {
-  const state = { snapshot, loading: false, error: null, lastPollSeconds: 0 };
+  // The fixed snapshot counts as having just been polled; epoch 0 read as "polled 20,000 days ago".
+  const state = { snapshot, loading: false, error: null, lastPollSeconds: Math.floor(Date.now() / 1000) };
   const store: Store = {
     getState: () => state,
     subscribe: () => () => undefined,

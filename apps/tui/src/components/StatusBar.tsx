@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
-import { type Snapshot, humanDuration, weightPercent } from "@zentis/console-data";
+import { type Snapshot, humanDuration, referenceAgeSeconds, weightPercent } from "@zentis/console-data";
+import { duration } from "../format.js";
 import type { Action } from "../action-types.js";
 import { type Seg, fitSegments, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
@@ -42,10 +43,16 @@ export function bookState(snapshot: Snapshot, armed: boolean): BookState {
 
   const refusing = snapshot.legs.filter((l) => l.spread?.tooStaleToQuote === true);
   const docked = snapshot.legs.filter((l) => l.position !== null && !l.position.active);
+  // One rule for a reference's age, shared with the leg detail, so the two cannot disagree about the
+  // same seq; it reads the slot over RPC when the fills are unread.
   const oldest = snapshot.legs
-    .map((l) => l.spread?.referenceAgeSeconds)
-    .filter((a): a is number => a !== undefined && a !== null)
+    .map((l) => referenceAgeSeconds(l, snapshot.takenAtSeconds))
+    .filter((a): a is number => a !== null)
     .reduce<number | null>((max, a) => (max === null || a > max ? a : max), null);
+  const limits = snapshot.legs
+    .map((l) => l.position?.maxStalenessSeconds)
+    .filter((limit): limit is number => limit !== undefined);
+  const limit = limits.length === 0 ? null : Math.min(...limits);
 
   if (refusing.length > 0) {
     const limit = refusing[0]!.position?.maxStalenessSeconds ?? 0;
@@ -86,21 +93,37 @@ export function bookState(snapshot: Snapshot, armed: boolean): BookState {
   }
   return {
     tone: UI.fill,
-    variants: [`reference fresh · ${humanDuration(oldest ?? 0)}`, `fresh ${humanDuration(oldest ?? 0)}`],
+    // "fresh · 21m" read as a contradiction. Against its limit it does not: 21m of an hour is fresh.
+    variants: [
+      limit === null
+        ? `reference fresh · ${humanDuration(oldest ?? 0)} old`
+        : `reference fresh · ${humanDuration(oldest ?? 0)} of ${humanDuration(limit)}`,
+      `fresh ${humanDuration(oldest ?? 0)}`,
+    ],
   };
 }
 
-/** Key hints, degraded by measured width rather than allowed to overflow. */
-function hints(actions: Action[], width: number): string {
-  const full = actions.map((a) => `${a.key} ${a.label}`).join(" · ");
-  const short = actions.map((a) => a.key).join(" ");
-  return trunc(
+/**
+ * The key hints, always shown, with the keys that cannot run dimmed rather than removed.
+ *
+ * They used to be replaced by whatever the last action said — including the signing-key sentence
+ * when a watch-only viewer pressed `r` — so a viewer could not tell which keys existed. The reason a
+ * key is off lives in the `?` overlay, where someone who wants to arm the console will look.
+ */
+function hints(actions: Action[], width: number): Seg[] {
+  const tone = (a: Action) => (a.disabledReason === null ? UI.action : UI.disabled);
+  const keys = (long: boolean): Seg[] =>
+    actions.flatMap((a, i): Seg[] => [
+      ...(i === 0 ? [] : [{ text: long ? " · " : " ", color: UI.muted }]),
+      { text: long ? `${a.key} ${a.label}` : a.key, color: tone(a) },
+    ]);
+  return fitSegments(
     [
-      `${full} · ←→ price · 1-3 detail · ? help · x quit`,
-      `${full} · ? help · x quit`,
-      `${short} ←→ 1-3 ? x`,
-      `${short} ? x`,
-    ].find((h) => h.length <= width) ?? short,
+      [...keys(true), { text: " · ←→ price · 1-3 detail · t window · ? help · x quit", color: UI.muted }],
+      [...keys(true), { text: " · ? help · x quit", color: UI.muted }],
+      [...keys(false), { text: " ←→ 1-3 t ? x", color: UI.muted }],
+      [...keys(false), { text: " ? x", color: UI.muted }],
+    ],
     width,
   );
 }
@@ -112,28 +135,46 @@ export function StatusBar({
   rows,
   width,
   transient,
+  polledAgo,
+  loading,
 }: {
   snapshot: Snapshot;
   actions: Action[];
   armed: boolean;
   rows: number;
   width: number;
-  /** the finality countdown or the landing line, present only while an action is in flight */
-  transient: string | null;
+  /**
+   * What the last action said, while it matters. `quiet` is for notes that are not warnings — a
+   * watch-only viewer pressing a key that is off — and they are drawn dim.
+   */
+  transient: { text: string; quiet: boolean } | null;
+  /** seconds since the last completed poll, or null before the first */
+  polledAgo: number | null;
+  loading: boolean;
 }) {
   const state = bookState(snapshot, armed);
   const symbol = snapshot.legs[0]?.config.tokenA.symbol ?? "";
   // The book split is omitted rather than shown as zero when no leg could be read: a book that
   // reads 0% USDC is a claim about the position, and nothing was read to support it.
-  const known = snapshot.legs.some((l) => l.sources.fills === null);
+  const unread = snapshot.legs.filter((l) => l.sources.fills !== null).length;
   // Ordered by what may be dropped first. The mode is last because it is the only one that is a
   // safety fact: a console that stops saying whether it can sign is one someone may assume can.
   // The seq survives a subgraph outage — the registries are read over RPC — so during an outage it
   // is present and long, and it was pushing the mode off the line.
-  const optional = [
-    snapshot.seq === null ? null : `seq ${snapshot.seq}`,
-    known ? `${weightPercent(snapshot.bookWeightA)}% ${symbol}` : null,
-  ].filter((f): f is string => f !== null);
+  // A split computed from the legs that answered is not the book's split; with any leg unread the
+  // honest statement is that it is unknown, and why.
+  const split =
+    unread === 0
+      ? `${weightPercent(snapshot.bookWeightA)}% ${symbol}`
+      : unread === snapshot.legs.length
+        ? null
+        : `book split unknown · ${unread} leg${unread === 1 ? "" : "s"} unread`;
+  // Proof the screen is live. The first thing dropped when the line is short: it is reassurance, not
+  // information about the book.
+  const pulse = loading ? "polling…" : polledAgo === null ? null : `polled ${duration(polledAgo)} ago`;
+  const optional = [pulse, snapshot.seq === null ? null : `seq ${snapshot.seq}`, split].filter(
+    (f): f is string => f !== null,
+  );
   const mode = armed ? "armed" : "watch-only";
   const factRuns = [...optional.map((_, i) => [...optional.slice(i), mode]), [mode]].map((parts) =>
     parts.join(" · "),
@@ -151,16 +192,22 @@ export function StatusBar({
     width,
   );
 
+  const note = transient === null ? null : (
+    <Text color={transient.quiet ? UI.muted : UI.caveat}>{trunc(transient.text, width)}</Text>
+  );
+
+  // Three rows when there is room: the state, the keys, and what the last action said. With two the
+  // keys stay and an action's note takes the state's row while it is live — a confirmation prompt
+  // has to be seen. With one, the note wins for the same reason.
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
-      <Box height={1}>
-        <Segments segs={line} />
-      </Box>
+      <Box height={1}>{rows < 3 && note !== null ? note : <Segments segs={line} />}</Box>
       {rows > 1 && (
-        <Text color={transient === null ? UI.muted : UI.caveat}>
-          {transient === null ? hints(actions, width) : trunc(transient, width)}
-        </Text>
+        <Box height={1}>
+          <Segments segs={hints(actions, width)} />
+        </Box>
       )}
+      {rows > 2 && <Box height={1}>{note ?? <Text> </Text>}</Box>}
     </Box>
   );
 }

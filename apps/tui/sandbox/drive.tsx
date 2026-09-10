@@ -67,7 +67,8 @@ export async function drive(
   const makeStore = fixedStore(fakeSnapshot(options.scenario ?? "fresh"));
 
   const actions: Action[] =
-    options.armed === true ? buildActions("/dev/null") : buildActions(null, null);
+    // Watch-only the way the real binary is when run from the repo: a repository, no signing key.
+    options.armed === true ? buildActions("/dev/null") : buildActions(null);
   const app = render(<App actions={actions} runAction={null} makeStore={makeStore} />, {
     stdout: stdout as never,
     stdin: stdin as never,

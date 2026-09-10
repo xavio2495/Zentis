@@ -122,10 +122,12 @@ export function buildActions(
   // Both reasons are real and either alone is enough, so the missing repository is named first:
   // it is the one the operator can fix without going to look for a key.
   const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
+  const blocker = repo === null ? ("repo" as const) : envFile === null ? ("env" as const) : null;
   const runnable = repo !== null && envFile !== null;
   return [
     {
       key: "r",
+      blocker,
       label: "republish fast",
       disabledReason: blocked,
       command: runnable ? creCommand("fast", envFile!, repo!) : null,
@@ -133,6 +135,7 @@ export function buildActions(
     },
     {
       key: "s",
+      blocker,
       label: "republish slow",
       disabledReason: blocked,
       command: runnable ? creCommand("slow", envFile!, repo!) : null,
@@ -140,6 +143,7 @@ export function buildActions(
     },
     {
       key: "f",
+      blocker,
       label: `fill sepolia ${Number(QUOTE_SIZE_A) / 10 ** LEGS[0]!.tokenA.decimals}`,
       disabledReason: blocked,
       command: runnable ? fillCommand(envFile!, repo!) : null,
@@ -147,6 +151,7 @@ export function buildActions(
     },
     {
       key: "q",
+      blocker: null,
       label: "re-quote",
       disabledReason: null,
       // Performed in-process: the quote path already asks the deployed router through `asView`, so
