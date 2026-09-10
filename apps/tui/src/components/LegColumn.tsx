@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import { type LegSnapshot, offMidBps, weightPercent, why } from "@zentis/console-data";
-import { amount, signed, since, stackedGauge, weiish } from "../format.js";
+import { amount, signed, stackedGauge, weiish } from "../format.js";
 import { TERM, UI } from "../theme.js";
 
 const WIDTH = 38;
@@ -20,7 +20,13 @@ function SpreadRow({ leg }: { leg: LegSnapshot }) {
       <Text color={TERM.markout}>{spread.markoutBps}</Text>
       <Text color={UI.muted}>+</Text>
       <Text color={TERM.staleness}>{spread.stalenessBps}</Text>
-      <Text color={UI.muted}> ({since(spread.referenceAgeSeconds)})</Text>
+      {/* The ramp's arithmetic, not just its total: a bare 86 reads as a policy choice, when it is
+          the reference's age times the rate the maker signed into the program. */}
+      <Text color={UI.muted}>
+        {` (${leg.position?.widenBpsPerMinute ?? 0}/m × ${Math.floor(spread.referenceAgeSeconds / 60)}m${
+          spread.stalenessBps === (leg.position?.maxWidenBps ?? 0) ? ", capped" : ""
+        })`}
+      </Text>
     </Box>
   );
 }

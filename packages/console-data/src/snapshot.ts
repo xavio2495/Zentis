@@ -1,6 +1,6 @@
 import { ASSUMED_GAINS, BOOK, LEGS, PAIR, type LegConfig } from "./config.js";
 import { type LegDecomposition, decomposeBook } from "./decompose.js";
-import { type FeedEvent, type IndexedPosition, type LegHistory, fetchHistory, mergeFeed } from "./fills.js";
+import { FEED_ROWS, type FeedRow, type IndexedPosition, type LegHistory, collapseFeed, fetchHistory, mergeFeed } from "./fills.js";
 import { type PoolSeries, fetchSeries } from "./pool.js";
 import { type LegQuote, type QuoteSet, fetchQuotes } from "./quotes.js";
 import { type Finality, type StoredRef, fetchFinality, fetchRef } from "./registry.js";
@@ -31,7 +31,8 @@ export interface Snapshot {
   readonly bookWeightA: bigint;
   readonly gains: typeof ASSUMED_GAINS;
   readonly legs: LegSnapshot[];
-  readonly feed: FeedEvent[];
+  /** collapsed: one publish across the legs is one row, so fills and refusals are not crowded out */
+  readonly feed: FeedRow[];
   readonly sim: SimReport;
   readonly caveats: string[];
 }
@@ -144,7 +145,10 @@ export async function takeSnapshot(quoteSize = QUOTE_SIZE_A): Promise<Snapshot> 
     bookWeightA: decomposition?.weightA ?? 0n,
     gains: ASSUMED_GAINS,
     legs,
-    feed: mergeFeed(histories.map((h) => h.value).filter((h): h is LegHistory => h !== null), 40),
+    feed: collapseFeed(
+      mergeFeed(histories.map((h) => h.value).filter((h): h is LegHistory => h !== null), 200),
+      FEED_ROWS,
+    ),
     sim: loadSimReport(),
     caveats,
   };

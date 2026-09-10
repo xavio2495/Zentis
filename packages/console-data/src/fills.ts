@@ -205,3 +205,56 @@ export const mergeFeed = (histories: LegHistory[], limit: number): FeedEvent[] =
     .flatMap((h): FeedEvent[] => [...h.fills, ...h.references, ...h.rejections])
     .sort((a, b) => (b.timestamp === a.timestamp ? 0 : b.timestamp > a.timestamp ? 1 : -1))
     .slice(0, limit);
+
+/**
+ * One reference is one publish across every leg, so the feed shows it as one row.
+ *
+ * Left raw, the feed spends itself restating the header: three chains times a write a minute buries
+ * the fill and the refusals, which are the only rows on this screen that record something changing.
+ * A run of references sharing a seq therefore collapses into a single round carrying what each leg's
+ * shift became — which is also the shape the demo's beat wants, since the point of the beat is that
+ * one publish moved three legs and no transaction touched two of them.
+ *
+ * Fills and refusals never collapse. Time order is preserved throughout, so the beat still reads in
+ * the order it happened.
+ */
+export interface FeedRound {
+  readonly kind: 'round'
+  readonly timestamp: bigint
+  readonly seq: number
+  /** how many writes were folded in: one per leg that published this seq */
+  readonly count: number
+  readonly legs: { chainId: number; tiltBps: number; mid: bigint; transaction: string }[]
+}
+
+export type FeedRow = IndexedFill | IndexedRejection | FeedRound
+
+/**
+ * How many rows the screen gives the feed. Shared with the tests so that "the fill and the refusals
+ * are visible" is asserted about the feed the operator actually sees, and not about a longer one.
+ */
+export const FEED_ROWS = 14
+
+export function collapseFeed(events: FeedEvent[], limit: number): FeedRow[] {
+	const rows: FeedRow[] = []
+	for (let i = 0; i < events.length && rows.length < limit; ) {
+		const event = events[i]!
+		if (event.kind !== 'reference') {
+			rows.push(event)
+			i += 1
+			continue
+		}
+		// A run ends at the first event that is not a reference, or at a change of seq: two seqs in
+		// one row would claim the legs published together when they did not.
+		const legs: FeedRound['legs'] = []
+		const seq = event.seq
+		while (i < events.length) {
+			const next = events[i]!
+			if (next.kind !== 'reference' || next.seq !== seq) break
+			legs.push({ chainId: next.chainId, tiltBps: next.tiltBps, mid: next.mid, transaction: next.transaction })
+			i += 1
+		}
+		rows.push({ kind: 'round', timestamp: event.timestamp, seq, count: legs.length, legs })
+	}
+	return rows
+}

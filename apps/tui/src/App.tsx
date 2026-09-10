@@ -66,7 +66,7 @@ export function App({ envFile }: { envFile: string | null }) {
           <LegColumn key={leg.config.chainId} leg={leg} />
         ))}
       </Box>
-      <Feed snapshot={snapshot} rows={8} />
+      <Feed snapshot={snapshot} />
       <SimCard report={snapshot.sim} />
       <Actions
         snapshot={snapshot}
