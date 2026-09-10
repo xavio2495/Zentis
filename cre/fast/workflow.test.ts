@@ -71,6 +71,33 @@ const slot0Data = (sqrtPriceX96: bigint) =>
 const balancesData = (a: bigint, b: bigint) =>
 	bytes(encodeAbiParameters(parseAbiParameters('uint256, uint256'), [a, b]))
 
+/** What the registry already holds for this leg. A zero mid means nothing has been published. */
+type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number }
+const NOTHING_STORED: Stored = { mid: 0n, spreadBps: 0, markoutBps: 0, bandEdgeBps: 0 }
+
+const storedData = (stored: Stored) =>
+	bytes(
+		encodeAbiParameters(
+			parseAbiParameters(
+				'(uint128 mid, uint16 spreadBps, int16 tiltBps, uint40 updatedAt, uint32 seq, uint128 refBalanceA, int64 dTiltPerA, uint32 maxExtrapBps, uint16 markoutBps, uint16 bandEdgeBps)',
+			),
+			[
+				{
+					mid: stored.mid,
+					spreadBps: stored.spreadBps,
+					tiltBps: 0,
+					updatedAt: stored.mid === 0n ? 0 : 1788891000,
+					seq: stored.mid === 0n ? 0 : 1788891000,
+					refBalanceA: 0n,
+					dTiltPerA: 0n,
+					maxExtrapBps: 0,
+					markoutBps: stored.markoutBps,
+					bandEdgeBps: stored.bandEdgeBps,
+				},
+			],
+		),
+	)
+
 /**
  * A chain that never changes: both legs' finalized block, pool price and Aqua balances are fixed.
  * Every determinism claim in this file rests on the handler being a pure function of these.
@@ -84,6 +111,8 @@ type ChainState = {
 	tsB: bigint
 	sqrtB: bigint
 	balB: [bigint, bigint]
+	storedA: Stored
+	storedB: Stored
 }
 
 const CHAIN: ChainState = {
@@ -95,6 +124,8 @@ const CHAIN: ChainState = {
 	tsB: 1788891600n,
 	sqrtB: 1782527366555253651198357277536396n,
 	balB: [15_000_000n, 7592844468186735n],
+	storedA: NOTHING_STORED,
+	storedB: NOTHING_STORED,
 }
 
 const makeRuntime = (chain: ChainState = CHAIN) => {
@@ -102,14 +133,16 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 	const reports: string[] = []
 	const calls: string[] = []
 
-	// header, slot0, safeBalances — per leg, in the order observeLeg issues them.
+	// header, slot0, safeBalances, refOf — per leg, in the order observeLeg issues them.
 	const queue: Array<() => unknown> = [
 		() => ({ header: { blockNumber: protoBigInt(chain.blockA), timestamp: chain.tsA } }),
 		() => ({ data: slot0Data(chain.sqrtA) }),
 		() => ({ data: balancesData(chain.balA[0], chain.balA[1]) }),
+		() => ({ data: storedData(chain.storedA) }),
 		() => ({ header: { blockNumber: protoBigInt(chain.blockB), timestamp: chain.tsB } }),
 		() => ({ data: slot0Data(chain.sqrtB) }),
 		() => ({ data: balancesData(chain.balB[0], chain.balB[1]) }),
+		() => ({ data: storedData(chain.storedB) }),
 	]
 	let i = 0
 
@@ -195,6 +228,26 @@ describe('fast workflow', () => {
 		expect(-refA.tiltBps).toBeGreaterThan(refB.tiltBps)
 		// Accumulating tokenA on leg A must move its tilt further down between references.
 		expect(refA.dTiltPerA).toBeLessThan(0n)
+	})
+
+	test('the terms the slow workflow publishes survive the next fast write', () => {
+		// The slow workflow measures the spread, the markout and the boundary and writes them into
+		// the same slot. If this workflow rebuilt the slot from its config every minute, an hour's
+		// measurement would live for at most sixty seconds.
+		const { runtime, reports } = makeRuntime({
+			...CHAIN,
+			storedA: { mid: 1n, spreadBps: 22, markoutBps: 37, bandEdgeBps: 54 },
+		})
+		onCronTrigger(runtime)
+		const [, refA] = decodeRef(reports[0]!)
+		const [, refB] = decodeRef(reports[1]!)
+		expect(refA.spreadBps).toBe(22)
+		expect(refA.markoutBps).toBe(37)
+		expect(refA.bandEdgeBps).toBe(54)
+		// Nothing published on leg B yet, so it bootstraps from the config.
+		expect(refB.spreadBps).toBe(config.spreadBps)
+		expect(refB.markoutBps).toBe(0)
+		expect(refB.bandEdgeBps).toBe(0)
 	})
 
 	test('the published seq and updatedAt are shared by both legs', () => {
