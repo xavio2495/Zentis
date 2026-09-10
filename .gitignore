@@ -77,3 +77,6 @@ __pycache__/
 
 # Built TUI bundle for the npm bin
 /apps/tui/dist/
+
+# Partial output left by an interrupted bun build --compile
+*.bun-build

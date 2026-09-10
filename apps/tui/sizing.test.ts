@@ -11,7 +11,8 @@ test("the regions always leave a row of headroom, at every size", () => {
   for (const [cols, rows] of SIZES) {
     const r = fit(cols, rows);
     expect(r.draw).toBe(rows - 1);
-    expect(r.statusRows + r.graphRows + r.feedRows).toBe(r.draw);
+    // Every region is a bordered panel; the status bar's border is the two rows outside its content.
+    expect(r.statusRows + 2 + r.graphRows + r.feedRows).toBe(r.draw);
     expect(r.cardHeights[0] + r.cardHeights[1] + r.cardHeights[2]).toBe(r.draw);
     expect(r.draw).toBeLessThan(rows);
   }
@@ -46,7 +47,7 @@ test("the charts give ground before the feed does, and vanish before either brea
   expect(tall.graphRows).toBeGreaterThan(short.graphRows);
   // At the smallest supported height the charts are gone rather than drawn as a row of noise.
   const tiny = fit(80, MIN_ROWS);
-  expect(tiny.graphRows === 0 || tiny.graphRows >= 5).toBe(true);
+  expect(tiny.graphRows === 0 || tiny.graphRows >= 7).toBe(true);
   expect(tiny.feedRows).toBeGreaterThan(0);
 });
 

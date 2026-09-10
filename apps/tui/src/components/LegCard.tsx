@@ -1,9 +1,12 @@
 import { Box, Text } from "ink";
+import type { ReactNode } from "react";
 import { type LegSnapshot, humanDuration } from "@zentis/console-data";
-import { chooseFit, signed, stackedGauge, tokenAmount, weightBar } from "../format.js";
-import { type Seg, fitSegments, trunc } from "../layout.js";
+import { chooseFit, duration, signed, tokenAmount } from "../format.js";
+import { plot } from "../chart.js";
+import { Panel, panelInner } from "./Panel.js";
+import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
-import { STATE, TERM, UI, legColour } from "../theme.js";
+import { STATE, UI, legColour } from "../theme.js";
 
 /**
  * One leg, reduced to what a glance needs.
@@ -56,73 +59,72 @@ export function LegCard({
   width,
   height,
   selected,
+  windowSeconds,
 }: {
   leg: LegSnapshot;
   index: number;
   width: number;
   height: number;
   selected: boolean;
+  windowSeconds: bigint;
 }) {
   const colour = legColour(leg.config.chainId);
   const state = legState(leg);
-  const quote = quoteLine(leg, width - 2);
+  const { width: inner, height: innerRows } = panelInner(width, height);
+  const quote = quoteLine(leg, inner);
   const shift = leg.shift;
-  const inner = width - 2;
+  const position = leg.position;
 
-  // The gauge is small and centred on zero: the card says how far off the mid this leg is, and the
-  // detail view says what the two terms behind that are.
-  const gauge =
-    shift === null
-      ? []
-      : stackedGauge(
-          shift.correction,
-          shift.concession,
-          BigInt(leg.position?.maxTiltBps ?? 500),
-          Math.max(8, Math.min(18, inner - 10)),
-        );
+  const rows: ReactNode[] = [];
 
-  const header = fitSegments(
-    [
-      [
-        { text: `${index + 1} ${leg.config.label}`, color: colour, bold: true },
-        { text: ` ${state.word}`, color: state.tone },
-        ...(selected ? [{ text: " ◂", color: UI.action }] : []),
-      ],
-      [
-        { text: `${index + 1} ${leg.config.label.split(" ")[0]}`, color: colour, bold: true },
-        { text: ` ${state.word}`, color: state.tone },
-      ],
-      // The state outranks the full chain name: a card headed only "Sepolia" during an outage says
-      // nothing about why it is empty, which is the one thing the reader needs.
-      [
-        { text: `${index + 1} ${leg.config.label.split(" ")[0]}`, color: colour, bold: true },
-        { text: ` ${state.short}`, color: state.tone },
-      ],
-      [
-        { text: `${index + 1} `, color: colour, bold: true },
-        { text: state.short, color: state.tone },
-      ],
-    ],
-    inner,
+  // What this chain holds, in the tokens it holds them in. The first question anyone asks of a leg.
+  rows.push(
+    position === null ? (
+      // The panel's title already says `unread`, and the status bar carries the reason in full;
+      // repeating a truncated copy of it here spends the card's widest line on nothing.
+      <Text color={UI.muted}>{trunc(leg.sources.fills === null ? "no position" : "could not be read", inner)}</Text>
+    ) : (
+      <Segments
+        segs={fitSegments(
+          [
+            [
+              { text: "holds ", color: UI.muted },
+              {
+                text: `${tokenAmount(position.balanceA, leg.config.tokenA.decimals)} ${leg.config.tokenA.symbol}`,
+                color: UI.heading,
+              },
+              { text: " · ", color: UI.muted },
+              {
+                text: `${tokenAmount(position.balanceB, leg.config.tokenB.decimals)} ${leg.config.tokenB.symbol}`,
+                color: UI.heading,
+              },
+            ],
+            [
+              { text: "holds ", color: UI.muted },
+              {
+                text: `${tokenAmount(position.balanceA, leg.config.tokenA.decimals)} / ${tokenAmount(position.balanceB, leg.config.tokenB.decimals)}`,
+                color: UI.heading,
+              },
+            ],
+          ],
+          inner,
+        )}
+      />
+    ),
   );
 
-  const shiftRow: Seg[] =
-    shift === null
-      ? []
-      : fitSegments(
+  rows.push(<Text color={quote.tone}>{quote.text}</Text>);
+
+  if (shift !== null) {
+    rows.push(
+      <Segments
+        segs={fitSegments(
           [
             [
               { text: "shift ", color: UI.muted },
               { text: signed(shift.tiltBps).padEnd(6), color: UI.heading },
-              ...gauge.map((span) => ({
-                text: span.text,
-                color:
-                  span.term === "correction"
-                    ? TERM.correction
-                    : span.term === "concession"
-                      ? TERM.concession
-                      : UI.frame,
-              })),
+              { text: "spread ", color: UI.muted },
+              { text: `${leg.spread?.totalBps ?? 0}`, color: UI.heading },
             ],
             [
               { text: "shift ", color: UI.muted },
@@ -130,66 +132,42 @@ export function LegCard({
             ],
           ],
           inner,
-        );
+        )}
+      />,
+    );
+  }
+
+  // The leg's own price line, small. The card answers "is this chain moving?" at a glance; the
+  // detail view behind its number answers why.
+  const sparkRows = Math.max(0, innerRows - rows.length - 1);
+  if (sparkRows > 0 && leg.series !== null) {
+    const p = plot([{ key: "s", samples: leg.series.samples }], inner, sparkRows, windowSeconds)
+      .byKey.get("s")!;
+    for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
+    rows.push(
+      <Text color={UI.muted}>
+        {trunc(`×${p.minRatio.toFixed(2)}–×${p.maxRatio.toFixed(2)} over ${duration(Number((p.to ?? 0n) - (p.from ?? 0n)))}`, inner)}
+      </Text>,
+    );
+  } else if (sparkRows > 0 && leg.sources.pool !== null) {
+    rows.push(<Text color={UI.caveat}>{trunc(`price history: ${leg.sources.pool}`, inner)}</Text>);
+  }
 
   return (
-    <Box flexDirection="column" width={width} height={height} overflow="hidden" paddingX={1}>
-      <Box height={1}>
-        <Segments segs={header} />
+    <Panel
+      title={`${index + 1} ${leg.config.label.split(" ")[0]}`}
+      right={state.short}
+      width={width}
+      height={height}
+      colour={selected ? colour : UI.frame}
+    >
+      <Box flexDirection="column" width={inner} height={innerRows} overflow="hidden">
+        {padRows(rows, innerRows, null).map((row, i) => (
+          <Box key={i} height={1}>
+            {row ?? <Text> </Text>}
+          </Box>
+        ))}
       </Box>
-      <Box height={1}>
-        <Text color={quote.tone}>{quote.text}</Text>
-      </Box>
-      {leg.position !== null && (
-        <Box height={1}>
-          <Segments
-            segs={fitSegments(
-              [
-                [
-                  { text: "▕", color: UI.frame },
-                  { text: weightBar(shift?.weightA ?? 0n, Math.max(6, inner - 8)), color: colour },
-                  { text: "▏", color: UI.frame },
-                  {
-                    text: shift === null ? "" : ` ${Math.round(Number(shift.weightA) / 1e16)}%`,
-                    color: UI.muted,
-                  },
-                ],
-                [
-                  { text: "▕", color: UI.frame },
-                  { text: weightBar(shift?.weightA ?? 0n, Math.max(4, inner - 4)), color: colour },
-                  { text: "▏", color: UI.frame },
-                ],
-              ],
-              inner,
-            )}
-          />
-        </Box>
-      )}
-      {shift !== null && (
-        <Box height={1}>
-          <Segments segs={shiftRow} />
-        </Box>
-      )}
-      {leg.spread !== null && (
-        <Box height={1}>
-          <Segments
-            segs={fitSegments(
-              [
-                [
-                  { text: "spread ", color: UI.muted },
-                  { text: String(leg.spread.totalBps), color: UI.heading },
-                  { text: " bps", color: UI.muted },
-                ],
-                [
-                  { text: "spread ", color: UI.muted },
-                  { text: String(leg.spread.totalBps), color: UI.heading },
-                ],
-              ],
-              inner,
-            )}
-          />
-        </Box>
-      )}
-    </Box>
+    </Panel>
   );
 }

@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import { type LegSnapshot, humanDuration, weightPercent, why } from "@zentis/console-data";
 import { signed, tokenAmount } from "../format.js";
+import { plot } from "../chart.js";
 import { padRows, trunc, wrapLines } from "../layout.js";
 import { TERM, UI, legColour } from "../theme.js";
 
@@ -16,10 +17,12 @@ export function LegDetail({
   leg,
   width,
   height,
+  windowSeconds,
 }: {
   leg: LegSnapshot;
   width: number;
   height: number;
+  windowSeconds: bigint;
 }) {
   const colour = legColour(leg.config.chainId);
   const { shift, spread, ref, position } = leg;
@@ -128,6 +131,23 @@ export function LegDetail({
     );
   }
 
+  if (leg.series !== null) {
+    line(
+      "pool",
+      <>
+        <Text color={UI.muted}>{"pool       "}</Text>
+        <Text color={UI.heading}>{`${leg.config.referencePool.slice(0, 10)}…${leg.config.referencePool.slice(-6)}`}</Text>
+        <Text color={UI.muted}>
+          {`  liquidity ${leg.series.liquidity}  ·  last swap ${humanDuration(
+            Math.max(0, Math.floor(Date.now() / 1000) - Number(leg.series.updatedAtTimestamp)),
+          )} ago`}
+        </Text>
+      </>,
+    );
+  } else if (leg.sources.pool !== null) {
+    line("pool", <Text color={UI.caveat}>{trunc(`pool       ${leg.sources.pool}`, width)}</Text>);
+  }
+
   if (ref !== null) {
     line(
       "ref",
@@ -148,14 +168,30 @@ export function LegDetail({
     line(`caveat${i}`, <Text color={UI.caveat}>{trunc(`! ${caveat}`, width - 1)}</Text>);
   }
 
+  // Whatever height is left after the numbers goes to this leg's own price line, so the detail
+  // answers "what is it doing" and "why" in one place rather than sending the reader back.
+  const sparkRows = height - rows.length - 1;
+  if (sparkRows > 1 && leg.series !== null) {
+    const p = plot([{ key: "s", samples: leg.series.samples }], width, sparkRows - 1, windowSeconds)
+      .byKey.get("s")!;
+    line(
+      "extent",
+      <Text color={UI.muted}>
+        {trunc(`price      ×${p.minRatio.toFixed(3)}–×${p.maxRatio.toFixed(3)} of its own start`, width)}
+      </Text>,
+    );
+    for (const [i, row] of p.rows.entries()) {
+      line(`spark${i}`, <Text color={colour}>{row}</Text>);
+    }
+  }
+
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
-      {padRows(rows, height - 1, null).map((row, i) => (
+      {padRows(rows, height, null).map((row, i) => (
         <Box key={i} height={1}>
           {row ?? <Text> </Text>}
         </Box>
       ))}
-      <Text color={UI.muted}>{trunc("esc  back to the charts", width)}</Text>
     </Box>
   );
 }

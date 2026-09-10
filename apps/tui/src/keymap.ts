@@ -23,7 +23,8 @@ export interface Binding {
 }
 
 export const BINDINGS: Binding[] = [
-  { scope: "main", keys: ["1", "2", "3"], label: "open a leg's detail", id: "leg" },
+  { scope: "main", keys: ["left", "right"], label: "step the price chart to the previous or next leg", id: "step" },
+  { scope: "main", keys: ["1", "2", "3"], label: "open a leg's detail; the same number closes it", id: "leg" },
   { scope: "overlay", keys: ["esc"], label: "back to the charts", id: "back" },
   { scope: "global", keys: ["q"], label: "re-quote every leg now", id: "quote" },
   { scope: "main", keys: ["r"], label: "republish the fast workflow", id: "fast" },
@@ -41,6 +42,10 @@ export function matches(spec: string, input: string, key: Key): boolean {
       return key.escape;
     case "enter":
       return key.return;
+    case "left":
+      return key.leftArrow;
+    case "right":
+      return key.rightArrow;
     case "up":
       return key.upArrow;
     case "down":
@@ -58,6 +63,11 @@ export interface UiState {
 /** Which scopes are live, most specific first. The order is the whole precedence model. */
 export function scopesFor(state: UiState): Scope[] {
   if (state.confirming) return ["confirm"];
+  // A leg's detail sits where the chart was and the rest of the screen stays live, so the main keys
+  // stay live with it: the number that opened a detail closes it, another number jumps legs, and an
+  // action can still be taken while reading. Help covers the whole right column and is a page to
+  // read, so only its own keys and the global ones reach through it.
+  if (state.overlay === "leg") return ["overlay", "main", "global"];
   if (state.overlay !== "none") return ["overlay", "global"];
   return ["main", "global"];
 }

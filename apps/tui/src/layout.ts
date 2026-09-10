@@ -60,6 +60,7 @@ export interface Regions {
   readonly cardHeights: [number, number, number];
   /** status bar, graphs and feed, right two thirds */
   readonly rightWidth: number;
+  /** the status bar's content rows, not counting its border */
   readonly statusRows: number;
   readonly graphRows: number;
   readonly feedRows: number;
@@ -86,12 +87,15 @@ export function fit(cols: number, rows: number): Regions {
 
   // Two rows: the state and its call to action, then the key hints. One row when there is no height
   // for the second, in which case the hints are what goes — `?` still reaches them.
-  const statusRows = draw >= 20 ? 2 : 1;
+  // Every region is a bordered panel now, and a border costs two rows. The status bar's own content
+  // is one or two lines inside that.
+  const statusRows = draw >= 22 ? 2 : 1;
 
-  const rightBody = Math.max(0, draw - statusRows);
+  const BORDER = 2;
+  const rightBody = Math.max(0, draw - statusRows - BORDER);
   // Roughly half to the charts, per the wireframe, but never so little that a chart is a single row
   // of noise, and never so much that the feed cannot show a publish and the fill that preceded it.
-  const graphRows = rightBody < 8 ? 0 : clamp(Math.floor(rightBody * 0.5), 5, 20);
+  const graphRows = rightBody < 10 ? 0 : clamp(Math.floor(rightBody * 0.5), 7, 22);
   const feedRows = Math.max(0, rightBody - graphRows);
 
   // The three cards divide the full height; the remainder goes to the last so the column always

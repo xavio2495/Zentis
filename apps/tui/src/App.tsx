@@ -7,11 +7,13 @@ import { Graphs } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
 import { LegCard } from "./components/LegCard.js";
 import { LegDetail } from "./components/LegDetail.js";
+import { Panel, panelInner } from "./components/Panel.js";
 import { StatusBar } from "./components/StatusBar.js";
+import { extentOf } from "./components/Graphs.js";
 import { type Pending, landed } from "./landed.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
 import { resolve } from "./keymap.js";
-import { LEG_ORDER, UI } from "./theme.js";
+import { LEG_ORDER, UI, legColour } from "./theme.js";
 
 /**
  * The console: three leg cards down the left, a status bar, the reference-pool charts and the feed
@@ -25,6 +27,9 @@ import { LEG_ORDER, UI } from "./theme.js";
  * the guarantee: a region that draws one row more than it was budgeted pushes the frame to
  * `stdout.rows`, and Ink then clears the whole terminal on every frame. Clipping is the guarantee.
  */
+/** Fifteen seconds a leg, as asked: long enough to read a line, short enough to see all three. */
+export const ROTATE_MS = 15_000;
+
 export function App({
   actions,
   runAction,
@@ -48,6 +53,12 @@ export function App({
 
   const [overlay, setOverlay] = useState<"none" | "leg" | "help">("none");
   const [legIndex, setLegIndex] = useState(0);
+  // Which leg the chart region is showing while it rotates. Separate from `legIndex`, which is the
+  // leg whose detail is pinned, so returning from a detail does not jerk the rotation somewhere else.
+  const [shown, setShown] = useState(0);
+  // Bumped by a manual step so the rotation timer restarts from it: a chart the operator just chose
+  // should not be carried off a second later because the clock happened to be about to fire.
+  const [stepped, setStepped] = useState(0);
   const [confirming, setConfirming] = useState<Action | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [transient, setTransient] = useState<string | null>(null);
@@ -63,6 +74,15 @@ export function App({
       clearInterval(timer);
     };
   }, [store]);
+
+  // Fifteen seconds a leg. One chart at the region's full height reads; three stacked in a third of
+  // it each do not. The rotation pauses whenever something is pinned, so reading a leg's detail is
+  // never interrupted by the carousel moving on underneath it.
+  useEffect(() => {
+    if (overlay !== "none") return undefined;
+    const timer = setInterval(() => setShown((current) => current + 1), ROTATE_MS);
+    return () => clearInterval(timer);
+  }, [overlay, stepped]);
 
   const snapshot = state.snapshot;
   const armed = actions.some((a) => a.disabledReason === null && a.command !== null);
@@ -113,10 +133,21 @@ export function App({
       case "quote":
         void store.refresh(true);
         return;
-      case "leg":
-        setLegIndex(Number(input) - 1);
-        setOverlay("leg");
+      case "step": {
+        const count = Math.max(1, snapshot?.legs.length ?? 1);
+        setShown((current) => (current + (key.leftArrow ? count - 1 : 1)) % count);
+        setStepped((n) => n + 1);
         return;
+      }
+      case "leg": {
+        const picked = Number(input) - 1;
+        setLegIndex(picked);
+        setShown(picked);
+        // Pressing a leg's number twice returns to the rotation, so the same key that opened a
+        // detail closes it and `esc` is a convenience rather than the only way out.
+        setOverlay((current) => (current === "leg" && legIndex === picked ? "none" : "leg"));
+        return;
+      }
       default: {
         if (running !== null) return;
         const action = actions.find((a) => a.key === input);
@@ -159,6 +190,9 @@ export function App({
   ).filter((leg): leg is NonNullable<typeof leg> => leg !== undefined);
   const selected = ordered[Math.min(legIndex, ordered.length - 1)];
 
+  const rotating = ordered[shown % Math.max(1, ordered.length)] ?? ordered[0];
+  const graphInner = panelInner(regions.rightWidth, regions.graphRows);
+
   return (
     <Box height={regions.draw} overflow="hidden">
       <Box flexDirection="column" width={regions.legsWidth} height={regions.draw} overflow="hidden">
@@ -170,44 +204,78 @@ export function App({
             width={regions.legsWidth}
             height={regions.cardHeights[i] ?? 0}
             selected={overlay === "leg" && i === legIndex}
+            windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
           />
         ))}
       </Box>
 
       <Box flexDirection="column" width={regions.rightWidth} height={regions.draw} overflow="hidden">
-        <StatusBar
-          snapshot={snapshot}
-          actions={actions}
-          armed={armed}
-          rows={regions.statusRows}
-          width={regions.rightWidth}
-          transient={transient}
-        />
-        {/* Help takes the whole right column below the status bar: it is the one place prose
-            lives, and prose that has to be paginated at 40 rows is prose nobody reads. The leg
-            detail stays in the chart region, so the feed underneath keeps running while you read
-            it — the feed is how you watch a write land. */}
-        {overlay === "help" ? (
-          <Help
-            report={snapshot.sim}
-            width={regions.rightWidth}
-            height={regions.graphRows + regions.feedRows}
+        <Panel title="zentis" width={regions.rightWidth} height={regions.statusRows + 2}>
+          <StatusBar
+            snapshot={snapshot}
+            actions={actions}
+            armed={armed}
+            rows={regions.statusRows}
+            width={panelInner(regions.rightWidth, regions.statusRows + 2).width}
+            transient={transient}
           />
-        ) : (
-          <>
-            {regions.graphRows > 0 &&
-              (overlay === "leg" && selected !== undefined ? (
-                <LegDetail leg={selected} width={regions.rightWidth} height={regions.graphRows} />
-              ) : (
-                <Graphs
-                  snapshot={snapshot}
-                  width={regions.rightWidth}
-                  height={regions.graphRows}
-                  windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
-                />
-              ))}
-            <Feed snapshot={snapshot} width={regions.rightWidth} rows={regions.feedRows} />
-          </>
+        </Panel>
+
+        {regions.graphRows > 0 &&
+          (overlay === "help" ? (
+            <Panel
+              title="help"
+              right="esc or ? to close"
+              width={regions.rightWidth}
+              height={regions.graphRows + regions.feedRows}
+            >
+              <Help
+                report={snapshot.sim}
+                {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)}
+              />
+            </Panel>
+          ) : overlay === "leg" && selected !== undefined ? (
+            <Panel
+              title={`${legIndex + 1} ${selected.config.label}`}
+              right="esc to close"
+              width={regions.rightWidth}
+              height={regions.graphRows}
+              colour={legColour(selected.config.chainId)}
+            >
+              <LegDetail
+                leg={selected}
+                {...panelInner(regions.rightWidth, regions.graphRows)}
+                windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
+              />
+            </Panel>
+          ) : rotating === undefined ? null : (
+            <Panel
+              title={`market price · ${rotating.config.label.split(" ")[0]}`}
+              right={
+                extentOf(rotating, graphInner.width, graphInner.height, BigInt(BOOK.volatilityWindowSeconds)) ||
+                `${(shown % ordered.length) + 1}/${ordered.length}`
+              }
+              width={regions.rightWidth}
+              height={regions.graphRows}
+              colour={legColour(rotating.config.chainId)}
+            >
+              <Graphs
+                leg={rotating}
+                snapshot={snapshot}
+                {...graphInner}
+                windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
+              />
+            </Panel>
+          ))}
+
+        {overlay !== "help" && (
+          <Panel title="feed" width={regions.rightWidth} height={regions.feedRows}>
+            <Feed
+              snapshot={snapshot}
+              width={panelInner(regions.rightWidth, regions.feedRows).width}
+              rows={panelInner(regions.rightWidth, regions.feedRows).height}
+            />
+          </Panel>
         )}
       </Box>
     </Box>

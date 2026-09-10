@@ -124,7 +124,11 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
         shift: null,
         spread: null,
         quoteAToB: null,
-        sources: { fills: refusal, registry: null, pool: null },
+        // The allowance is per endpoint but the console reads six of them; when the fills are out
+        // the pools usually are too. A scenario that leaves the charts working is kinder than the
+        // outage the user actually saw.
+        series: null,
+        sources: { fills: refusal, registry: null, pool: refusal },
         caveats: [`fills subgraph unavailable (${refusal})`],
       })),
       feed: [],

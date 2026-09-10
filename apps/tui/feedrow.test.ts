@@ -8,13 +8,18 @@ import { drive } from "./sandbox/drive.js";
  * start of the line is testing the wrong column.
  */
 const feedOf = (lines: string[]) => {
-  const header = lines.findIndex((l) => l.includes("─ feed"));
+  // The feed lives in a titled panel: `┌ feed ───┐`, then rows between `│` borders.
+  const header = lines.findIndex((l) => l.includes("┌ feed"));
   if (header === -1) return [];
-  const column = lines[header]!.indexOf("─ feed");
-  return lines
-    .slice(header + 1)
-    .map((l) => l.slice(column))
-    .filter((l) => l.trim() !== "");
+  const column = lines[header]!.indexOf("┌ feed") + 1;
+  const rows: string[] = [];
+  for (const line of lines.slice(header + 1)) {
+    const cell = line.slice(column);
+    if (cell.startsWith("─") || cell.startsWith("╰")) break; // the panel's bottom edge
+    const text = cell.replace(/│\s*$/, "").trimEnd();
+    if (text.trim() !== "") rows.push(text);
+  }
+  return rows;
 };
 
 test("no feed row ends mid-clause", async () => {
@@ -24,7 +29,9 @@ test("no feed row ends mid-clause", async () => {
     [100, 30],
     [80, 24],
   ] as const) {
-    for (const line of feedOf((await drive(cols, rows, { armed: true })).lines)) {
+    const feed = feedOf((await drive(cols, rows, { armed: true })).lines);
+    expect(feed.length).toBeGreaterThan(3);
+    for (const line of feed) {
       // The variant ladder drops a trailing clause whole. A row ending in a comma or a preposition
       // is a row that was cut rather than chosen.
       expect(line.trimEnd()).not.toMatch(/(,|·|at shift|reference|→|on)$/);

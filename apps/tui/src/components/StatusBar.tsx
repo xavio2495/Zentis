@@ -95,7 +95,12 @@ function hints(actions: Action[], width: number): string {
   const full = actions.map((a) => `${a.key} ${a.label}`).join(" · ");
   const short = actions.map((a) => a.key).join(" ");
   return trunc(
-    [`${full} · ? help · x quit`, `${short} ? x`].find((h) => h.length <= width) ?? short,
+    [
+      `${full} · ←→ price · 1-3 detail · ? help · x quit`,
+      `${full} · ? help · x quit`,
+      `${short} ←→ 1-3 ? x`,
+      `${short} ? x`,
+    ].find((h) => h.length <= width) ?? short,
     width,
   );
 }

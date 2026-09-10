@@ -118,7 +118,7 @@ export function Feed({
   width: number;
   rows: number;
 }) {
-  const body = Math.max(0, rows - 1);
+  const body = Math.max(0, rows);
   const shown = snapshot.feed.slice(0, body);
 
   // A blank region during an outage reads as "nothing has happened", which is a claim. It has not
@@ -131,7 +131,6 @@ export function Feed({
 
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
-      <Text color={UI.frame}>{trunc("─ feed ".padEnd(width, "─"), width)}</Text>
       {/* Padded to the region's height so the feed does not resize as events arrive, which would
           drag the charts above it up and down between polls. */}
       {shown.length === 0 && (

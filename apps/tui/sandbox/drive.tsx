@@ -15,7 +15,14 @@ import { type Scenario, fakeSnapshot } from "./world.js";
  * clear the whole terminal on every repaint.
  */
 const ESC = "";
-const KEYS: Record<string, string> = { ESC, ENTER: "\r", UP: `${ESC}[A`, DOWN: `${ESC}[B` };
+const KEYS: Record<string, string> = {
+  ESC,
+  ENTER: "\r",
+  UP: `${ESC}[A`,
+  DOWN: `${ESC}[B`,
+  RIGHT: `${ESC}[C`,
+  LEFT: `${ESC}[D`,
+};
 const ANSI = new RegExp(`${ESC}\\[[0-9;?]*[a-zA-Z]`, "g");
 const strip = (text: string) => text.replace(ANSI, "");
 
