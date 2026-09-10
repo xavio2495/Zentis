@@ -1,22 +1,14 @@
-import { render, Box, Text, useApp, useInput } from "ink";
-import { useState } from "react";
+import { render } from "ink";
+import { App } from "./App.js";
 
-function Hello() {
-  const { exit } = useApp();
-  const [keys, setKeys] = useState<string[]>([]);
-  useInput((input, key) => {
-    if (input === "x") {
-      exit();
-      return;
-    }
-    setKeys((prev) => [...prev, key.return ? "<return>" : input].slice(-8));
-  });
-  return (
-    <Box flexDirection="column" borderStyle="round" paddingX={1}>
-      <Text color="cyan">zentis tui · gate 0</Text>
-      <Text>raw input: {keys.length === 0 ? "(press keys; x quits)" : keys.join(" ")}</Text>
-    </Box>
-  );
-}
+/**
+ * The operator console.
+ *
+ * `ZENTIS_ENV` is a path to a private env file, never a key: it is handed to the child processes the
+ * actions run and is neither read nor printed here. Without it the console still watches and still
+ * re-quotes, and says so, because watching is most of the job and a demo machine should not need a
+ * signing key to show the position.
+ */
+const envFile = process.env.ZENTIS_ENV ?? null;
 
-render(<Hello />);
+render(<App envFile={envFile} />);

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { BOOK, LEGS } from "./src/config.js";
-import { mergeFeed, parseHistory } from "./src/fills.js";
+import { type IndexedFill, mergeFeed, parseHistory } from "./src/fills.js";
 import { parseSeries } from "./src/pool.js";
 import { offMidBps } from "./src/quotes.js";
 import { headline, loadSimReport } from "./src/sim.js";
@@ -67,7 +67,9 @@ test("the feed carries the rejections, with the registry's own reason string", (
 });
 
 test("the Sepolia fill is in the feed with the reference that priced it", () => {
-  const fills = mergeFeed(histories, 200).filter((e) => e.kind === "fill" && e.chainId === 11155111);
+  const fills = mergeFeed(histories, 200).filter(
+    (e): e is IndexedFill => e.kind === "fill" && e.chainId === 11155111,
+  );
   expect(fills.length).toBeGreaterThan(0);
   const latest = fills[0]!;
   expect(latest.amountIn).toBeGreaterThan(0n);
