@@ -1,0 +1,130 @@
+import baseSepolia from "../../../contracts/deployments/base-sepolia.json" with { type: "json" };
+import arbitrumSepolia from "../../../contracts/deployments/arbitrum-sepolia.json" with { type: "json" };
+import sepolia from "../../../contracts/deployments/sepolia.json" with { type: "json" };
+import fastConfig from "../../../cre/fast/config.staging.json" with { type: "json" };
+import slowConfig from "../../../cre/slow/config.staging.json" with { type: "json" };
+
+/**
+ * One leg, assembled rather than declared.
+ *
+ * Every field is taken from the file that already owns it: the deployment record owns the chain and
+ * its tokens, the fast workflow's config owns the shipped program, the slow workflow's config owns
+ * the endpoints it reads. The join is the registry address, which appears in all three and is the
+ * one identifier a leg cannot change without being re-deployed. Nothing here is retyped, so a
+ * re-ship that edits those files moves the console with it.
+ */
+export interface LegConfig {
+  readonly chainId: number;
+  /** the deployment record's own name, e.g. "sepolia" */
+  readonly name: string;
+  /** short enough for a column header at 40 columns */
+  readonly label: string;
+  readonly registry: `0x${string}`;
+  /** the Zentis router this leg is shipped to */
+  readonly app: `0x${string}`;
+  readonly aqua: `0x${string}`;
+  readonly strategyHash: `0x${string}`;
+  readonly tokenA: TokenConfig;
+  readonly tokenB: TokenConfig;
+  readonly referencePool: `0x${string}`;
+  readonly fillsSubgraphUrl: string;
+  readonly referencePoolSubgraphUrl: string;
+  readonly rpcUrl: string;
+  /** the slow workflow's per-leg override, or the book-wide default when it has none */
+  readonly volatilityMultiplierBps: number;
+}
+
+export interface TokenConfig {
+  readonly symbol: string;
+  readonly decimals: number;
+  readonly address: `0x${string}`;
+}
+
+/** Book-wide policy parameters, from the two workflow configs. */
+export interface BookConfig {
+  readonly positionId: `0x${string}`;
+  readonly maxTiltBps: number;
+  readonly baseSpreadBps: number;
+  readonly volatilityHorizonSeconds: number;
+  readonly volatilityWindowSeconds: number;
+  readonly volatilityCapBps: number;
+  readonly maker: `0x${string}`;
+}
+
+/**
+ * The gains are secret and never leave the enclave, so a client-side decomposition has to assume
+ * them. These are the values the harness published and the workflows are running; a maker running
+ * other gains will see the enclave's tilt diverge from the console's, which is correct behaviour.
+ * Every screen that uses them carries `assumedGains` so it can say so.
+ */
+export const ASSUMED_GAINS = {
+  kappaOwnBps: 10_000n,
+  kappaBookBps: 5_000n,
+  source: "the published harness gains, not read from the enclave",
+} as const;
+
+const DEPLOYMENTS = [sepolia, arbitrumSepolia, baseSepolia];
+
+/** Sepolia first: it is the leg the demo's beat runs on. */
+const LABELS: Record<string, string> = {
+  sepolia: "Sepolia",
+  "arbitrum-sepolia": "Arbitrum Sepolia",
+  "base-sepolia": "Base Sepolia",
+};
+
+const RPC_ENV: Record<string, [string, string]> = {
+  sepolia: ["ZENTIS_RPC_SEPOLIA", "https://ethereum-sepolia-rpc.publicnode.com"],
+  "arbitrum-sepolia": ["ZENTIS_RPC_ARBITRUM_SEPOLIA", "https://sepolia-rollup.arbitrum.io/rpc"],
+  "base-sepolia": ["ZENTIS_RPC_BASE_SEPOLIA", "https://sepolia.base.org"],
+};
+
+const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+function rpcUrl(name: string): string {
+  const entry = RPC_ENV[name];
+  if (entry === undefined) throw new Error(`no rpc endpoint is configured for ${name}`);
+  const [variable, fallback] = entry;
+  const override = process.env[variable];
+  return override === undefined || override === "" ? fallback : override;
+}
+
+export const BOOK: BookConfig = {
+  positionId: fastConfig.positionId as `0x${string}`,
+  maxTiltBps: fastConfig.maxTiltBps,
+  baseSpreadBps: slowConfig.baseSpreadBps,
+  volatilityHorizonSeconds: slowConfig.volatilityHorizonSeconds,
+  volatilityWindowSeconds: slowConfig.volatilityWindowSeconds,
+  volatilityCapBps: slowConfig.volatilityCapBps,
+  maker: fastConfig.maker as `0x${string}`,
+};
+
+export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
+  const registry = deployment.contracts.ZentisRefRegistry.address;
+  const fast = fastConfig.legs.find((leg) => sameAddress(leg.registry, registry));
+  const slow = slowConfig.legs.find((leg) => sameAddress(leg.registry, registry));
+  if (fast === undefined || slow === undefined) {
+    throw new Error(`${deployment.name} is deployed but no workflow leg reads its registry`);
+  }
+  const label = LABELS[deployment.name];
+  if (label === undefined) throw new Error(`${deployment.name} has no column label`);
+
+  return {
+    chainId: deployment.chainId,
+    name: deployment.name,
+    label,
+    registry: registry as `0x${string}`,
+    app: fast.app as `0x${string}`,
+    aqua: fast.aqua as `0x${string}`,
+    strategyHash: fast.strategyHash as `0x${string}`,
+    tokenA: deployment.tokens.tokenA as TokenConfig,
+    tokenB: deployment.tokens.tokenB as TokenConfig,
+    referencePool: slow.referencePool as `0x${string}`,
+    fillsSubgraphUrl: slow.fillsSubgraphUrl,
+    referencePoolSubgraphUrl: slow.referencePoolSubgraphUrl,
+    rpcUrl: rpcUrl(deployment.name),
+    volatilityMultiplierBps: slow.volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
+  };
+});
+
+/** The pair, taken from the legs rather than named, so a different book renames the header. */
+export const PAIR = `${LEGS[0]!.tokenA.symbol}/${LEGS[0]!.tokenB.symbol}`;
