@@ -19,7 +19,7 @@ const realFetch = globalThis.fetch;
 beforeEach(() => {
   calls = 0;
   respond = () => new Response(JSON.stringify(ok), { status: 200, headers: { "content-type": "application/json" } });
-  globalThis.fetch = (async () => { calls += 1; return respond(); }) as typeof fetch;
+  globalThis.fetch = (async () => { calls += 1; return respond(); }) as unknown as typeof fetch;
   clearLegCache();
 });
 afterEach(() => { globalThis.fetch = realFetch; });
