@@ -16,10 +16,38 @@ import type { Action } from "./action-types.js";
  * is what the site serves, and a mode that became signing-capable because a file happened to be on
  * disk beside it would be a mode nobody could safely publish.
  */
+/**
+ * The alternate screen buffer.
+ *
+ * Launched from a shell the prompt occupies row 0, so a frame sized to the terminal's height pushes
+ * its own first row — the status line, and the first card's title — off the top. Reserving another
+ * row would work and would also waste one; entering the alternate buffer removes the prompt from the
+ * question entirely, which is what every full-screen TUI does. It also leaves scrollback untouched
+ * on exit, so quitting the console does not bury whatever the operator was reading before it.
+ */
+const ALTERNATE_ON = "\u001b[?1049h\u001b[H\u001b[2J";
+const ALTERNATE_OFF = "\u001b[?1049l";
+
+const usingAlternate = process.stdout.isTTY === true;
+if (usingAlternate) process.stdout.write(ALTERNATE_ON);
+const leaveAlternate = () => {
+  if (usingAlternate) process.stdout.write(ALTERNATE_OFF);
+};
+// Covers a clean exit, ctrl-c, and a terminal that goes away: leaving the alternate buffer behind
+// would leave the shell drawing into a screen the user cannot scroll.
+process.on("exit", leaveAlternate);
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+  process.on(signal, () => {
+    leaveAlternate();
+    process.exit(0);
+  });
+}
+
 const watchOnly = process.argv.slice(2).includes("watch");
 const envFile = watchOnly ? null : (process.env.ZENTIS_ENV ?? null);
 
 const runAction = async (action: Action): Promise<string> =>
   summarise(action, await run(action.command!));
 
-render(<App actions={buildActions(envFile)} runAction={runAction} />);
+const app = render(<App actions={buildActions(envFile)} runAction={runAction} />);
+void app.waitUntilExit().then(leaveAlternate);

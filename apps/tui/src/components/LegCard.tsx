@@ -13,21 +13,33 @@ import { STATE, TERM, UI, legColour } from "../theme.js";
  * five facts an operator watches: which chain and whether it is live, what it would pay right now,
  * what it holds, how far off the mid it is quoting, and how wide.
  */
-export function legState(leg: LegSnapshot): { word: string; tone: string } {
-  if (leg.position === null) return { word: "no position", tone: STATE.docked };
-  if (!leg.position.active) return { word: "docked", tone: STATE.docked };
-  if (leg.spread?.tooStaleToQuote === true) {
-    return { word: `stale ${humanDuration(leg.spread.referenceAgeSeconds)}`, tone: STATE.refusing };
+export function legState(leg: LegSnapshot): { word: string; short: string; tone: string } {
+  // A read that failed is not a position that is absent. Both arrive as a null `position`, and
+  // reporting the first as the second told a viewer, during a rate-limit outage, that the position
+  // this whole console is about had gone away.
+  if (leg.sources.fills !== null) {
+    return { word: `unavailable — ${leg.sources.fills}`, short: "unread", tone: STATE.refusing };
   }
-  if (leg.ref === null) return { word: "no reference", tone: STATE.refusing };
-  return { word: "live", tone: STATE.live };
+  if (leg.position === null) return { word: "no position", short: "none", tone: STATE.docked };
+  if (!leg.position.active) return { word: "docked", short: "docked", tone: STATE.docked };
+  if (leg.spread?.tooStaleToQuote === true) {
+    const age = humanDuration(leg.spread.referenceAgeSeconds);
+    return { word: `stale ${age}`, short: `stale ${age}`, tone: STATE.refusing };
+  }
+  if (leg.ref === null) return { word: "no reference", short: "no ref", tone: STATE.refusing };
+  return { word: "live", short: "live", tone: STATE.live };
 }
 
 /** The quote, or the single reason there is not one. */
 function quoteLine(leg: LegSnapshot, width: number): { text: string; tone: string } {
   const quote = leg.quoteAToB;
   if (quote?.amountOut == null) {
-    const reason = leg.spread?.tooStaleToQuote === true ? "reference too stale" : "not priced";
+    const reason =
+      leg.sources.fills !== null
+        ? "this leg could not be read"
+        : leg.spread?.tooStaleToQuote === true
+          ? "reference too stale"
+          : "not priced";
     return { text: trunc(`quote — ${reason}`, width), tone: UI.muted };
   }
   const inAmount = `${tokenAmount(quote.amountIn, leg.config.tokenA.decimals)} ${leg.config.tokenA.symbol}`;
@@ -80,7 +92,16 @@ export function LegCard({
         { text: `${index + 1} ${leg.config.label.split(" ")[0]}`, color: colour, bold: true },
         { text: ` ${state.word}`, color: state.tone },
       ],
-      [{ text: `${index + 1} ${leg.config.label.split(" ")[0]}`, color: colour, bold: true }],
+      // The state outranks the full chain name: a card headed only "Sepolia" during an outage says
+      // nothing about why it is empty, which is the one thing the reader needs.
+      [
+        { text: `${index + 1} ${leg.config.label.split(" ")[0]}`, color: colour, bold: true },
+        { text: ` ${state.short}`, color: state.tone },
+      ],
+      [
+        { text: `${index + 1} `, color: colour, bold: true },
+        { text: state.short, color: state.tone },
+      ],
     ],
     inner,
   );

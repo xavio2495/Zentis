@@ -20,6 +20,26 @@ export interface BookState {
 }
 
 export function bookState(snapshot: Snapshot, armed: boolean): BookState {
+  // An outage comes first, and is not the same fact as the legs having drifted apart. During a
+  // rate-limit refusal every leg reads as null, and reporting that as "legs are on different
+  // references" says the book has come apart when it has only gone unread.
+  const unread = snapshot.legs.filter((l) => l.sources.fills !== null);
+  if (unread.length === snapshot.legs.length && unread.length > 0) {
+    const why = unread[0]!.sources.fills!;
+    // Also offered short, because the mode — armed or watch-only — has to survive beside it. A
+    // console that stops saying whether it can sign is a console someone may assume can.
+    const brief = why.replace(/^subgraph HTTP /, "");
+    return {
+      tone: UI.rejection,
+      variants: [
+        `fills subgraph unavailable (${why}) — showing what it last read`,
+        `fills subgraph unavailable (${why})`,
+        `fills unavailable (${brief})`,
+        `fills unavailable`,
+      ],
+    };
+  }
+
   const refusing = snapshot.legs.filter((l) => l.spread?.tooStaleToQuote === true);
   const docked = snapshot.legs.filter((l) => l.position !== null && !l.position.active);
   const oldest = snapshot.legs
@@ -98,24 +118,31 @@ export function StatusBar({
 }) {
   const state = bookState(snapshot, armed);
   const symbol = snapshot.legs[0]?.config.tokenA.symbol ?? "";
-  const facts = [
+  // The book split is omitted rather than shown as zero when no leg could be read: a book that
+  // reads 0% USDC is a claim about the position, and nothing was read to support it.
+  const known = snapshot.legs.some((l) => l.sources.fills === null);
+  // Ordered by what may be dropped first. The mode is last because it is the only one that is a
+  // safety fact: a console that stops saying whether it can sign is one someone may assume can.
+  // The seq survives a subgraph outage — the registries are read over RPC — so during an outage it
+  // is present and long, and it was pushing the mode off the line.
+  const optional = [
     snapshot.seq === null ? null : `seq ${snapshot.seq}`,
-    `${weightPercent(snapshot.bookWeightA)}% ${symbol}`,
-    armed ? "armed" : "watch-only",
-  ]
-    .filter((f): f is string => f !== null)
-    .join(" · ");
+    known ? `${weightPercent(snapshot.bookWeightA)}% ${symbol}` : null,
+  ].filter((f): f is string => f !== null);
+  const mode = armed ? "armed" : "watch-only";
+  const factRuns = [...optional.map((_, i) => [...optional.slice(i), mode]), [mode]].map((parts) =>
+    parts.join(" · "),
+  );
 
   // The state sentence takes what it needs and the facts take what is left. Both are chosen from
   // whole variants, because a clipped seq is a different seq and a clipped remedy is not a remedy.
   const line = fitSegments(
-    state.variants.flatMap((variant): Seg[][] => [
-      [
+    state.variants.flatMap((variant): Seg[][] =>
+      factRuns.map((facts) => [
         { text: variant, color: state.tone, bold: true },
         { text: `   ${facts}`, color: UI.muted },
-      ],
-      [{ text: variant, color: state.tone, bold: true }],
-    ]),
+      ]),
+    ),
     width,
   );
 

@@ -131,19 +131,36 @@ export function plot(
       const y = Math.round(Math.max(0, Math.min(subRows - 1, scaled)));
       column[x] = column[x] === null ? y : Math.round((column[x]! + y) / 2);
     }
-    let previous: number | null = null;
+    const ink = (x: number, y: number) => {
+      const row = height - 1 - Math.floor(y / 4);
+      const cell = Math.floor(x / 2);
+      if (row < 0 || row >= height || cell < 0 || cell >= width) return;
+      grid[row]![cell]! |= DOTS[x % 2]![y % 4]!;
+    };
+
+    // Joined, not scattered. Swaps are sparse — a week of them across a few hundred sub-columns —
+    // so plotting only the columns that carry a sample leaves gaps between them and the result reads
+    // as noise rather than as a series. Consecutive samples are connected by interpolating across
+    // the empty columns between them, which is what makes three legs legible as three lines.
+    let previous: { x: number; y: number } | null = null;
     for (let x = 0; x < subCols; x += 1) {
       const y = column[x];
       if (y === null || y === undefined) continue;
-      const start = previous === null ? y : previous;
-      const [top, bottom] = start <= y ? [start, y] : [y, start];
-      for (let fill = top; fill <= bottom; fill += 1) {
-        const row = height - 1 - Math.floor(fill / 4);
-        const cell = Math.floor(x / 2);
-        if (row < 0 || row >= height || cell < 0 || cell >= width) continue;
-        grid[row]![cell]! |= DOTS[x % 2]![fill % 4]!;
+      if (previous === null) {
+        ink(x, y);
+      } else {
+        const run = x - previous.x;
+        for (let step = 1; step <= run; step += 1) {
+          const at = previous.x + step;
+          const between = Math.round(previous.y + ((y - previous.y) * step) / run);
+          // The vertical run at each step keeps the line continuous where it is steep, rather than
+          // leaving a dotted diagonal.
+          const from = step === 1 ? previous.y : Math.round(previous.y + ((y - previous.y) * (step - 1)) / run);
+          const [top, bottom] = from <= between ? [from, between] : [between, from];
+          for (let fill = top; fill <= bottom; fill += 1) ink(at, fill);
+        }
       }
-      previous = y;
+      previous = { x, y };
     }
 
     byKey.set(s.key, {

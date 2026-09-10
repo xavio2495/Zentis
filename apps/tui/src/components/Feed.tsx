@@ -121,16 +121,29 @@ export function Feed({
   const body = Math.max(0, rows - 1);
   const shown = snapshot.feed.slice(0, body);
 
+  // A blank region during an outage reads as "nothing has happened", which is a claim. It has not
+  // been established that nothing happened; the source that would say so refused.
+  const unread = snapshot.legs.map((l) => l.sources.fills).find((e) => e !== null) ?? null;
+  const empty =
+    unread !== null
+      ? `feed unavailable: ${unread}`
+      : "nothing indexed yet for this position";
+
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
       <Text color={UI.frame}>{trunc("─ feed ".padEnd(width, "─"), width)}</Text>
       {/* Padded to the region's height so the feed does not resize as events arrive, which would
           drag the charts above it up and down between polls. */}
+      {shown.length === 0 && (
+        <Box height={1}>
+          <Text color={unread === null ? UI.muted : UI.caveat}>{trunc(empty, width)}</Text>
+        </Box>
+      )}
       {padRows(
         shown.map((row, i) => (
           <Segments key={`${row.kind}-${i}`} segs={rowSegments(row, snapshot, width)} />
         )),
-        body,
+        shown.length === 0 ? Math.max(0, body - 1) : body,
         null,
       ).map((row, i) => (
         <Box key={i} height={1}>

@@ -38,7 +38,14 @@ export async function query<T>(url: string, body: string): Promise<Read<T>> {
   } catch (cause) {
     return failed(`could not reach the subgraph: ${String(cause)}`);
   }
-  if (!response.ok) return failed(`the subgraph answered ${response.status}`);
+  if (!response.ok) {
+    // Subgraph Studio's allowance is per deployment endpoint over a window of hours, so the reset
+    // time is the only part of a refusal anyone can act on. Backing off without it is guesswork.
+    const reset = response.headers.get("x-ratelimit-reset");
+    const when =
+      reset === null ? "" : `, resets ${new Date(Number(reset) * 1000).toISOString().slice(11, 16)}Z`;
+    return failed(`subgraph HTTP ${response.status}${when}`);
+  }
 
   let payload: { data?: T & { _meta?: { hasIndexingErrors: boolean } }; errors?: { message: string }[] };
   try {

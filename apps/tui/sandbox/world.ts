@@ -21,7 +21,7 @@ import refBase from "../../../packages/console-data/fixtures/ref-base-sepolia.js
  *
  * It is also what the site can show a visitor when the live reference is stale.
  */
-export type Scenario = "fresh" | "stale" | "docked" | "landing";
+export type Scenario = "fresh" | "stale" | "docked" | "landing" | "outage";
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;
@@ -97,11 +97,41 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
         : null,
       quoteBToA: null,
       finality: { head: 11_674_000n, finalized: 11_673_920n },
+      // Every source answered in the fake world; the outage scenario is the one that sets these.
+      sources: { fills: null, registry: null, pool: null },
       caveats: spread.tooStaleToQuote
         ? [`the reference is ${Math.floor(ageSeconds / 60)}m old, past this leg's limit`]
         : [],
     };
   });
+
+  if (scenario === "outage") {
+    // What the user's screenshot caught: every fills read refused with a cold cache, so every leg
+    // arrives null. The console has to say the legs are unread, never that they are gone.
+    const refusal = "subgraph HTTP 429, resets 21:52Z";
+    return {
+      pair: PAIR,
+      positionId: BOOK.positionId,
+      takenAtSeconds: now,
+      // The registries are read over RPC, which answers while Studio does not, so a subgraph outage
+      // leaves the seq known. Setting it null here made the scenario easier than the real thing.
+      seq,
+      bookWeightA: 0n,
+      gains: ASSUMED_GAINS,
+      legs: legs.map((leg) => ({
+        ...leg,
+        position: null,
+        shift: null,
+        spread: null,
+        quoteAToB: null,
+        sources: { fills: refusal, registry: null, pool: null },
+        caveats: [`fills subgraph unavailable (${refusal})`],
+      })),
+      feed: [],
+      sim: loadSimReport(),
+      caveats: [],
+    } as unknown as Snapshot;
+  }
 
   return {
     pair: PAIR,

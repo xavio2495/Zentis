@@ -137,3 +137,23 @@ test("a spike is banded out and counted; a sustained step is not, because it is 
   }));
   expect(plot([{ key: "a", samples: step }], 30, 6, WINDOW).byKey.get("a")!.clipped).toBe(0);
 });
+
+test("sparse samples are joined into a line rather than left as scattered dots", () => {
+  // A week of swaps across a few hundred sub-columns leaves most of them empty. Plotting only the
+  // columns that carry a sample reads as noise; the gaps between them have to be drawn.
+  const sparse = [0, 10, 20, 30].map((i) => ({
+    timestamp: BigInt(1000 + (30 - i) * 600),
+    mid: BigInt(Math.round((1 + i * 0.01) * 1e18)),
+  }));
+  const rows = plot([{ key: "a", samples: sparse }], 40, 6, WINDOW).byKey.get("a")!.rows;
+
+  const inked = rows.join("").split("").filter((c) => c !== " ").length;
+  // Four samples plotted as points would ink four cells; joined, they ink most of the width.
+  expect(inked).toBeGreaterThan(20);
+
+  // And the line is continuous: no column between the first and last inked one is empty.
+  const columns = Array.from({ length: 40 }, (_, x) => rows.some((row) => row[x] !== " "));
+  const first = columns.indexOf(true);
+  const last = columns.lastIndexOf(true);
+  expect(columns.slice(first, last + 1).every(Boolean)).toBe(true);
+});

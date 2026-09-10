@@ -20,6 +20,18 @@ export interface LegSnapshot {
   readonly quoteAToB: LegQuote | null;
   readonly quoteBToA: LegQuote | null;
   readonly finality: Finality | null;
+  /**
+   * Why each source is missing, when it is.
+   *
+   * A null `position` means "docked and gone" and "could not be read" equally, and rendering the
+   * second as the first tells a viewer the position is absent when it is merely unread. The screen
+   * keys its wording off these rather than off the nulls.
+   */
+  readonly sources: {
+    readonly fills: string | null;
+    readonly registry: string | null;
+    readonly pool: string | null;
+  };
   /** printed as-is; a missing source is part of the state, not an exception */
   readonly caveats: string[];
 }
@@ -159,6 +171,11 @@ export async function takeSnapshot(
       quoteAToB: aToB.value?.quotes.find((q) => q.chainId === config.chainId) ?? null,
       quoteBToA: bToA.value?.quotes.find((q) => q.chainId === config.chainId) ?? null,
       finality: finalities[i]!.value,
+      sources: {
+        fills: history.value === null ? history.error : null,
+        registry: ref.value === null ? ref.error : null,
+        pool: pool.value === null ? pool.error : null,
+      },
       caveats: legCaveats,
     };
   });
