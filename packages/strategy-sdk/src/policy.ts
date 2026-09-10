@@ -165,3 +165,20 @@ export const bucketToBps = (value: bigint, scale: bigint): bigint => {
 	const half = scale / (2n * BPS)
 	return ((value + half) / (scale / BPS)) * (scale / BPS)
 }
+
+/**
+ * The concession room read back from a published boundary.
+ *
+ * The slow workflow publishes the boundary as the shift it saw plus the room it allocated, and the
+ * fast workflow keeps that difference as it moves the shift. Reading the room back as boundary
+ * minus shift is exact below the maker's signed cap. On the cap it is meaningless: a boundary
+ * sitting there could be any shift plus any room, and reading it as zero would refuse a concession
+ * the enclave never refused. Null means no budget is known and the concession runs free, which is
+ * safe because the total still clamps at the cap. Zero means no boundary has been published.
+ */
+export const recoverRoom = (boundaryBps: bigint, tiltBps: bigint, maxTiltBps: bigint): bigint | null => {
+	if (boundaryBps === 0n || boundaryBps >= maxTiltBps) return null
+	const magnitude = tiltBps < 0n ? -tiltBps : tiltBps
+	const room = boundaryBps - magnitude
+	return room < 0n ? 0n : room
+}

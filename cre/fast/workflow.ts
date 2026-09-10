@@ -14,7 +14,7 @@ import {
 import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, parseAbiParameters, type Address, type Hex } from 'viem'
 import { z } from 'zod'
 
-import { legWeight, midFromSqrtPriceX96, reservation, type LegWeight } from '@zentis/strategy-sdk'
+import { legWeight, midFromSqrtPriceX96, recoverRoom, reservation, type LegWeight } from '@zentis/strategy-sdk'
 
 // ─── Config ─────────────────────────────────────────────────
 const legSchema = z.object({
@@ -292,11 +292,9 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	// The room the slow workflow granted each leg, recovered from the boundary it published: that
 	// boundary is the shift it saw plus the allocated room, and every writer keeps that difference.
 	// Zero means no boundary has been published, and the concession runs free until one is.
-	const room = observed.map((o) => {
-		if (o.stored.bandEdgeBps === 0) return null
-		const r = BigInt(o.stored.bandEdgeBps) - BigInt(Math.abs(o.stored.tiltBps))
-		return r < 0n ? 0n : r
-	})
+	const room = observed.map((o) =>
+		recoverRoom(BigInt(o.stored.bandEdgeBps), BigInt(o.stored.tiltBps), BigInt(config.maxTiltBps)),
+	)
 	const policies = reservation(
 		observed.map((o) => o.weight),
 		kappaOwnBps,
