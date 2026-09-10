@@ -86,7 +86,14 @@ const STORED_TUPLE = parseAbiParameters(
  * forward rather than rebuild the slot from config — or an hour's measurement would live for at
  * most sixty seconds. A zero mid means nothing has been published yet, and the config bootstraps.
  */
-type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number; tiltBps: number }
+type Stored = {
+	mid: bigint
+	spreadBps: number
+	markoutBps: number
+	bandEdgeBps: number
+	tiltBps: number
+	seq: number
+}
 
 /** Shift plus room, never zero once a boundary exists, never past the cap the maker signed. */
 const boundaryFor = (tiltBps: bigint, room: bigint | null, maxTiltBps: bigint): number => {
@@ -244,6 +251,7 @@ const observeLeg = (
 		markoutBps: current.markoutBps,
 		bandEdgeBps: current.bandEdgeBps,
 		tiltBps: current.tiltBps,
+		seq: current.seq,
 	}
 
 	return {
@@ -304,7 +312,12 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 		(oldest, o) => (o.pinnedTimestamp < oldest ? o.pinnedTimestamp : oldest),
 		observed[0]!.pinnedTimestamp,
 	)
-	const seq = updatedAt
+	// The registry rejects a seq that does not exceed the stored one, and the finalized timestamp
+	// only moves when the laggiest chain finalizes another block, minutes apart. A run over the same
+	// pinned instant still has something to say (a slot changed at the head, a budget to carry), so
+	// seq passes every leg's stored seq, and stays one number across every leg.
+	const highestStored = observed.reduce((top, o) => (o.stored.seq > top ? o.stored.seq : top), 0)
+	const seq = updatedAt > BigInt(highestStored) ? updatedAt : BigInt(highestStored + 1)
 
 	const written = observed.map((o, i) => {
 		const payload = encodeAbiParameters(REF_ABI, [
