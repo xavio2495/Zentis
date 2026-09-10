@@ -98,6 +98,11 @@ class Result:
     declined: int = 0
     transfers: int = 0
     transfer_cost_a: int = 0
+    #: what the opening inventory would be worth at the closing mids, untouched: the part of
+    #: `pnl_a` that is the price path, not the policy
+    hold_pnl_a: int = 0
+    #: `pnl_a` less the hold. This is the number that measures the policy.
+    trading_pnl_a: int = 0
     ticks: list = field(default_factory=list)
 
 
@@ -157,6 +162,22 @@ def _value_in_a(leg: Leg) -> int:
     return leg.balance_a + leg.balance_b * ONE_E18 // leg.mid
 
 
+def band_allows(mid: int, tilt_bps: int, book: Book, *, a_to_b: bool, amount_in: int, amount_out: int) -> bool:
+    """The band, as the instruction applies it: the realised price must sit within
+    `spread + |tilt| + tol` of the reference mid. The tilt widens the band rather than tripping it,
+    so a fill the skew priced is never refused by the band for having been priced.
+
+    The maker buys tokenA on an A-in fill and wants to pay low, so the realised price is bounded
+    above; it sells tokenA on a B-in fill and wants to be paid high, so the price is bounded below.
+    """
+    band = book.spread_bps + abs(tilt_bps) + book.band_tol_bps
+    if a_to_b:
+        realised = amount_out * ONE_E18 // amount_in
+        return realised <= mid * (BPS + band) // BPS
+    realised = amount_in * ONE_E18 // amount_out
+    return realised >= mid * (BPS - band) // BPS
+
+
 def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, banded: bool) -> Result:
     """One policy over one price path. `tilted=False` is the static control."""
     rng = random.Random(series.seed + 1)
@@ -168,6 +189,7 @@ def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, b
         for _ in range(book.legs)
     ]
     opening = sum(_value_in_a(leg) for leg in legs)
+    opening_balances = [(leg.balance_a, leg.balance_b) for leg in legs]
     result = Result(name=name)
 
     for tick in range(series.ticks):
@@ -198,7 +220,7 @@ def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, b
             depth = book.external_depth_a * (1 if index == 0 else book.external_depth_multiple)
             floor = _external_out(leg, a_to_b, amount_in, depth)
             if got > 0 and got >= floor:
-                if banded and abs(tilt) >= book.band_tol_bps:
+                if banded and not band_allows(leg.mid, tilt, book, a_to_b=a_to_b, amount_in=amount_in, amount_out=got):
                     result.refused += 1
                 else:
                     if a_to_b:
@@ -246,4 +268,7 @@ def run(name: str, series: Series, book: Book, *, tilted: bool, bounded: bool, b
 
     closing = sum(_value_in_a(leg) for leg in legs)
     result.pnl_a = closing - opening
+    held = sum(_value_in_a(Leg(a, b, leg.mid)) for (a, b), leg in zip(opening_balances, legs))
+    result.hold_pnl_a = held - opening
+    result.trading_pnl_a = result.pnl_a - result.hold_pnl_a
     return result
