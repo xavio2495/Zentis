@@ -4,7 +4,7 @@ import { protoBigIntToBigint, type TeeRuntime } from '@chainlink/cre-sdk'
 import { encodeAbiParameters, parseAbiParameters } from 'viem'
 
 import { onCronTrigger, restrictions, type Config } from './workflow'
-import { antiSymmetric, legWeight, midFromSqrtPriceX96 } from './policy'
+import { anchorTiltBps, antiSymmetric, legWeight, midFromSqrtPriceX96 } from './policy'
 
 const KAPPA = '10000'
 const KAPPA_BOOK = '5000'
@@ -86,7 +86,7 @@ const balancesData = (a: bigint, b: bigint) =>
 	bytes(encodeAbiParameters(parseAbiParameters('uint256, uint256'), [a, b]))
 
 /** What the registry already holds for this leg. A zero mid means nothing has been published. */
-type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number }
+type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number; tiltBps?: number }
 const NOTHING_STORED: Stored = { mid: 0n, spreadBps: 0, markoutBps: 0, bandEdgeBps: 0 }
 
 const storedData = (stored: Stored) =>
@@ -99,7 +99,7 @@ const storedData = (stored: Stored) =>
 				{
 					mid: stored.mid,
 					spreadBps: stored.spreadBps,
-					tiltBps: 0,
+					tiltBps: stored.tiltBps ?? (stored.mid === 0n ? 0 : -2),
 					updatedAt: stored.mid === 0n ? 0 : 1788891000,
 					seq: stored.mid === 0n ? 0 : 1788891000,
 					refBalanceA: 0n,
@@ -284,6 +284,33 @@ describe('fast workflow', () => {
 			String(LEG_B.block),
 			'latest',
 		])
+	})
+
+	test('the boundary keeps the room the slow workflow granted, above whatever shift is now quoted', () => {
+		// The instruction caps the whole shift at the published boundary. The slow workflow publishes
+		// the boundary as the shift it saw plus the room it allocated, but it runs hourly and the
+		// shift moves every minute; a correction larger than the stale boundary would be clamped to
+		// it. So this workflow republishes the boundary as the new shift plus the same room, and
+		// spends that room on the concession inside the enclave, where the budget belongs.
+		const stored = { mid: 1n, spreadBps: 22, markoutBps: 0, bandEdgeBps: 57 } // room = 57 - |-2|
+		const { runtime, reports } = makeRuntime(
+			withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal: [25_000_000n, 4137282795001288n] }),
+		)
+		onCronTrigger(runtime)
+		const [, refA] = decodeRef(reports[0]!)
+		expect(refA.bandEdgeBps).toBe(Math.abs(refA.tiltBps) + 55)
+		expect(refA.bandEdgeBps).toBeGreaterThan(57)
+	})
+
+	test('with no room granted the published shift is the correction alone', () => {
+		const stored = { mid: 1n, spreadBps: 22, markoutBps: 0, bandEdgeBps: 2 } // room = 2 - |-2| = 0
+		const bal: [bigint, bigint] = [25_000_000n, 4137282795001288n]
+		const { runtime, reports } = makeRuntime(withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal }))
+		onCronTrigger(runtime)
+		const [, refA] = decodeRef(reports[0]!)
+		const mid = midFromSqrtPriceX96(LEG_A.sqrt)
+		const anchor = anchorTiltBps(legWeight({ balanceA: bal[0], balanceB: bal[1], mid }).weightA)
+		expect(BigInt(refA.tiltBps)).toBe(anchor < -500n ? -500n : anchor)
 	})
 
 	test('the published seq and updatedAt are shared by both legs', () => {

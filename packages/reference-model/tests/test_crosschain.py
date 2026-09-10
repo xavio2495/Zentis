@@ -103,3 +103,36 @@ class TestReservation:
         legs = [leg_weight(a, a, ONE), leg_weight(a, a * 90 // 100, ONE), leg_weight(a, a, ONE)]
         ps = reservation(legs, 0, 3_000, 500)
         assert ps[0]["tiltBps"] == ps[2]["tiltBps"] > 0
+
+
+class TestConcessionBudget:
+    """The bridge-parity budget bounds the concession, never the correction."""
+
+    def _cheap(self):
+        a = 10_000_000
+        return leg_weight(a, a * 96 // 100, ONE)
+
+    def test_no_budget_leaves_the_policy_unchanged(self):
+        from reference_model.crosschain import reservation
+
+        legs = [self._cheap(), leg_weight(10_000_000, 10_000_000, ONE)]
+        assert reservation(legs, 10_000, 5_000, 500) == reservation(legs, 10_000, 5_000, 500, [None, None])
+
+    def test_a_zero_budget_leaves_only_the_correction(self):
+        from reference_model.crosschain import anchor_tilt_bps, reservation
+
+        leg = self._cheap()
+        [p] = reservation([leg], 10_000, 5_000, 10_000, [0])
+        assert p["tiltBps"] == anchor_tilt_bps(leg["weightA"])
+
+    def test_the_budget_binds_on_the_concession_alone(self):
+        from reference_model.crosschain import anchor_tilt_bps, reservation
+
+        leg = self._cheap()
+        [free] = reservation([leg], 10_000, 5_000, 10_000)
+        concession = free["tiltBps"] - anchor_tilt_bps(leg["weightA"])
+        assert concession > 20
+        [capped] = reservation([leg], 10_000, 5_000, 10_000, [20])
+        assert capped["tiltBps"] == anchor_tilt_bps(leg["weightA"]) + 20
+        [loose] = reservation([leg], 10_000, 5_000, 10_000, [concession + 5])
+        assert loose["tiltBps"] == free["tiltBps"]
