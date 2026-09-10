@@ -1,7 +1,7 @@
 import { CHAINS, PORT, REFERENCE_WARN_AGE_SECONDS } from "./config.js";
 import { fetchLeg, type LegResult } from "./legs.js";
 import { QuoteRefused, quoteLeg } from "./quote.js";
-import { explain } from "./reason.js";
+import { absenceCaveat, explain } from "./reason.js";
 import { crowdingBps, fetchVenue } from "./crowding.js";
 
 interface LegQuote {
@@ -74,7 +74,7 @@ async function buildQuote(
   };
 
   if (position === null) {
-    caveats.push("this leg has no such position");
+    caveats.push(absenceCaveat(leg.error));
     return base;
   }
 

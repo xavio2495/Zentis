@@ -27,3 +27,16 @@ export function explain(position: LegPosition, isAToB: boolean): string {
     ? `the leg is over-weight ${heldLong} at ${Math.abs(tilt)} bps of tilt and wants takers to ${wanted} it, so this side is discounted`
     : `the leg is over-weight ${heldLong} at ${Math.abs(tilt)} bps of tilt and wants takers to ${wanted} it, so this side pays a premium`;
 }
+
+/**
+ * Why a leg has no position — which is not always that it has no position.
+ *
+ * A failed read and an absent leg both arrive here as `null`. Reporting the first as the second is
+ * the more dangerous direction: on a console whose whole claim is one position on three chains, "no
+ * such position" reads as the position being gone rather than as the reader being unable to look.
+ */
+export function absenceCaveat(readError: string | null): string {
+  return readError === null
+    ? "this leg has no such position"
+    : "this leg could not be read, so nothing below is known about it";
+}
