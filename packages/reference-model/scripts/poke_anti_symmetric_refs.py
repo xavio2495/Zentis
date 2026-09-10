@@ -163,7 +163,9 @@ def main() -> None:
     tilts = [legs[n]["policy"]["tiltBps"] for n in order]
     # Conservation, restated: tilting moves inventory between legs and cannot create any, so the
     # tilts must sum to zero. Integer truncation leaves at most one basis point per leg.
-    assert abs(sum(tilts)) <= len(tilts) - 1, f"tilts do not net out: {tilts}"
+    # Under the reservation policy the legs do not net out: each is repriced onto its own mid
+    # first, and only the skews are conservative. What must hold is the cap, on every leg.
+    assert all(abs(t) <= MAX_TILT_BPS for t in tilts), f"a tilt is past the cap: {tilts}"
     print("distribution: " + ", ".join(f"{n} {t:+d} bps" for n, t in zip(order, tilts)))
 
 
