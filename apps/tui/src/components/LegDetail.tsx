@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
-import { type LegSnapshot, humanDuration, referenceAgeSeconds, weightPercent, why } from "@zentis/console-data";
-import { pairPrice, signed, tokenAmount } from "../format.js";
+import { type LegSnapshot, humanDuration, invertMid, referenceAgeSeconds, weightPercent, why } from "@zentis/console-data";
+import { pairPrice, priceFigure, signed, tokenAmount } from "../format.js";
+import { quoted } from "../quoted.js";
 import { plot } from "../chart.js";
 import { padRows, trunc, wrapLines } from "../layout.js";
 import { TERM, UI, legColour } from "../theme.js";
@@ -150,8 +151,10 @@ export function LegDetail({
         <Text color={UI.muted}>{"pool       "}</Text>
         <Text color={UI.heading}>{pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB)}</Text>
         <Text color={UI.muted}>{`  ${leg.config.referencePool.slice(0, 10)}…${leg.config.referencePool.slice(-6)}`}</Text>
+        {/* Liquidity is not shown: a Uniswap v3 liquidity value is not an amount of either token, and
+            printing its fifteen digits said nothing a reader could use. */}
         <Text color={UI.muted}>
-          {`  liquidity ${leg.series.liquidity}  ·  last swap ${humanDuration(
+          {`  last swap ${humanDuration(
             Math.max(0, Math.floor(Date.now() / 1000) - Number(leg.series.updatedAtTimestamp)),
           )} ago`}
         </Text>
@@ -168,14 +171,24 @@ export function LegDetail({
         <Text color={UI.muted}>{"reference  "}</Text>
         <Text color={UI.reference}>{`seq ${ref.seq}`}</Text>
         <Text color={UI.muted}>
-          {`  ${humanDuration(referenceAgeSeconds(leg, Math.floor(Date.now() / 1000)) ?? 0)} old  ·  mid ${ref.mid}`}
+          {`  ${humanDuration(referenceAgeSeconds(leg, Math.floor(Date.now() / 1000)) ?? 0)} old  ·  ` +
+            `mid ${pairPrice(ref.mid, leg.config.tokenA, leg.config.tokenB)}`}
         </Text>
       </>,
     );
   }
 
-  for (const [i, text] of wrapLines(`why  ${why(leg)}`, width - 1, 3).entries()) {
-    line(`why${i}`, <Text color={UI.muted}>{text}</Text>);
+  // Labelled in the same column as `pool` and `reference`, with its continuation lines indented to
+  // match. Run straight into its sentence, "why this leg has no…" read as a question.
+  const LABEL = 11;
+  for (const [i, text] of wrapLines(why(leg), width - 1 - LABEL, 3).entries()) {
+    line(
+      `why${i}`,
+      <>
+        <Text color={UI.muted}>{(i === 0 ? "why" : "").padEnd(LABEL)}</Text>
+        <Text color={UI.muted}>{text}</Text>
+      </>,
+    );
   }
   for (const [i, caveat] of leg.caveats.entries()) {
     line(`caveat${i}`, <Text color={UI.caveat}>{trunc(`! ${caveat}`, width - 1)}</Text>);
@@ -185,12 +198,18 @@ export function LegDetail({
   // answers "what is it doing" and "why" in one place rather than sending the reader back.
   const sparkRows = height - rows.length - 1;
   if (sparkRows > 1 && leg.series !== null) {
-    const p = plot([{ key: "s", samples: leg.series.samples }], width, sparkRows - 1, windowSeconds)
+    // As quoted, like the main chart, and labelled with the prices at its ends rather than ratios.
+    const p = plot([{ key: "s", samples: quoted(leg.series.samples) }], width, sparkRows - 1, windowSeconds)
       .byKey.get("s")!;
+    const low = priceFigure(invertMid(p.lowMid), leg.config.tokenA, leg.config.tokenB);
+    const high = priceFigure(invertMid(p.highMid), leg.config.tokenA, leg.config.tokenB);
     line(
       "extent",
       <Text color={UI.muted}>
-        {trunc(`price      ×${p.minRatio.toFixed(3)}–×${p.maxRatio.toFixed(3)} of its own start`, width)}
+        {trunc(
+          `price      ${low}–${high} ${leg.config.tokenA.symbol} per ${leg.config.tokenB.symbol} over ${humanDuration(Number(windowSeconds))}`,
+          width,
+        )}
       </Text>,
     );
     for (const [i, row] of p.rows.entries()) {
