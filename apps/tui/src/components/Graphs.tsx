@@ -27,19 +27,27 @@ export function Graphs({
   height: number;
   windowSeconds: bigint;
 }) {
-  const axisRows = 2; // the marks row and the time labels
-  const plotHeight = Math.max(1, height - axisRows - 1);
   const legs = snapshot.legs.filter((l) => l.series !== null);
+  const axisRows = 2; // the marks row and the time labels
+  const bandRows = Math.max(1, Math.floor((height - axisRows) / Math.max(1, legs.length)));
 
-  const { byKey, from, to } = plot(
-    legs.map((l) => ({ key: String(l.config.chainId), samples: l.series!.samples })),
-    width,
-    plotHeight,
-    windowSeconds,
-  );
+  // One band per leg, each on its own scale and labelled with it. Not one shared axis: a reference
+  // pool that steps to a twentieth of where it started and stays there would own the whole range,
+  // and the two legs that behaved would draw as flat lines against the frame. What is compared here
+  // is the shape of each leg's move, and the label is what stops the bands being read as one number.
+  const plots = legs.map((leg) => ({
+    leg,
+    plot: plot([{ key: "s", samples: leg.series!.samples }], width, bandRows - 1, windowSeconds)
+      .byKey.get("s")!,
+  }));
 
-  // Publishes and fills, on the same clock as the lines. A reference is a tick; a fill is the letter
-  // that names it, because the fill is the event a viewer is looking for.
+  const from = plots.map((p) => p.plot.from).filter((t): t is bigint => t !== null);
+  const to = plots.map((p) => p.plot.to).filter((t): t is bigint => t !== null);
+  const first = from.length === 0 ? null : from.reduce((a, b) => (a < b ? a : b));
+  const last = to.length === 0 ? null : to.reduce((a, b) => (a > b ? a : b));
+
+  // Publishes and fills, on the same clock as the lines: a tick for a reference, a marker for a
+  // fill, because the fill is the event a viewer is looking for.
   const marks = axisMarks(
     snapshot.feed.flatMap((row) =>
       row.kind === "round"
@@ -48,109 +56,56 @@ export function Graphs({
           ? [{ at: row.timestamp, glyph: "▲" }]
           : [],
     ),
-    from,
-    to,
+    first,
+    last,
     width,
   );
 
-  // Ages rather than clock times: the window is a week, so two wall-clock labels differ by days and
-  // read as though the axis ran backwards. "7d ago → now" cannot be misread.
   const span =
-    from === null || to === null
+    first === null || last === null
       ? ""
       : (() => {
-          const left = `${duration(Number(to - from))} ago`;
+          const left = `${duration(Number(last - first))} ago    ▲ fill   │ publish`;
           return `${left}${" ".repeat(Math.max(1, width - left.length - 3))}now`;
         })();
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
-      <Box height={1}>
-        <Segments
-          segs={fitSegments(
-            [
-              [
-                { text: "reference pools, each normalised to its own start ", color: UI.muted },
-                ...legs.map((leg) => ({
-                  text: ` ── ${leg.config.label.split(" ")[0]}`,
-                  color: legColour(leg.config.chainId),
-                })),
-              ],
-              [
-                { text: "reference pools ", color: UI.muted },
-                ...legs.map((leg) => ({
-                  text: ` ── ${leg.config.label.split(" ")[0]}`,
-                  color: legColour(leg.config.chainId),
-                })),
-              ],
-              legs.map((leg) => ({
-                text: ` ──${leg.config.label.slice(0, 3)}`,
-                color: legColour(leg.config.chainId),
-              })),
-            ],
-            width,
-          )}
-        />
-      </Box>
-
-      {/* Ink cannot overlay boxes, so the three lines are composited in the data and emitted as
-          coloured runs; see Overlay. */}
-      {Array.from({ length: plotHeight }, (_, row) => (
-        <Box key={row}>
-          <Overlay legs={legs} byKey={byKey} row={row} width={width} />
-        </Box>
-      ))}
-
+      {plots.map(({ leg, plot: p }) => {
+        const colour = legColour(leg.config.chainId);
+        const extent =
+          `${leg.config.label.split(" ")[0]}  ` +
+          `×${p.minRatio.toFixed(3)}–×${p.maxRatio.toFixed(3)} of its own start` +
+          (p.clipped > 0 ? `  (${p.clipped} beyond)` : "");
+        return (
+          <Box key={leg.config.chainId} flexDirection="column" height={bandRows} overflow="hidden">
+            <Box height={1}>
+              <Segments
+                segs={fitSegments(
+                  [
+                    [{ text: extent, color: colour }],
+                    [
+                      {
+                        text: `${leg.config.label.split(" ")[0]} ×${p.minRatio.toFixed(2)}–×${p.maxRatio.toFixed(2)}`,
+                        color: colour,
+                      },
+                    ],
+                    [{ text: leg.config.label.split(" ")[0]!, color: colour }],
+                  ],
+                  width,
+                )}
+              />
+            </Box>
+            {p.rows.map((row, i) => (
+              <Box key={i} height={1}>
+                <Text color={colour}>{row}</Text>
+              </Box>
+            ))}
+          </Box>
+        );
+      })}
       <Text color={UI.reference}>{marks}</Text>
       <Text color={UI.muted}>{span}</Text>
     </Box>
-  );
-}
-
-/**
- * Composites the layers into one row of coloured runs.
- *
- * Ink cannot overlay boxes, so the merge happens in the data: for each cell, the last leg that inked
- * it owns it, and consecutive cells with the same owner become one `<Text>`. That keeps the number
- * of nodes proportional to the number of colour changes rather than to the width.
- */
-function Overlay({
-  legs,
-  byKey,
-  row,
-  width,
-}: {
-  legs: { config: { chainId: number } }[];
-  byKey: Map<string, { rows: string[] }>;
-  row: number;
-  width: number;
-}) {
-  const cells: { char: string; chainId: number | null }[] = Array.from({ length: width }, () => ({
-    char: " ",
-    chainId: null,
-  }));
-  for (const leg of legs) {
-    const line = byKey.get(String(leg.config.chainId))?.rows[row] ?? "";
-    for (let i = 0; i < width; i += 1) {
-      const char = line[i];
-      if (char !== undefined && char !== " ") cells[i] = { char, chainId: leg.config.chainId };
-    }
-  }
-
-  const runs: { text: string; chainId: number | null }[] = [];
-  for (const cell of cells) {
-    const last = runs[runs.length - 1];
-    if (last !== undefined && last.chainId === cell.chainId) last.text += cell.char;
-    else runs.push({ text: cell.char, chainId: cell.chainId });
-  }
-
-  return (
-    <>
-      {runs.map((run, i) => (
-        <Text key={i} color={run.chainId === null ? UI.frame : legColour(run.chainId)}>
-          {run.text}
-        </Text>
-      ))}
-    </>
   );
 }

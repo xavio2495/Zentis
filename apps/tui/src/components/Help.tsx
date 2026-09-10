@@ -7,6 +7,11 @@ import { TERM, UI } from "../theme.js";
 /**
  * The one place prose lives.
  *
+ * Ordered so that what clips is what can be spared. The region is whatever the terminal leaves, and
+ * content past it is dropped from the bottom — so the disclosures come first and the terms and keys
+ * tables last, because a reader can work out what `spread` means by looking at the screen and cannot
+ * work out that the gains were assumed.
+ *
  * Every honest disclosure the console owes a reader is here rather than on the main screen: what the
  * terms mean, that the decomposition assumes gains it cannot read out of the enclave, what the
  * simulation does and does not claim. On the main screen these were footnotes competing with the
@@ -61,14 +66,55 @@ export function Help({
       what this is
     </Text>,
   );
+  // Wrapped to as many rows as the sentence needs rather than a fixed three: this column is the one
+  // place prose lives, and a paragraph clipped mid-clause at 80 columns is the thing being fixed.
   for (const [i, text] of wrapLines(
     "One market-making position on three chains, quoting from one reference published at the same " +
       "instant on all of them, managing its inventory as a single book without bridging.",
     width,
-    3,
+    6,
   ).entries()) {
     push(
       <Text key={`w${i}`} color={UI.muted}>
+        {text}
+      </Text>,
+    );
+  }
+
+  push(<Text key="sp3"> </Text>);
+  push(
+    <Text key="t4" color={UI.heading} bold>
+      what the numbers are, and are not
+    </Text>,
+  );
+  for (const [i, text] of wrapLines(
+    "The shift's split is recomputed here at the harness's published gains — own 10,000, book " +
+      "5,000 — because the real ones never leave the enclave. A maker running other gains sees the " +
+      "published shift diverge from this one, which is correct and is flagged on the leg.",
+    width,
+    6,
+  ).entries()) {
+    push(
+      <Text key={`g${i}`} color={UI.muted}>
+        {text}
+      </Text>,
+    );
+  }
+  for (const [i, text] of simLines(report, width).entries()) {
+    push(
+      <Text key={`s${i}`} color={i === 0 ? UI.heading : UI.muted}>
+        {text}
+      </Text>,
+    );
+  }
+  for (const [i, text] of wrapLines(
+    "The simulation ranks this policy against a static one over shared seeds. It is uncalibrated, " +
+      "so it says which is ahead and not what either is worth.",
+    width,
+    4,
+  ).entries()) {
+    push(
+      <Text key={`u${i}`} color={UI.muted}>
         {text}
       </Text>,
     );
@@ -101,45 +147,6 @@ export function Help({
         <Text color={UI.action}>{binding.keys.join(" / ").padEnd(12)}</Text>
         <Text color={UI.muted}>{trunc(binding.label, width - 12)}</Text>
       </Box>,
-    );
-  }
-
-  push(<Text key="sp3"> </Text>);
-  push(
-    <Text key="t4" color={UI.heading} bold>
-      what the numbers are, and are not
-    </Text>,
-  );
-  for (const [i, text] of wrapLines(
-    "The shift's split is recomputed here at the harness's published gains — own 10,000, book " +
-      "5,000 — because the real ones never leave the enclave. A maker running other gains sees the " +
-      "published shift diverge from this one, which is correct and is flagged on the leg.",
-    width,
-    3,
-  ).entries()) {
-    push(
-      <Text key={`g${i}`} color={UI.muted}>
-        {text}
-      </Text>,
-    );
-  }
-  for (const [i, text] of simLines(report, width).entries()) {
-    push(
-      <Text key={`s${i}`} color={i === 0 ? UI.heading : UI.muted}>
-        {text}
-      </Text>,
-    );
-  }
-  for (const [i, text] of wrapLines(
-    "The simulation ranks this policy against a static one over shared seeds. It is uncalibrated, " +
-      "so it says which is ahead and not what either is worth.",
-    width,
-    2,
-  ).entries()) {
-    push(
-      <Text key={`u${i}`} color={UI.muted}>
-        {text}
-      </Text>,
     );
   }
 

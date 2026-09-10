@@ -27,9 +27,11 @@ export interface Series {
 export interface Plot {
   /** one string per terminal row, top first; every row is exactly `width` cells */
   readonly rows: string[];
-  /** the vertical extent actually drawn, as a fraction from each series' own start */
+  /** the band actually drawn, as a multiple of each series' own first sample */
   readonly minRatio: number;
   readonly maxRatio: number;
+  /** how many of this series' points fell outside that band and were drawn on its edge */
+  readonly clipped: number;
   readonly from: bigint | null;
   readonly to: bigint | null;
 }
@@ -70,6 +72,7 @@ export function plot(
         rows: Array.from({ length: Math.max(0, height) }, () => EMPTY_ROW(Math.max(0, width))),
         minRatio: 1,
         maxRatio: 1,
+        clipped: 0,
         from: null,
         to: null,
       });
@@ -77,15 +80,34 @@ export function plot(
     return { byKey, from: null, to: null };
   }
 
-  // One shared vertical scale across every series, or the lines could not be compared; padded so a
-  // flat line sits in the middle of the region rather than along its edge.
-  const ratios = all.map((p) => p.ratio);
-  let lo = Math.min(...ratios);
-  let hi = Math.max(...ratios);
-  if (hi - lo < 1e-9) {
-    lo -= 0.0005;
-    hi += 0.0005;
+  // One shared vertical scale across every series, or the lines could not be compared — and that
+  // scale is logarithmic. A testnet reference pool really does step from ×1.045 to ×0.049 in a
+  // single swap, and on a linear axis that one outlier owns the entire range while the other two
+  // legs draw as flat lines along the frame. Ratios belong in log space for the same reason returns
+  // always do: it is proportional moves that are being compared.
+  //
+  // Log space is necessary but not sufficient: against a 20x outlier a 10% move is still 3% of the
+  // height. So the band is taken from the bulk of the points rather than their extremes, and a point
+  // outside it is drawn on the edge row it exceeded rather than dropped. The excursion stays visible
+  // and stays labelled; what it no longer does is flatten the two legs that behaved.
+  const ratios = all
+    .map((p) => p.ratio)
+    .filter((r) => r > 0)
+    .sort((a, b) => a - b);
+  const at = (q: number) => ratios[Math.min(ratios.length - 1, Math.floor(q * (ratios.length - 1)))]!;
+  const full = { lo: ratios[0]!, hi: ratios[ratios.length - 1]! };
+  // Band only when the range is genuinely extreme. Banding unconditionally clips a tenth of the
+  // points by construction, so every graph would carry an "(N beyond)" note that means nothing —
+  // and a warning that is always on is not a warning.
+  const extreme = full.hi / full.lo > 4;
+  let lo = extreme ? at(0.05) : full.lo;
+  let hi = extreme ? at(0.95) : full.hi;
+  if (hi / lo < 1.000001) {
+    lo *= 0.9995;
+    hi *= 1.0005;
   }
+  const logLo = Math.log(lo);
+  const logSpan = Math.log(hi) - logLo;
   const times = all.map((p) => p.t);
   const from = times.reduce((a, b) => (a < b ? a : b));
   const to = times.reduce((a, b) => (a > b ? a : b));
@@ -103,7 +125,10 @@ export function plot(
     const column = new Array<number | null>(subCols).fill(null);
     for (const p of pts) {
       const x = Math.min(subCols - 1, Number(((p.t - from) * BigInt(subCols - 1)) / span));
-      const y = Math.round(((p.ratio - lo) / (hi - lo)) * (subRows - 1));
+      // Clamped, not dropped: a point beyond the band still says "this leg went off the top".
+      const scaled =
+        ((Math.log(Math.max(p.ratio, Number.MIN_VALUE)) - logLo) / logSpan) * (subRows - 1);
+      const y = Math.round(Math.max(0, Math.min(subRows - 1, scaled)));
       column[x] = column[x] === null ? y : Math.round((column[x]! + y) / 2);
     }
     let previous: number | null = null;
@@ -127,6 +152,7 @@ export function plot(
       ),
       minRatio: lo,
       maxRatio: hi,
+      clipped: pts.filter((p) => p.ratio < lo || p.ratio > hi).length,
       from,
       to,
     });

@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import type { FeedRow, Snapshot } from "@zentis/console-data";
-import { clock, duration, signed, tokenAmount } from "../format.js";
+import { duration, signed, tokenAmount } from "../format.js";
 import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { UI, legColour } from "../theme.js";
@@ -22,7 +22,10 @@ const short = (chainId: number) => SHORT[chainId] ?? String(chainId);
  * looking like the thing they no longer were.
  */
 function rowSegments(row: FeedRow, snapshot: Snapshot, width: number): Seg[] {
-  const time = clock(row.timestamp);
+  // An age, not a wall clock. The feed reaches back past midnight, and `21:56:00` sitting under
+  // `07:45:00` is yesterday with nothing on the row to say so — which reads as the feed being out of
+  // order. Right-aligned so the column stays a column.
+  const time = `${duration(snapshot.takenAtSeconds - Number(row.timestamp)).padStart(6)} `;
 
   if (row.kind === "round") {
     const full = row.legs.flatMap((leg): Seg[] => [
@@ -35,7 +38,7 @@ function rowSegments(row: FeedRow, snapshot: Snapshot, width: number): Seg[] {
       { text: signed(leg.tiltBps), color: legColour(leg.chainId) },
     ]);
     const head: Seg[] = [
-      { text: `${time} `, color: UI.muted },
+      { text: time, color: UI.muted },
       { text: "reference ", color: UI.reference },
       { text: `seq ${row.seq}`, color: UI.heading },
     ];
@@ -49,7 +52,7 @@ function rowSegments(row: FeedRow, snapshot: Snapshot, width: number): Seg[] {
         [...head, { text: " ·", color: UI.muted }, ...full],
         [...head, ...bare],
         head,
-        [{ text: `${time} seq ${row.seq}`, color: UI.reference }],
+        [{ text: `${time}seq ${row.seq}`, color: UI.reference }],
       ],
       width,
     );
@@ -60,12 +63,12 @@ function rowSegments(row: FeedRow, snapshot: Snapshot, width: number): Seg[] {
     return fitSegments(
       [
         [
-          { text: `${time} `, color: UI.muted },
+          { text: time, color: UI.muted },
           { text: short(row.chainId).padEnd(5), color: colour, bold: true },
           { text: `rejected ${row.reason}`, color: UI.rejection },
         ],
         [
-          { text: `${time} `, color: UI.muted },
+          { text: time, color: UI.muted },
           { text: `${short(row.chainId)} `, color: colour },
           { text: row.reason, color: UI.rejection },
         ],
@@ -87,7 +90,7 @@ function rowSegments(row: FeedRow, snapshot: Snapshot, width: number): Seg[] {
       ? "  no reference had been published"
       : `  at shift ${signed(row.refTiltBps)}, reference ${duration(Number(row.refAgeSeconds ?? 0n))} old`;
   const head: Seg[] = [
-    { text: `${time} `, color: UI.muted },
+    { text: time, color: UI.muted },
     { text: short(row.chainId).padEnd(5), color: colour, bold: true },
     { text: "fill ", color: UI.fill },
   ];
@@ -97,7 +100,7 @@ function rowSegments(row: FeedRow, snapshot: Snapshot, width: number): Seg[] {
       [...head, { text: amounts, color: UI.heading }, { text: context, color: UI.muted }],
       [...head, { text: amounts, color: UI.heading }],
       [
-        { text: `${time} `, color: UI.muted },
+        { text: time, color: UI.muted },
         { text: `${short(row.chainId)} `, color: colour },
         { text: "fill", color: UI.fill },
       ],
