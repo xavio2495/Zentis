@@ -99,7 +99,7 @@ test("the compiled binary finds the repository from its working directory, not f
         cmd: [
           "sh",
           "-c",
-          `cd ${JSON.stringify(cwd)} && (sleep 4; printf r; sleep 3; printf x; sleep 2) | ` +
+          `cd ${JSON.stringify(cwd)} && (sleep 16; printf r; sleep 4; printf x; sleep 2) | ` +
             `${env} script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary}`)} /dev/null`,
         ],
         stdout: "pipe",

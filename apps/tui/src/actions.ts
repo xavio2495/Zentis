@@ -58,11 +58,11 @@ export function findRepoRoot(
   return null;
 }
 
-const NO_ENV =
-  "no ZENTIS_ENV file was given, so this cannot sign — start with ZENTIS_ENV=/path/to/private.env";
+// Both reasons lead with the remedy. They are shown in the status bar, which truncates to its
+// width, and a reason whose actionable half falls off the end has not been given.
+const NO_ENV = "set ZENTIS_ENV=/path/to/private.env — this console cannot sign without one";
 
-const NO_REPO =
-  "not inside the Zentis repository, so the scripts cannot be found — set ZENTIS_REPO=/path/to/Zentis";
+const NO_REPO = "set ZENTIS_REPO=/path/to/Zentis — the scripts are not below this directory";
 
 /**
  * A shell that sources only the assignments whose names a shell can actually take.

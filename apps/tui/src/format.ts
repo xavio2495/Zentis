@@ -254,6 +254,12 @@ export function duration(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  return rest === 0 ? `${hours}h` : `${hours}h${rest}m`
+  if (hours < 24) {
+    const rest = minutes % 60
+    return rest === 0 ? `${hours}h` : `${hours}h${rest}m`
+  }
+  // A week-long window read as "166h40m ago", which nobody converts in their head.
+  const days = Math.floor(hours / 24)
+  const restHours = hours % 24
+  return restHours === 0 ? `${days}d` : `${days}d${restHours}h`
 }

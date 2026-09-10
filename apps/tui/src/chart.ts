@@ -1,0 +1,160 @@
+import type { PriceSample } from "@zentis/strategy-sdk";
+
+/**
+ * A line chart drawn in braille cells, by hand.
+ *
+ * No charting library: one would be a dependency the binary carries for a picture it can draw in
+ * sixty lines. Braille gives four vertical sub-rows per terminal row, which is the difference
+ * between a line and a staircase at the eight or ten rows this region gets.
+ *
+ * Three series share one axis by being **normalised to their own first sample**, so what the chart
+ * compares is how far each leg's reference pool has moved, not what its mid happens to be — three
+ * mids that differ by orders of magnitude would otherwise put two lines flat against the frame.
+ */
+
+/** Braille dot bits, by (column 0-1, row 0-3), as the Unicode block orders them. */
+const DOTS = [
+  [0x01, 0x02, 0x04, 0x40],
+  [0x08, 0x10, 0x20, 0x80],
+];
+const BRAILLE_BASE = 0x2800;
+
+export interface Series {
+  readonly key: string;
+  readonly samples: PriceSample[];
+}
+
+export interface Plot {
+  /** one string per terminal row, top first; every row is exactly `width` cells */
+  readonly rows: string[];
+  /** the vertical extent actually drawn, as a fraction from each series' own start */
+  readonly minRatio: number;
+  readonly maxRatio: number;
+  readonly from: bigint | null;
+  readonly to: bigint | null;
+}
+
+const EMPTY_ROW = (width: number) => " ".repeat(width);
+
+/**
+ * Samples come newest-first from the subgraph. Normalising against the *oldest* in the window is
+ * what makes the line read left to right as time moving forwards.
+ */
+function normalise(samples: PriceSample[], windowSeconds: bigint): { t: bigint; ratio: number }[] {
+  if (samples.length === 0) return [];
+  const newest = samples[0]!.timestamp;
+  const inWindow = samples.filter((s) => newest - s.timestamp <= windowSeconds).slice().reverse();
+  const base = inWindow[0];
+  if (base === undefined || base.mid === 0n) return [];
+  return inWindow.map((s) => ({ t: s.timestamp, ratio: Number(s.mid) / Number(base.mid) }));
+}
+
+/**
+ * Plots one series per call, each returning its own rows, so the caller can colour a whole line in
+ * its leg's colour. Overlaying them into one grid would mean one colour for three lines, and the
+ * chart's entire job is showing that one leg moved and the others did not.
+ */
+export function plot(
+  series: Series[],
+  width: number,
+  height: number,
+  windowSeconds: bigint,
+): { byKey: Map<string, Plot>; from: bigint | null; to: bigint | null } {
+  const points = new Map(series.map((s) => [s.key, normalise(s.samples, windowSeconds)]));
+  const all = [...points.values()].flat();
+  const byKey = new Map<string, Plot>();
+
+  if (width <= 0 || height <= 0 || all.length === 0) {
+    for (const s of series) {
+      byKey.set(s.key, {
+        rows: Array.from({ length: Math.max(0, height) }, () => EMPTY_ROW(Math.max(0, width))),
+        minRatio: 1,
+        maxRatio: 1,
+        from: null,
+        to: null,
+      });
+    }
+    return { byKey, from: null, to: null };
+  }
+
+  // One shared vertical scale across every series, or the lines could not be compared; padded so a
+  // flat line sits in the middle of the region rather than along its edge.
+  const ratios = all.map((p) => p.ratio);
+  let lo = Math.min(...ratios);
+  let hi = Math.max(...ratios);
+  if (hi - lo < 1e-9) {
+    lo -= 0.0005;
+    hi += 0.0005;
+  }
+  const times = all.map((p) => p.t);
+  const from = times.reduce((a, b) => (a < b ? a : b));
+  const to = times.reduce((a, b) => (a > b ? a : b));
+  const span = to - from === 0n ? 1n : to - from;
+
+  const subRows = height * 4;
+  const subCols = width * 2;
+
+  for (const s of series) {
+    const pts = points.get(s.key) ?? [];
+    const grid = Array.from({ length: height }, () => new Array<number>(width).fill(0));
+
+    // Column-major: each sub-column takes the mean of the samples that land in it, and consecutive
+    // sub-columns are joined vertically so the line is continuous rather than a scatter.
+    const column = new Array<number | null>(subCols).fill(null);
+    for (const p of pts) {
+      const x = Math.min(subCols - 1, Number(((p.t - from) * BigInt(subCols - 1)) / span));
+      const y = Math.round(((p.ratio - lo) / (hi - lo)) * (subRows - 1));
+      column[x] = column[x] === null ? y : Math.round((column[x]! + y) / 2);
+    }
+    let previous: number | null = null;
+    for (let x = 0; x < subCols; x += 1) {
+      const y = column[x];
+      if (y === null || y === undefined) continue;
+      const start = previous === null ? y : previous;
+      const [top, bottom] = start <= y ? [start, y] : [y, start];
+      for (let fill = top; fill <= bottom; fill += 1) {
+        const row = height - 1 - Math.floor(fill / 4);
+        const cell = Math.floor(x / 2);
+        if (row < 0 || row >= height || cell < 0 || cell >= width) continue;
+        grid[row]![cell]! |= DOTS[x % 2]![fill % 4]!;
+      }
+      previous = y;
+    }
+
+    byKey.set(s.key, {
+      rows: grid.map((row) =>
+        row.map((bits) => (bits === 0 ? " " : String.fromCharCode(BRAILLE_BASE + bits))).join(""),
+      ),
+      minRatio: lo,
+      maxRatio: hi,
+      from,
+      to,
+    });
+  }
+
+  return { byKey, from, to };
+}
+
+/**
+ * Marks on the time axis, one row, in the same coordinate space as the plot.
+ *
+ * The publishes and the fill are what make the demo's beat legible — a fill, then a reference, then
+ * the other legs' lines not moving — so they are drawn against the same clock as the lines rather
+ * than listed beside them.
+ */
+export function axisMarks(
+  events: { at: bigint; glyph: string }[],
+  from: bigint | null,
+  to: bigint | null,
+  width: number,
+): string {
+  if (from === null || to === null || width <= 0) return " ".repeat(Math.max(0, width));
+  const span = to - from === 0n ? 1n : to - from;
+  const row = new Array<string>(width).fill(" ");
+  for (const event of events) {
+    if (event.at < from || event.at > to) continue;
+    const x = Math.min(width - 1, Number(((event.at - from) * BigInt(width - 1)) / span));
+    row[x] = event.glyph;
+  }
+  return row.join("");
+}

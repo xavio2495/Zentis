@@ -14,10 +14,16 @@ import results from "../../sim-report/results/latest.json" with { type: "json" }
 export interface Regime {
   readonly regime: string;
   readonly seeds: number;
-  readonly meanVsStatic: number;
-  readonly sdVsStatic: number;
-  readonly worstVsStatic: number;
   readonly seedsAhead: number;
+  /**
+   * The edge as basis points of the opening book, not as raw tokenA.
+   *
+   * A raw figure like `142,676` reads as dollars and is not: it is six-decimal tokenA against a
+   * 60 tokenA book, which is 26.9 bps. Stating it against the book is the only form that cannot be
+   * mistaken for money.
+   */
+  readonly meanBpsOfBook: number;
+  readonly worstBpsOfBook: number;
 }
 
 export interface SimReport {
@@ -29,6 +35,8 @@ export interface SimReport {
   readonly kappaBookBps: number;
   readonly ticks: number;
   readonly regimes: Regime[];
+  /** the opening book in raw tokenA, which is what the basis points are of */
+  readonly bookInA: number;
   /** every regime's seeds, when they agree; null when a run mixed them */
   readonly seedsPerRegime: number | null;
 }
@@ -46,11 +54,11 @@ export function loadSimReport(): SimReport {
     regimes: results.regimes.map((r) => ({
       regime: r.regime,
       seeds: r.seeds,
-      meanVsStatic: r.meanVsStatic,
-      sdVsStatic: r.sdVsStatic,
-      worstVsStatic: r.worstVsStatic,
       seedsAhead: r.seedsAhead,
+      meanBpsOfBook: r.meanVsStaticBpsOfBook,
+      worstBpsOfBook: r.worstVsStaticBpsOfBook,
     })),
+    bookInA: results.bookInA,
     seedsPerRegime: seeds.size === 1 ? results.regimes[0]!.seeds : null,
   };
 }

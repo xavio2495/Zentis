@@ -1,84 +1,97 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { createStore } from "@zentis/console-data";
-import { Actions } from "./components/Actions.js";
+import { BOOK, type Store, createStore } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
-import { type Pending, landed } from "./landed.js";
-import { BookStrip } from "./components/BookStrip.js";
 import { Feed } from "./components/Feed.js";
-import { LegColumn } from "./components/LegColumn.js";
-import { Divider, useFrame } from "./components/Divider.js";
-import { SimCard } from "./components/SimCard.js";
-import { UI } from "./theme.js";
+import { Graphs } from "./components/Graphs.js";
+import { Help } from "./components/Help.js";
+import { LegCard } from "./components/LegCard.js";
+import { LegDetail } from "./components/LegDetail.js";
+import { StatusBar } from "./components/StatusBar.js";
+import { type Pending, landed } from "./landed.js";
+import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
+import { resolve } from "./keymap.js";
+import { LEG_ORDER, UI } from "./theme.js";
 
 /**
- * The whole screen is a function of one snapshot.
+ * The console: three leg cards down the left, a status bar, the reference-pool charts and the feed
+ * down the right.
  *
- * The store polls and the screen renders whatever the last complete poll produced, so no two panels
- * can be showing different moments: a book strip claiming one seq above three columns read seconds
- * apart would be asserting exactly the thing the project has to prove.
- */
-/**
- * `actions` and `runAction` are injected rather than imported.
+ * Everything comes from one snapshot, so no two regions can be describing different moments — a
+ * status bar claiming one seq above three cards read seconds apart would be asserting exactly the
+ * thing this project has to prove.
  *
- * Running one means `Bun.spawn` and `node:path`, which a browser build has neither of — and the site
- * serves this same component watch-only. Taking them as props keeps the screen one implementation
- * instead of two that drift, and makes "the browser build cannot sign" a fact about what was handed
- * in rather than a promise the render has to keep.
+ * Every region is given an explicit height and clipped. Shedding rows in `fit` is not on its own
+ * the guarantee: a region that draws one row more than it was budgeted pushes the frame to
+ * `stdout.rows`, and Ink then clears the whole terminal on every frame. Clipping is the guarantee.
  */
 export function App({
   actions,
   runAction,
+  makeStore = createStore,
 }: {
   actions: Action[];
-  /** resolves to the line the actions row should show once the command has finished */
+  /** resolves to the line the status bar should show once the command has finished */
   runAction: ((action: Action) => Promise<string>) | null;
+  /**
+   * The store, injectable so the sandbox can drive this exact component against a fixed snapshot.
+   * ESM exports are read-only, so patching the module is not available; a defaulted prop keeps the
+   * shipped path identical rather than giving the sandbox a different app to test.
+   */
+  makeStore?: () => Store;
 }) {
   const { exit } = useApp();
-  const frame = useFrame();
-  const store = useMemo(() => createStore(), []);
+  const size = useSize();
+  const store = useMemo(() => makeStore(), [makeStore]);
   const state = useSyncExternalStore(store.subscribe, store.getState);
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  const [, setTick] = useState(0);
+
+  const [overlay, setOverlay] = useState<"none" | "leg" | "help">("none");
+  const [legIndex, setLegIndex] = useState(0);
+  const [confirming, setConfirming] = useState<Action | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
+  const [transient, setTransient] = useState<string | null>(null);
+  const [awaiting, setAwaiting] = useState<Pending | null>(null);
 
   useEffect(() => {
     store.start();
-    // The reference's age advances between polls, and a screen whose age field only moved when the
-    // network answered would understate how stale the quote it is showing has become.
-    const tick = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    // The reference's age advances between polls, and an age that only moved when the network
+    // answered would understate how stale the quote on screen has become.
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
     return () => {
       store.stop();
-      clearInterval(tick);
+      clearInterval(timer);
     };
   }, [store]);
 
-  const [running, setRunning] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<string | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
-  const [awaiting, setAwaiting] = useState<Pending | null>(null);
+  const snapshot = state.snapshot;
+  const armed = actions.some((a) => a.disabledReason === null && a.command !== null);
 
-  useInput((input) => {
-    if (input === "x") {
-      exit();
-      return;
-    }
-    if (running !== null) return;
+  const landing = running === null ? landed(awaiting, snapshot?.seq ?? null) : null;
+  useEffect(() => {
+    if (landing === null) return;
+    setTransient(landing);
+    setAwaiting(null);
+  }, [landing]);
 
-    // An action that has been offered for confirmation consumes the next keystroke, so that the
-    // key which broadcasts is never the same key that was pressed to ask about broadcasting.
-    if (pending !== null) {
-      const action = actions.find((a) => a.key === pending);
-      setPending(null);
-      if (input !== "y" || action?.command == null || runAction === null) {
-        setLastResult(`${action?.label ?? "action"} cancelled`);
+  useInput((input, key) => {
+    const binding = resolve({ confirming: confirming !== null, overlay }, input, key);
+
+    // A pending confirmation consumes the next keystroke whatever it is, so the key that broadcasts
+    // is never the key that was pressed to ask about broadcasting.
+    if (confirming !== null) {
+      const action = confirming;
+      setConfirming(null);
+      if (binding?.id !== "confirm" || action.command === null || runAction === null) {
+        setTransient(`${action.label} cancelled`);
         return;
       }
       setRunning(action.label);
-      // Captured before the command runs, so the comparison is against the state the operator acted
-      // from rather than whatever the next poll happens to find.
-      setAwaiting({ label: action.label, seqBefore: state.snapshot?.seq ?? null });
+      setTransient(`running ${action.label}…`);
+      setAwaiting({ label: action.label, seqBefore: snapshot?.seq ?? null });
       void runAction(action)
-        .then(setLastResult)
-        .catch((cause: unknown) => setLastResult(`${action.label} could not start: ${String(cause)}`))
+        .then(setTransient)
+        .catch((cause: unknown) => setTransient(`${action.label} could not start: ${String(cause)}`))
         .finally(() => {
           setRunning(null);
           void store.refresh();
@@ -86,69 +99,117 @@ export function App({
       return;
     }
 
-    const action = actions.find((a) => a.key === input);
-    if (action === undefined) return;
-    if (action.disabledReason !== null) {
-      setLastResult(action.disabledReason);
-      return;
+    if (binding === null) return;
+    switch (binding.id) {
+      case "quit":
+        exit();
+        return;
+      case "help":
+        setOverlay((current) => (current === "help" ? "none" : "help"));
+        return;
+      case "back":
+        setOverlay("none");
+        return;
+      case "quote":
+        void store.refresh();
+        return;
+      case "leg":
+        setLegIndex(Number(input) - 1);
+        setOverlay("leg");
+        return;
+      default: {
+        if (running !== null) return;
+        const action = actions.find((a) => a.key === input);
+        if (action === undefined) return;
+        if (action.disabledReason !== null) {
+          setTransient(action.disabledReason);
+          return;
+        }
+        setConfirming(action);
+        // The key comes first: this line is truncated to the status bar's width, and a prompt whose
+        // instruction falls off the end is a prompt that has not been given.
+        setTransient(`press y to broadcast — ${action.label}: ${action.describe}`);
+      }
     }
-    // Re-quote reads and is therefore immediate. Everything else signs and broadcasts, and a
-    // console that did that on one keystroke would broadcast every time a key was brushed.
-    if (action.command === null) {
-      void store.refresh();
-      return;
-    }
-    if (runAction === null) {
-      setLastResult("this build cannot run commands, so it watches only");
-      return;
-    }
-    setPending(action.key);
   });
 
-  const snapshot = state.snapshot;
-  // Only once the command has finished. The other workflow publishes on its own schedule, so a seq
-  // that moved while this one was still running is not evidence that this one landed.
-  const landing = running === null ? landed(awaiting, snapshot?.seq ?? null) : null;
-  useEffect(() => {
-    if (landing === null) return;
-    setLastResult(landing);
-    setAwaiting(null);
-  }, [landing]);
+  if (size.tooSmall) {
+    return (
+      <Text color={UI.caveat}>
+        {`the console needs at least ${MIN_COLS}×${MIN_ROWS}; this terminal is ${size.cols}×${size.rows}`}
+      </Text>
+    );
+  }
+
+  const regions = fit(size.cols, size.rows);
 
   if (snapshot === null) {
     return (
-      <Box borderStyle="round" borderColor={UI.frame} paddingX={1} width={frame.width}>
+      <Box width={regions.legsWidth + regions.rightWidth} height={regions.draw} overflow="hidden">
         <Text color={UI.muted}>
-          {state.error === null ? "reading three chains, three subgraphs and the quote service…" : state.error}
+          {state.error ?? "reading three chains, three subgraphs and the quote service…"}
         </Text>
       </Box>
     );
   }
 
+  // The wireframe's order, which is not the data layer's: the display owns how the legs are stacked.
+  const ordered = LEG_ORDER.map((chainId) =>
+    snapshot.legs.find((leg) => leg.config.chainId === chainId),
+  ).filter((leg): leg is NonNullable<typeof leg> => leg !== undefined);
+  const selected = ordered[Math.min(legIndex, ordered.length - 1)];
+
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={UI.frame} paddingX={1} width={frame.width}>
-      <BookStrip snapshot={snapshot} nowSeconds={now} width={frame.contentWidth} />
-      <Divider label="legs" width={frame.contentWidth} />
-      <Box>
-        {snapshot.legs.map((leg) => (
-          <LegColumn key={leg.config.chainId} leg={leg} width={frame.columnWidth} />
+    <Box height={regions.draw} overflow="hidden">
+      <Box flexDirection="column" width={regions.legsWidth} height={regions.draw} overflow="hidden">
+        {ordered.map((leg, i) => (
+          <LegCard
+            key={leg.config.chainId}
+            leg={leg}
+            index={i}
+            width={regions.legsWidth}
+            height={regions.cardHeights[i] ?? 0}
+            selected={overlay === "leg" && i === legIndex}
+          />
         ))}
       </Box>
-      <Feed snapshot={snapshot} width={frame.contentWidth} />
-      <SimCard report={snapshot.sim} width={frame.contentWidth} />
-      <Actions
-        width={frame.contentWidth}
-        snapshot={snapshot}
-        actions={actions}
-        running={running}
-        pending={pending === null ? null : (actions.find((a) => a.key === pending) ?? null)}
-        lastResult={lastResult ?? (state.loading ? "refreshing…" : null)}
-      />
-      {snapshot.caveats.map((caveat, i) => (
-        <Text key={i} color={UI.caveat} wrap="truncate-end">
-          ! {caveat}
-        </Text>
-      ))}
+
+      <Box flexDirection="column" width={regions.rightWidth} height={regions.draw} overflow="hidden">
+        <StatusBar
+          snapshot={snapshot}
+          actions={actions}
+          armed={armed}
+          rows={regions.statusRows}
+          width={regions.rightWidth}
+          transient={transient}
+        />
+        {/* Help takes the whole right column below the status bar: it is the one place prose
+            lives, and prose that has to be paginated at 40 rows is prose nobody reads. The leg
+            detail stays in the chart region, so the feed underneath keeps running while you read
+            it — the feed is how you watch a write land. */}
+        {overlay === "help" ? (
+          <Help
+            report={snapshot.sim}
+            width={regions.rightWidth}
+            height={regions.graphRows + regions.feedRows}
+          />
+        ) : (
+          <>
+            {regions.graphRows > 0 &&
+              (overlay === "leg" && selected !== undefined ? (
+                <LegDetail leg={selected} width={regions.rightWidth} height={regions.graphRows} />
+              ) : (
+                <Graphs
+                  snapshot={snapshot}
+                  width={regions.rightWidth}
+                  height={regions.graphRows}
+                  windowSeconds={BigInt(BOOK.volatilityWindowSeconds)}
+                />
+              ))}
+            <Feed snapshot={snapshot} width={regions.rightWidth} rows={regions.feedRows} />
+          </>
+        )}
+      </Box>
     </Box>
   );
 }

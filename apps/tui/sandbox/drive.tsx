@@ -1,0 +1,90 @@
+import { render } from "ink";
+import { PassThrough, Writable } from "node:stream";
+import { App } from "../src/App.js";
+import { buildActions } from "../src/actions.js";
+import type { Action } from "../src/action-types.js";
+import { type Scenario, fakeSnapshot } from "./world.js";
+
+/**
+ * Headless frame capture.
+ *
+ * Ink is given a fake stdout that reports whatever size is asked for and collects what is written,
+ * so a frame at 190, 120 or 80 columns can be looked at without a terminal, without the network, and
+ * without the answer depending on what the testnets are doing this minute. It also checks the one
+ * invariant that cannot be seen by reading the frame: a frame as tall as `stdout.rows` makes Ink
+ * clear the whole terminal on every repaint.
+ */
+const ESC = "";
+const KEYS: Record<string, string> = { ESC, ENTER: "\r", UP: `${ESC}[A`, DOWN: `${ESC}[B` };
+const ANSI = new RegExp(`${ESC}\\[[0-9;?]*[a-zA-Z]`, "g");
+const strip = (text: string) => text.replace(ANSI, "");
+
+class Sink extends Writable {
+  frames: string[] = [];
+  constructor(
+    public columns: number,
+    public rows: number,
+  ) {
+    super();
+  }
+  override _write(chunk: unknown, _encoding: unknown, done: () => void) {
+    this.frames.push(String(chunk));
+    done();
+  }
+}
+
+export interface Frame {
+  readonly lines: string[];
+  readonly rows: number;
+  readonly width: number;
+  /** true when the frame is as tall as the terminal, which is where Ink starts clearing it */
+  readonly overflows: boolean;
+}
+
+export async function drive(
+  cols: number,
+  rows: number,
+  options: { scenario?: Scenario; keys?: string[]; armed?: boolean } = {},
+): Promise<Frame> {
+  const stdin = Object.assign(new PassThrough(), {
+    isTTY: true,
+    setRawMode: () => stdin,
+    ref: () => stdin,
+    unref: () => stdin,
+  });
+  const stdout = new Sink(cols, rows);
+
+  // The store answers a fixed snapshot: the app under test is the real one, and only the world
+  // behind it is fake. A sandbox that needed the app written differently would test a different app.
+  const { fixedStore } = await import("./state.js");
+  const makeStore = fixedStore(fakeSnapshot(options.scenario ?? "fresh"));
+
+  const actions: Action[] =
+    options.armed === true ? buildActions("/dev/null") : buildActions(null, null);
+  const app = render(<App actions={actions} runAction={null} makeStore={makeStore} />, {
+    stdout: stdout as never,
+    stdin: stdin as never,
+    debug: true,
+    patchConsole: false,
+    exitOnCtrlC: false,
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  for (const key of options.keys ?? []) {
+    stdin.write(KEYS[key] ?? key);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 250));
+
+  const lines = strip(stdout.frames.at(-1) ?? "")
+    .replace(/\n$/, "")
+    .split("\n");
+  app.unmount();
+
+  return {
+    lines,
+    rows: lines.length,
+    width: Math.max(0, ...lines.map((line) => [...line].length)),
+    overflows: lines.length >= rows,
+  };
+}

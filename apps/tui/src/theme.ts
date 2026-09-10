@@ -41,3 +41,30 @@ export const UI = {
 
 /** Filled and empty cells for the inventory and weight bars. */
 export const BAR = { filled: "█", empty: "░", marker: "│" } as const;
+
+/**
+ * One colour per leg, carried through its card, its chart line and its feed rows.
+ *
+ * Keyed on chain id rather than on position in a list, so a reordered display or a fourth leg
+ * cannot silently reassign an identity the reader has already learned. Hues follow the user's
+ * wireframe; like the terms above they are placeholders until branding arrives.
+ */
+export const LEG = {
+  11155111: "#e05252", // Sepolia
+  84532: "#5a6ee0", // Base Sepolia
+  421614: "#b0b0b0", // Arbitrum Sepolia
+} as const
+
+/** The order the wireframe stacks them in, top to bottom. */
+export const LEG_ORDER = [11155111, 84532, 421614] as const
+
+export const legColour = (chainId: number): string =>
+	(LEG as Record<number, string>)[chainId] ?? UI.heading
+
+/** A leg's one-word state, and the colour that carries it. */
+export const STATE = {
+	live: UI.fill,
+	stale: TERM.staleness,
+	refusing: UI.rejection,
+	docked: UI.disabled,
+} as const

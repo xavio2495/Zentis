@@ -20,6 +20,9 @@
       ],
       "@zentis/console-data": [
         "../../packages/console-data/src/index.ts"
+      ],
+      "@zentis/strategy-sdk": [
+        "../../packages/strategy-sdk/src/index.ts"
       ]
     },
     "baseUrl": "."

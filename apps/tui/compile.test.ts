@@ -13,7 +13,7 @@ const drive = (binary: string, keys: string) =>
       "sh",
       "-c",
       `(sleep 2; printf %s ${JSON.stringify(keys)}; sleep 2; printf x; sleep 2) | ` +
-        `script -qec ${JSON.stringify(binary)} /dev/null`,
+        `script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary}`)} /dev/null`,
     ],
     stdout: "pipe",
     stderr: "pipe",
@@ -40,9 +40,9 @@ test("the compiled binary renders Ink and reads raw-mode input", () => {
     const screen = new TextDecoder().decode(run.stdout);
 
     expect(screen).toContain("reading three chains"); // the app's own first frame
+    expect(screen).toContain("[?25l"); // the cursor was hidden, i.e. Ink took the terminal
     expect(screen).not.toContain("Raw mode is not supported"); // stdin arrived as a tty
     expect(screen).toContain("38;2;"); // truecolour survives the compile
-    expect(screen).toContain("\u256d"); // Ink's box borders, i.e. yoga laid the frame out
     expect(run.exitCode).toBe(0); // and `x` unwound raw mode cleanly
   } finally {
     rmSync(dir, { recursive: true, force: true });

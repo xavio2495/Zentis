@@ -143,6 +143,12 @@ test("the simulation card reads a committed run and carries the commit it came f
   // No "bps saved": the harness is uncalibrated, so it ranks policies and does not price them.
   expect(headline(report)).not.toContain("saved");
   expect(headline(report)).toContain("regimes");
+  // Basis points of the book, never the raw tokenA amount, which reads as dollars and is not.
+  expect(report.bookInA).toBeGreaterThan(0);
+  for (const regime of report.regimes) {
+    expect(Number.isFinite(regime.meanBpsOfBook)).toBe(true);
+    expect(Number.isFinite(regime.worstBpsOfBook)).toBe(true);
+  }
 });
 
 test("the fixtures were recorded, not written", () => {

@@ -29,3 +29,10 @@ test("a duration reads the way an operator says it, at every scale", () => {
   expect(duration(3600)).toBe("1h");
   expect(duration(0)).toBe("0s");
 });
+
+test("a week-long window reads in days, not in hundreds of hours", () => {
+  // The chart's axis said "166h40m ago", which nobody converts in their head.
+  expect(duration(604800)).toBe("7d");
+  expect(duration(600000)).toBe("6d22h");
+  expect(duration(86400)).toBe("1d");
+});
