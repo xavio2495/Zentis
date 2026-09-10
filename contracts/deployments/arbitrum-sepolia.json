@@ -33,18 +33,17 @@
   },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "strategyHash": "0x043bc8498eb18c4ce6f7bde9a0302171d60d6747cf460853e2b553b4cd790cc3",
+    "strategyHash": "0xa590c4c406170f9b370530122499c23f429878c6acb6b3ff0a02431ac21747d7",
     "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
     "deadline": 1791500000,
+    "shipTx": "0x232afe34e7269e8c2461a3d6579139a0f1c7fc88a80705281fe0722c213fcb81",
+    "shipBlock": 307360558,
     "shippedBalanceA": "15000000",
-    "shippedBalanceB": "7592844468186735",
     "shippedAgainstRef": {
-      "mid": "506189631212449007683687217",
-      "seq": 1,
-      "updatedAt": 1788888860
+      "seq": 1789027836
     },
-    "note": "Same positionId as Base Sepolia, different strategyHash -- the chainSalt is what separates the two legs of one cross-chain position.",
-    "shipTx": "0x795fbe746785297c56a4b5395fac73f8542c6623bd8b98002233b3fa7557ffcd"
+    "widenBpsPerMinute": 2,
+    "note": "Balances here are the shipped amounts; live balances come from the fills subgraph."
   },
   "fills": [
     {
@@ -67,24 +66,44 @@
     "arbitrumTiltBpsAfter": -36,
     "note": "Between the two quotes the only Arbitrum state that changed is the reference. Arbitrum is now the under-weight-USDC leg, so it pays takers more WETH for their USDC -- it bids USDC in, while Base discounts USDC out. Inventory moves between the chains through independent takers."
   },
-  "supersededPosition": {
-    "strategyHash": "0x80d27b5399c2504f0d62affed8d9d5b52c48e9a796ff0429054a3a9974fb320e",
-    "shippedBalanceA": "10000000",
-    "shippedBalanceB": "5061896312124490",
-    "shipTx": "0x96cdbb1b26e57b0bcb00542e696b41c1a78c0d77c0441f5c24ac2e3ec3f9836c",
-    "fills": [
-      {
-        "tx": "0x286f0496e2ad02b7b656b13b7e54a1018dca6e15a7c83abba6377ddf03f9ae51",
-        "block": 306791551,
-        "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
-        "tokenIn": "USDC",
-        "tokenOut": "WETH",
-        "amountIn": "1000000",
-        "amountOut": "459503354458188"
-      }
-    ],
-    "topUps": [],
-    "note": "Docked when the registry was redeployed. Its fills are real and still on-chain; it read the superseded registry, whose address is an instruction immediate, so it could not follow the redeploy.",
-    "dockTx": "0x16e2ea69a65b3f7f1890ddcb16dd1309f733df72ddcc16a28ceedc50980bc6ec"
-  }
+  "supersededPositions": [
+    {
+      "strategyHash": "0x80d27b5399c2504f0d62affed8d9d5b52c48e9a796ff0429054a3a9974fb320e",
+      "shippedBalanceA": "10000000",
+      "shippedBalanceB": "5061896312124490",
+      "shipTx": "0x96cdbb1b26e57b0bcb00542e696b41c1a78c0d77c0441f5c24ac2e3ec3f9836c",
+      "fills": [
+        {
+          "tx": "0x286f0496e2ad02b7b656b13b7e54a1018dca6e15a7c83abba6377ddf03f9ae51",
+          "block": 306791551,
+          "taker": "0x8B49122d7482E83304c23eDe906A6a1f0e63e9b1",
+          "tokenIn": "USDC",
+          "tokenOut": "WETH",
+          "amountIn": "1000000",
+          "amountOut": "459503354458188"
+        }
+      ],
+      "topUps": [],
+      "note": "Docked when the registry was redeployed. Its fills are real and still on-chain; it read the superseded registry, whose address is an instruction immediate, so it could not follow the redeploy.",
+      "dockTx": "0x16e2ea69a65b3f7f1890ddcb16dd1309f733df72ddcc16a28ceedc50980bc6ec"
+    },
+    {
+      "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "strategyHash": "0x043bc8498eb18c4ce6f7bde9a0302171d60d6747cf460853e2b553b4cd790cc3",
+      "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
+      "deadline": 1791500000,
+      "shippedBalanceA": "15000000",
+      "shippedBalanceB": "7592844468186735",
+      "shippedAgainstRef": {
+        "mid": "506189631212449007683687217",
+        "seq": 1,
+        "updatedAt": 1788888860
+      },
+      "note": "Same positionId as Base Sepolia, different strategyHash -- the chainSalt is what separates the two legs of one cross-chain position.",
+      "shipTx": "0x795fbe746785297c56a4b5395fac73f8542c6623bd8b98002233b3fa7557ffcd",
+      "dockTx": "0x71a4a1cb4eadaddcf52b9d92946adbc68eb398badde81bc5a72240f5321ac9c0",
+      "supersededBy": "0xa590c4c406170f9b370530122499c23f429878c6acb6b3ff0a02431ac21747d7",
+      "reason": "re-shipped with widenBpsPerMinute 2 instead of 10"
+    }
+  ]
 }

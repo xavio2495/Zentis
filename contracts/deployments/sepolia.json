@@ -47,17 +47,17 @@
   },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "strategyHash": "0x67ee91a188604f42c6d50978e68d9b2a0e6bb6f79421fa696a804836273e4d79",
+    "strategyHash": "0xc546fefc7855bf162c02c95bb5a125cf27cdec3d483b2c4c73c63c4b21333b7b",
     "maker": "0x4887b4695dee830a341304bfeb14538e2442dd55",
     "deadline": 1791500000,
+    "shipTx": "0xad638c819df48a4fb246bd6f9321bc6b22233b63e1fafd577228389219940ab0",
+    "shipBlock": 11673796,
     "shippedBalanceA": "15000000",
-    "shippedBalanceB": "415074829001483",
     "shippedAgainstRef": {
-      "mid": "27671655266765545300028160",
-      "seq": 5
+      "seq": 1789027836
     },
-    "shipTx": "0x27636831df167e09c7f0ea8564be7ef252a2dec4752effa1be3ebadffc813139",
-    "note": "Balances and fill amounts here are read from the fills subgraph, not from forge output. The forge script's printed amountOut is a pre-broadcast quote and drifts from the Swapped event."
+    "widenBpsPerMinute": 2,
+    "note": "Balances here are the shipped amounts; live balances come from the fills subgraph."
   },
   "fills": [
     {
@@ -68,6 +68,25 @@
       "tokenOut": "WETH",
       "amountIn": "150000",
       "amountOut": "4009890146858"
+    }
+  ],
+  "supersededPositions": [
+    {
+      "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "strategyHash": "0x67ee91a188604f42c6d50978e68d9b2a0e6bb6f79421fa696a804836273e4d79",
+      "maker": "0x4887b4695dee830a341304bfeb14538e2442dd55",
+      "deadline": 1791500000,
+      "shippedBalanceA": "15000000",
+      "shippedBalanceB": "415074829001483",
+      "shippedAgainstRef": {
+        "mid": "27671655266765545300028160",
+        "seq": 5
+      },
+      "shipTx": "0x27636831df167e09c7f0ea8564be7ef252a2dec4752effa1be3ebadffc813139",
+      "note": "Balances and fill amounts here are read from the fills subgraph, not from forge output. The forge script's printed amountOut is a pre-broadcast quote and drifts from the Swapped event.",
+      "dockTx": "0x24f400ab632dc6de72f10001628ac7f843c3f9694a52829cf034cc27a06f6339",
+      "supersededBy": "0xc546fefc7855bf162c02c95bb5a125cf27cdec3d483b2c4c73c63c4b21333b7b",
+      "reason": "re-shipped with widenBpsPerMinute 2 instead of 10"
     }
   ]
 }
