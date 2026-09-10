@@ -23,6 +23,9 @@ import { z } from 'zod'
 
 import {
 	allocateBandEdge, publishedBoundary,
+	midFromSqrtPriceX96,
+	volatilitySpreadBps,
+	type PriceSample,
 	BPS,
 	crowdingBpsOf,
 	markoutBps,
@@ -41,6 +44,13 @@ const legSchema = z.object({
 	 * the flow the other sees — so each leg is scored against its own indexed history.
 	 */
 	fillsSubgraphUrl: z.string(),
+	/**
+	 * This leg's reference-pool subgraph and the pool in it: the price series the volatility term is
+	 * measured on. Empty means no series, which publishes no term — absence of a series is not
+	 * evidence of calm, but a spread that widens on missing data would brick a leg for a broken URL.
+	 */
+	referencePoolSubgraphUrl: z.string().default(''),
+	referencePool: z.string().default(''),
 	/**
 	 * The standardized Aqua subgraph for the mainnet this leg corresponds to, and the pair to read
 	 * from it. Empty means no positioning data for this leg, which allocates it the full budget —
@@ -102,6 +112,16 @@ export const configSchema = z.object({
 	markoutCapBps: z.number(),
 	/** How many recent fills and references to score over. */
 	markoutWindow: z.number(),
+	/** The base half-spread the volatility term widens. Once published it replaces the fast workflow's bootstrap value. */
+	baseSpreadBps: z.number(),
+	/** The reference cadence: how long a quote can be stale before it is repriced, which is the move the spread must cover. */
+	volatilityHorizonSeconds: z.number(),
+	/** How far back the price series reaches, from its newest sample rather than from a clock. */
+	volatilityWindowSeconds: z.number(),
+	/** How many standard deviations of the move over the horizon the spread covers, in bps of one. */
+	volatilityMultiplierBps: z.number(),
+	/** Ceiling on the term: a wild series widens a leg, it does not brick it. */
+	volatilityCapBps: z.number(),
 	/** The secret holding how hard the maker responds to a crowded venue. */
 	congestionSecretId: z.string(),
 	/** Floor under an allocated budget. Never zero: zero reads as "nothing published" on-chain. */
@@ -212,6 +232,18 @@ const MARKOUT_QUERY = `query Markout($positionId: ID!, $window: Int!) {
     }
   }
 }`
+
+const VOLATILITY_QUERY = `query Volatility($pool: String!) {
+  swaps(where: { pool: $pool }, orderBy: timestamp, orderDirection: desc, first: 1000) {
+    timestamp
+    sqrtPriceX96
+  }
+}`
+
+type VolatilityResponse = {
+	data?: { swaps: { timestamp: string; sqrtPriceX96: string }[] }
+	errors?: { message: string }[]
+}
 
 type MarkoutResponse = {
 	data?: {
@@ -369,6 +401,51 @@ const readMarkout = (
 	}
 }
 
+/**
+ * The volatility term for one leg, measured off the indexed swaps of its reference pool.
+ *
+ * The window is anchored on the newest indexed swap, not on a clock: the enclave has none it can
+ * trust, and a series that ends where the index ends is the same series on every node.
+ */
+const readVolatility = (runtime: TeeRuntime<Config>, leg: z.infer<typeof legSchema>): bigint => {
+	const config = runtime.config
+	if (leg.referencePoolSubgraphUrl === '' || leg.referencePool === '') return 0n
+
+	const body = JSON.stringify({
+		query: VOLATILITY_QUERY,
+		variables: { pool: leg.referencePool.toLowerCase() },
+	})
+	const response = new cre.capabilities.HTTPClient()
+		.sendRequest(runtime, {
+			url: leg.referencePoolSubgraphUrl,
+			method: 'POST',
+			multiHeaders: { 'Content-Type': { values: ['application/json'] } },
+			body: toBase64(new TextEncoder().encode(body)),
+		})
+		.result()
+	if (!ok(response)) throw new Error(`reference-pool subgraph failed with status ${response.statusCode}`)
+
+	const payload = JSON.parse(text(response)) as VolatilityResponse
+	if (payload.errors && payload.errors.length > 0) {
+		throw new Error(`reference-pool subgraph returned an error: ${payload.errors[0]?.message}`)
+	}
+	const swaps = payload.data?.swaps ?? []
+	if (swaps.length === 0) return 0n
+
+	const newest = BigInt((swaps[0] as { timestamp: string }).timestamp)
+	const window = BigInt(config.volatilityWindowSeconds)
+	const samples: PriceSample[] = swaps
+		.filter((s) => newest - BigInt(s.timestamp) <= window)
+		.map((s) => ({ timestamp: BigInt(s.timestamp), mid: midFromSqrtPriceX96(BigInt(s.sqrtPriceX96)) }))
+		.reverse()
+	return volatilitySpreadBps(
+		samples,
+		BigInt(config.volatilityHorizonSeconds),
+		BigInt(config.volatilityMultiplierBps),
+		BigInt(config.volatilityCapBps),
+	)
+}
+
 const readRef = (don: Runtime<Config>, leg: z.infer<typeof legSchema>, positionId: Hex): StoredRef => {
 	const client = new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 	const header = client
@@ -443,6 +520,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const congestionBps = BigInt(runtime.getSecret({ id: config.congestionSecretId }).result().value)
 
 	const signals = config.legs.map((leg) => readMarkout(runtime, leg, positionId))
+	const volatility = config.legs.map((leg) => readVolatility(runtime, leg))
 	const crowding = config.legs.map((leg, i) => {
 		const mid = (signals[i] as LegSignals).mid
 		return mid === 0n ? 0n : readCrowding(runtime, leg, mid)
@@ -471,6 +549,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 			positionId,
 			{
 				...ref,
+				spreadBps: config.baseSpreadBps + Number(volatility[index] as bigint),
 				bandEdgeBps: Number(
 					publishedBoundary(
 						BigInt(ref.tiltBps),
@@ -489,6 +568,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 			.result()
 		return (
 			`${leg.registry}: seq ${ref.seq} -> ${ref.seq + 1}, ` +
+			`spreadBps ${config.baseSpreadBps}+${volatility[index]}, ` +
 			`bandEdgeBps ${edges[index]}, markoutBps ${(signals[index] as LegSignals).markoutBps}, ` +
 			`crowdingBps ${crowding[index]}`
 		)
