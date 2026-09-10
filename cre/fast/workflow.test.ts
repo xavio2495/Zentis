@@ -6,12 +6,14 @@ import { encodeAbiParameters, parseAbiParameters } from 'viem'
 import { onCronTrigger, restrictions, type Config } from './workflow'
 import { antiSymmetric, legWeight, midFromSqrtPriceX96 } from './policy'
 
-const KAPPA = '500'
+const KAPPA = '10000'
+const KAPPA_BOOK = '5000'
 
 const config: Config = {
 	schedule: '*/10 * * * * *',
 	positionId: `0x${'00'.repeat(31)}01`,
 	kappaSecretId: 'KAPPA_BPS',
+	kappaBookSecretId: 'KAPPA_BOOK_BPS',
 	spreadBps: 10,
 	markoutBps: 0,
 	maxTiltBps: 500,
@@ -130,7 +132,9 @@ const makeRuntime = (chain: ChainState = CHAIN) => {
 
 	const runtime = {
 		config,
-		getSecret: () => ({ result: () => ({ value: KAPPA }) }),
+		getSecret: ({ id }: { id: string }) => ({
+			result: () => ({ value: id === 'KAPPA_BOOK_BPS' ? KAPPA_BOOK : KAPPA }),
+		}),
 		log: (m: string) => logs.push(m),
 		usingTheDons: () => don,
 	}
@@ -172,22 +176,25 @@ describe('fast workflow', () => {
 		expect(logs).toEqual([])
 	})
 
-	test('the two legs carry anti-symmetric tilts', () => {
-		// Leg A is deliberately over-weight tokenA, so the tilts must be equal and opposite.
+	test('a leg holding excess tokenA is repriced dear, and the rest of the book sheds it', () => {
+		// Leg A is deliberately over-weight tokenA. On a constant-product curve that means its own
+		// price already sits below the mid, so the anchor makes tokenA dear there: a negative tilt.
+		// Leg B is even, but the book as a whole holds excess tokenA, so the book skew has it
+		// discount tokenA a little: a small positive tilt.
 		const { runtime, reports } = makeRuntime({
 			...CHAIN,
 			balA: [25_000_000n, 4137282795001288n],
 		})
 		onCronTrigger(runtime)
 
-		const tiltOf = (payload: string) => {
-			const [, ref] = decodeRef(payload)
-			return ref.tiltBps
-		}
-		const tiltA = tiltOf(reports[0]!)
-		const tiltB = tiltOf(reports[1]!)
-		expect(tiltA).not.toBe(0)
-		expect(tiltA).toBe(-tiltB)
+		const refOf = (payload: string) => decodeRef(payload)[1]
+		const refA = refOf(reports[0]!)
+		const refB = refOf(reports[1]!)
+		expect(refA.tiltBps).toBeLessThan(0)
+		expect(refB.tiltBps).toBeGreaterThan(0)
+		expect(-refA.tiltBps).toBeGreaterThan(refB.tiltBps)
+		// Accumulating tokenA on leg A must move its tilt further down between references.
+		expect(refA.dTiltPerA).toBeLessThan(0n)
 	})
 
 	test('the published seq and updatedAt are shared by both legs', () => {

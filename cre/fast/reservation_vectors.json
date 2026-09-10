@@ -1,0 +1,959 @@
+{
+  "seed": 1,
+  "mid": "275818853000085890554200491",
+  "maxTiltBps": 500,
+  "cases": [
+    {
+      "name": "one leg at the mid",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "15000000",
+          "4137282795001288"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "0",
+          "dTiltPerA": "-416666622222223"
+        }
+      ]
+    },
+    {
+      "name": "two legs at the mid, four times apart in size",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "60000000",
+          "16549131180005152"
+        ],
+        [
+          "15000000",
+          "4137282795001288"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "0",
+          "dTiltPerA": "-114583330555556"
+        },
+        {
+          "tiltBps": "0",
+          "dTiltPerA": "-458333288888890"
+        }
+      ]
+    },
+    {
+      "name": "one leg 4% below the mid, the other even",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "15000000",
+          "3971791483201236"
+        ],
+        [
+          "15000000",
+          "4137282795001288"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-273",
+          "dTiltPerA": "-431753391918995"
+        },
+        {
+          "tiltBps": "25",
+          "dTiltPerA": "-458333288888890"
+        }
+      ]
+    },
+    {
+      "name": "one leg 20% below the mid: the cap binds",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "15000000",
+          "3309826236001030"
+        ],
+        [
+          "15000000",
+          "4137282795001288"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-327571973921658"
+        },
+        {
+          "tiltBps": "138",
+          "dTiltPerA": "-458333288888890"
+        }
+      ]
+    },
+    {
+      "name": "gain of four times the basis is the plain curve",
+      "kappaOwnBps": 40000,
+      "kappaBookBps": 0,
+      "legs": [
+        [
+          "15000000",
+          "4013164311151249"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "4",
+          "dTiltPerA": "19845440433189"
+        }
+      ]
+    },
+    {
+      "name": "anchor alone",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 0,
+      "legs": [
+        [
+          "15000000",
+          "4261401278851326"
+        ],
+        [
+          "15450000",
+          "4137282795001288"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "299",
+          "dTiltPerA": "-686666622222222"
+        },
+        {
+          "tiltBps": "-291",
+          "dTiltPerA": "-628397230862684"
+        }
+      ]
+    },
+    {
+      "name": "three legs, one dear",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "15000000",
+          "4344146934751352"
+        ],
+        [
+          "15000000",
+          "4137282795001288"
+        ],
+        [
+          "30000000",
+          "8274565590002576"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "358",
+          "dTiltPerA": "-505671182698602"
+        },
+        {
+          "tiltBps": "-20",
+          "dTiltPerA": "-472222177777779"
+        },
+        {
+          "tiltBps": "-20",
+          "dTiltPerA": "-236111100000001"
+        }
+      ]
+    },
+    {
+      "name": "a leg holding no tokenB",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "15000000",
+          "0"
+        ],
+        [
+          "15000000",
+          "4137282795001288"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "0"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-458333288888890"
+        }
+      ]
+    },
+    {
+      "name": "random 0",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "39198625",
+          "11713245276649600"
+        ],
+        [
+          "5235027",
+          "1359040617202444"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-174502248782254"
+        },
+        {
+          "tiltBps": "-364",
+          "dTiltPerA": "-1034537804916719"
+        }
+      ]
+    },
+    {
+      "name": "random 1",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "44727664",
+          "11980295819068784"
+        ],
+        [
+          "15089828",
+          "3756367759053179"
+        ],
+        [
+          "2902366",
+          "876093904664483"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-173",
+          "dTiltPerA": "-129567490881461"
+        },
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-339226981302759"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-2423970805035535"
+        }
+      ]
+    },
+    {
+      "name": "random 2",
+      "kappaOwnBps": 5000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "47696553",
+          "12983177013402372"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-99",
+          "dTiltPerA": "-154498332329550"
+        }
+      ]
+    },
+    {
+      "name": "random 3",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "22302342",
+          "5458398762999058"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-342021007699850"
+        }
+      ]
+    },
+    {
+      "name": "random 4",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "26582183",
+          "7660013191339082"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "229",
+          "dTiltPerA": "-205022910817556"
+        }
+      ]
+    },
+    {
+      "name": "random 5",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "36408610",
+          "9371423607556618"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-374",
+          "dTiltPerA": "-139723362598896"
+        }
+      ]
+    },
+    {
+      "name": "random 6",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 0,
+      "legs": [
+        [
+          "24199562",
+          "6243563306032926"
+        ],
+        [
+          "15682146",
+          "4596322299012579"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-479",
+          "dTiltPerA": "-283346622894520"
+        },
+        {
+          "tiltBps": "475",
+          "dTiltPerA": "-518333316654204"
+        }
+      ]
+    },
+    {
+      "name": "random 7",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "38343017",
+          "11647315201421612"
+        ],
+        [
+          "7710904",
+          "1966488246864907"
+        ],
+        [
+          "49562591",
+          "14851235230107640"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-276388121371573"
+        },
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-1145150624460986"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-210802521685251"
+        }
+      ]
+    },
+    {
+      "name": "random 8",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "49417998",
+          "15178565504818942"
+        ],
+        [
+          "34608098",
+          "10545423266192638"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-137064221637894"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-193113551570538"
+        }
+      ]
+    },
+    {
+      "name": "random 9",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "21358716",
+          "5585965354220578"
+        ],
+        [
+          "34511620",
+          "10309860515742760"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-335",
+          "dTiltPerA": "-239250130285621"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-187265453173227"
+        }
+      ]
+    },
+    {
+      "name": "random 10",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "33227486",
+          "8598912303653176"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-348",
+          "dTiltPerA": "-154597565959991"
+        }
+      ]
+    },
+    {
+      "name": "random 11",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 0,
+      "legs": [
+        [
+          "25637263",
+          "7154056741116145"
+        ],
+        [
+          "48180266",
+          "14168772974356750"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "88",
+          "dTiltPerA": "-297114468043094"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-169458936796464"
+        }
+      ]
+    },
+    {
+      "name": "random 12",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "45544032",
+          "12587307321292704"
+        ],
+        [
+          "11985606",
+          "3322468754369870"
+        ],
+        [
+          "27390902",
+          "7320161134529251"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "24",
+          "dTiltPerA": "-216352320525878"
+        },
+        {
+          "tiltBps": "54",
+          "dTiltPerA": "-824621326959175"
+        },
+        {
+          "tiltBps": "-306",
+          "dTiltPerA": "-347656640368158"
+        }
+      ]
+    },
+    {
+      "name": "random 13",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "21705059",
+          "6278883755736979"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "251",
+          "dTiltPerA": "-252980405309477"
+        }
+      ]
+    },
+    {
+      "name": "random 14",
+      "kappaOwnBps": 5000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "12314171",
+          "3398305293694316"
+        ],
+        [
+          "1825545",
+          "536211025068518"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-10",
+          "dTiltPerA": "-690697893341076"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-5012604774398724"
+        }
+      ]
+    },
+    {
+      "name": "random 15",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "39775153",
+          "10584411337910092"
+        ],
+        [
+          "19071039",
+          "5461150695286653"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-352",
+          "dTiltPerA": "-236276604709409"
+        },
+        {
+          "tiltBps": "382",
+          "dTiltPerA": "-531287434776794"
+        }
+      ]
+    },
+    {
+      "name": "random 16",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "35807910",
+          "10534027627497244"
+        ],
+        [
+          "14789882",
+          "4006968197761707"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-290885802537436"
+        },
+        {
+          "tiltBps": "-188",
+          "dTiltPerA": "-647242301524845"
+        }
+      ]
+    },
+    {
+      "name": "random 17",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "39252007",
+          "10967796689196504"
+        ],
+        [
+          "34871217",
+          "9418235771651734"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "100",
+          "dTiltPerA": "-188033147729174"
+        },
+        {
+          "tiltBps": "-153",
+          "dTiltPerA": "-201956331884762"
+        }
+      ]
+    },
+    {
+      "name": "random 18",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "1106350",
+          "307970241307440"
+        ],
+        [
+          "42841668",
+          "12628887278902558"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "52",
+          "dTiltPerA": "-6636603975657531"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-185345334783622"
+        }
+      ]
+    },
+    {
+      "name": "random 19",
+      "kappaOwnBps": 5000,
+      "kappaBookBps": 0,
+      "legs": [
+        [
+          "16408532",
+          "4672820901622948"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "285",
+          "dTiltPerA": "-553078698212464"
+        }
+      ]
+    },
+    {
+      "name": "random 20",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "3178295",
+          "948534088695379"
+        ],
+        [
+          "46171884",
+          "11422202237013236"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-3325862767011983"
+        },
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-188855767684917"
+        }
+      ]
+    },
+    {
+      "name": "random 21",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "19870789",
+          "5151314151860599"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-410156931835181"
+        }
+      ]
+    },
+    {
+      "name": "random 22",
+      "kappaOwnBps": 5000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "24113827",
+          "6316289128314267"
+        ],
+        [
+          "12238742",
+          "3099917251173553"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-354",
+          "dTiltPerA": "-316122849897516"
+        },
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-597406240950125"
+        }
+      ]
+    },
+    {
+      "name": "random 23",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "44500153",
+          "12897273345907076"
+        ],
+        [
+          "31514509",
+          "9115003219435042"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "298",
+          "dTiltPerA": "-146297663757358"
+        },
+        {
+          "tiltBps": "284",
+          "dTiltPerA": "-205891039991498"
+        }
+      ]
+    },
+    {
+      "name": "random 24",
+      "kappaOwnBps": 10000,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "2586089",
+          "681109205508189"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-313",
+          "dTiltPerA": "-2532939555627126"
+        }
+      ]
+    },
+    {
+      "name": "random 25",
+      "kappaOwnBps": 5000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "18342328",
+          "4584118955437271"
+        ],
+        [
+          "49999686",
+          "13824337971697238"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-392020991918028"
+        },
+        {
+          "tiltBps": "81",
+          "dTiltPerA": "-162986645731430"
+        }
+      ]
+    },
+    {
+      "name": "random 26",
+      "kappaOwnBps": 15000,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "2397079",
+          "617582395826076"
+        ],
+        [
+          "27663383",
+          "6982676302255472"
+        ],
+        [
+          "49240231",
+          "15080421097501082"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-383",
+          "dTiltPerA": "-2160573714796939"
+        },
+        {
+          "tiltBps": "-495",
+          "dTiltPerA": "-180492020497918"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-141113768402398"
+        }
+      ]
+    },
+    {
+      "name": "random 27",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "37554343",
+          "11184145678172640"
+        ],
+        [
+          "43330381",
+          "12805553016556272"
+        ],
+        [
+          "35668406",
+          "9721957819592592"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-283082199147417"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-243438376568430"
+        },
+        {
+          "tiltBps": "-139",
+          "dTiltPerA": "-272380184593493"
+        }
+      ]
+    },
+    {
+      "name": "random 28",
+      "kappaOwnBps": 5000,
+      "kappaBookBps": 0,
+      "legs": [
+        [
+          "45280031",
+          "12881586805185130"
+        ],
+        [
+          "4945002",
+          "1441652534278755"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "276",
+          "dTiltPerA": "-200189216221465"
+        },
+        {
+          "tiltBps": "500",
+          "dTiltPerA": "-1884901546553743"
+        }
+      ]
+    },
+    {
+      "name": "random 29",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "21561258",
+          "5334308359599996"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-392890761063750"
+        }
+      ]
+    },
+    {
+      "name": "random 30",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 5000,
+      "legs": [
+        [
+          "11617118",
+          "3139755555740172"
+        ],
+        [
+          "17935465",
+          "4508115540260974"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-131",
+          "dTiltPerA": "-789686203087529"
+        },
+        {
+          "tiltBps": "-500",
+          "dTiltPerA": "-473323931005495"
+        }
+      ]
+    },
+    {
+      "name": "random 31",
+      "kappaOwnBps": 0,
+      "kappaBookBps": 2000,
+      "legs": [
+        [
+          "39270881",
+          "10729881649787432"
+        ],
+        [
+          "48246193",
+          "13699919680307216"
+        ]
+      ],
+      "expected": [
+        {
+          "tiltBps": "-97",
+          "dTiltPerA": "-245883240471599"
+        },
+        {
+          "tiltBps": "291",
+          "dTiltPerA": "-208206347096487"
+        }
+      ]
+    }
+  ]
+}

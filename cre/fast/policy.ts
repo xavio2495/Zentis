@@ -95,6 +95,58 @@ const slope = (leg: LegWeight, kappaBps: bigint): bigint =>
  * Squaring first and dividing once keeps every bit: no decimals handling appears anywhere, on-chain
  * or here, because raw-per-raw already folds both tokens' decimals in.
  */
+/**
+ * The tilt that reprices a constant-product leg's effective price back onto the mid.
+ *
+ * The leg's own price is `balanceB / balanceA`, which in weight terms is `(1 - w) / w` of the mid,
+ * so in the instruction's sign convention the correction is `(1 - 2w) / w`: negative when the leg
+ * holds excess tokenA, because excess tokenA is already cheap on the curve and must be made dear
+ * again. Exact for a tokenA-in fill, second-order off for tokenB-in. The caller caps it.
+ */
+export const anchorTiltBps = (weightA: bigint): bigint =>
+	weightA <= 0n ? 0n : truncDiv((ONE - 2n * weightA) * BPS, weightA)
+
+/**
+ * The reservation policy. One ref input per leg.
+ *
+ *     tilt_c = anchor(w_c) + kappaOwn * (w_c - 1/2) + kappaBook * (mean(w) - 1/2)
+ *
+ * The anchor is a correction: it puts the leg's curve on the mid whatever its reserves say. The two
+ * skews are concessions: the leg pays to shed what it holds, and the whole book pays the same way on
+ * every leg. Near an even split the anchor is `-4 (w - 1/2)`, so the own-leg gain is a dial from the
+ * plain curve (four times the basis) to a curve pinned at the mid (zero).
+ *
+ * `dTiltPerA` is this policy's own derivative in raw tokenA, so the instruction's extrapolation
+ * between references follows the rule the reference was computed under. With `w = A / T` and
+ * `T = A + bInA`: `d anchor / dA = -BPS * bInA / A^2` and `d w / dA = bInA / T^2`, and the book term
+ * sees a `1/n` share of the leg's own weight change. Mirrors `reference_model.crosschain.reservation`.
+ */
+export const reservation = (
+	legs: LegWeight[],
+	kappaOwnBps: bigint,
+	kappaBookBps: bigint,
+	maxTiltBps: bigint,
+): LegPolicy[] => {
+	const n = BigInt(legs.length)
+	if (n === 0n) throw new Error('a book needs at least one leg')
+	const meanW = legs.reduce((sum, leg) => sum + leg.weightA, 0n) / n
+	const half = ONE / 2n
+	return legs.map((leg) => {
+		const w = leg.weightA
+		let tilt = anchorTiltBps(w)
+		tilt += truncDiv(kappaOwnBps * (w - half), ONE)
+		tilt += truncDiv(kappaBookBps * (meanW - half), ONE)
+		tilt = clamp(tilt, -maxTiltBps, maxTiltBps)
+
+		const { balanceA: a, bInA, totalInA: total } = leg
+		let slope = 0n
+		if (a > 0n) slope += truncDiv(-BPS * bInA * ONE, a * a)
+		slope += truncDiv(kappaOwnBps * bInA * ONE, total * total)
+		slope += truncDiv(kappaBookBps * bInA * ONE, n * total * total)
+		return { x: w - half, tiltBps: tilt, dTiltPerA: slope }
+	})
+}
+
 export const midFromSqrtPriceX96 = (sqrtPriceX96: bigint): bigint =>
 	(sqrtPriceX96 * sqrtPriceX96 * ONE) >> 192n
 

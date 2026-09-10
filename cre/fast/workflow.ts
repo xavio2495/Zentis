@@ -13,7 +13,7 @@ import {
 import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, parseAbiParameters, type Address, type Hex } from 'viem'
 import { z } from 'zod'
 
-import { antiSymmetric, legWeight, midFromSqrtPriceX96, type LegWeight } from './policy'
+import { legWeight, midFromSqrtPriceX96, reservation, type LegWeight } from './policy'
 
 // ─── Config ─────────────────────────────────────────────────
 const legSchema = z.object({
@@ -31,6 +31,7 @@ export const configSchema = z.object({
 	schedule: z.string(),
 	positionId: z.string(),
 	kappaSecretId: z.string(),
+	kappaBookSecretId: z.string(),
 	spreadBps: z.number(),
 	markoutBps: z.number(),
 	maxTiltBps: z.number(),
@@ -175,17 +176,18 @@ const observeLeg = (don: Runtime<Config>, leg: Leg, maker: Address, name: string
 /**
  * The fast reference: mid, tilt and spread for both legs of one cross-chain position.
  *
- * What the enclave actually keeps confidential is `kappa`, the gain that turns an inventory imbalance
- * into a quote concession. That number is the maker's aggression — how far they will move price to
- * shed inventory — and a node operator who could read it could position against every rebalance
- * before it happens. The pool prices and Aqua balances this workflow reads are public on-chain data
+ * What the enclave actually keeps confidential is the pair of gains that turn inventory into a quote
+ * concession: one on the leg's own weight, one on the whole book's. Those numbers are the maker's
+ * aggression — how far they will move price to shed inventory — and a node operator who could read
+ * them could position against every rebalance before it happens. The pool prices and Aqua balances this workflow reads are public on-chain data
  * and are deliberately NOT treated as secret; claiming otherwise would be theatre.
  */
 export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const config = runtime.config
 
 	// Released by the Vault DON directly into the attested enclave, decrypted at this call.
-	const kappaBps = BigInt(runtime.getSecret({ id: config.kappaSecretId }).result().value)
+	const kappaOwnBps = BigInt(runtime.getSecret({ id: config.kappaSecretId }).result().value)
+	const kappaBookBps = BigInt(runtime.getSecret({ id: config.kappaBookSecretId }).result().value)
 
 	// EVM capabilities take a DON runtime, so chain reads and writes cross back out of the enclave.
 	// That is correct here: they carry no secret, and they are the part that needs consensus.
@@ -196,10 +198,10 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 		observeLeg(don, config.legA, maker, 'legA'),
 		observeLeg(don, config.legB, maker, 'legB'),
 	] as [Observation, Observation]
-	const policies = antiSymmetric(
-		observed[0].weight,
-		observed[1].weight,
-		kappaBps,
+	const policies = reservation(
+		[observed[0].weight, observed[1].weight],
+		kappaOwnBps,
+		kappaBookBps,
 		BigInt(config.maxTiltBps),
 	)
 

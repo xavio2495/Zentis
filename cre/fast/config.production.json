@@ -2,6 +2,7 @@
   "schedule": "0 */1 * * * *",
   "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
   "kappaSecretId": "KAPPA_BPS",
+  "kappaBookSecretId": "KAPPA_BOOK_BPS",
   "spreadBps": 10,
   "markoutBps": 0,
   "maxTiltBps": 500,
