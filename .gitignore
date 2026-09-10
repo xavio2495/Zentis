@@ -74,3 +74,6 @@ __pycache__/
 .claude/
 # Compiled TUI binary
 /apps/tui/zentis
+
+# Built TUI bundle for the npm bin
+/apps/tui/dist/

@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/main.tsx",
+    "watch": "bun run src/main.tsx watch",
+    "bundle": "bun build src/main.tsx --target node --outfile dist/cli.js",
     "compile": "bun build --compile src/main.tsx --outfile zentis",
+    "prepack": "bun run bundle",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
@@ -17,5 +20,12 @@
     "@types/bun": "^1.4.2",
     "@types/react": "^19.3.0",
     "typescript": "5.9.3"
-  }
+  },
+  "description": "The Zentis operator console: one screen that watches a cross-chain market-making position and acts on it.",
+  "bin": {
+    "zentis": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ]
 }
