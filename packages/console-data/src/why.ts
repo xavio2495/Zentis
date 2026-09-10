@@ -43,7 +43,9 @@ export function why(leg: LegSnapshot): string {
       size: spread.stalenessBps,
       say:
         `the reference is ${Math.floor(spread.referenceAgeSeconds / 60)} minutes old, so the quote has ` +
-        `widened ${spread.stalenessBps} bps with its age`,
+        `widened ${spread.stalenessBps} bps with its age` +
+        // Said here rather than on the spread row, which has no room for it and must not be squeezed.
+        (spread.stalenessBps === position.maxWidenBps ? ", which is the most it will widen" : ""),
     },
     { size: spread.markoutBps, say: `recent fills went against the maker, so ${spread.markoutBps} bps is charged for it` },
   ];

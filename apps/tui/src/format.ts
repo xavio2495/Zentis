@@ -110,9 +110,63 @@ export function stackedGauge(
  * constant, and the sentences are written to say the important half first.
  */
 export function clampToRows(text: string, columns: number, rows: number): string {
-  const limit = columns * rows;
-  if (text.length <= limit) return text;
-  const cut = text.slice(0, limit - 1);
-  const atWord = cut.lastIndexOf(" ");
-  return `${(atWord > limit / 2 ? cut.slice(0, atWord) : cut).trimEnd()}…`;
+  // Wrapped the way a terminal wraps — greedily, on whole words — rather than by counting
+  // characters. A character count is wrong in the direction that costs a row: `columns * rows`
+  // characters only fit if no word ever straddles a line end, and every word that does wastes the
+  // rest of that line. Getting this wrong pushes every panel below the column down one.
+  const words = text.split(/\s+/).filter((w) => w !== "")
+  const lines: string[] = []
+  let line = ""
+  let overflowed = false
+
+  for (const word of words) {
+    const candidate = line === "" ? word : `${line} ${word}`
+    if (candidate.length <= columns) {
+      line = candidate
+      continue
+    }
+    if (lines.length + 1 === rows) {
+      overflowed = true
+      break
+    }
+    lines.push(line)
+    // A single word longer than the column is cut rather than allowed to wrap on its own.
+    line = word.length <= columns ? word : word.slice(0, columns)
+  }
+  if (!overflowed) return text
+
+  const room = columns - 1
+  lines.push(line.length <= room ? `${line}…` : `${line.slice(0, room)}…`)
+  return lines.join(" ")
+}
+
+/**
+ * The spread row, laid out so that Ink never has to shorten it.
+ *
+ * Ink squeezes an overlong row by dropping characters out of the middle of it, and on a row of
+ * numbers that is silent corruption: `10+49+0+200` came out as `10+4+0+20`, which still reads as a
+ * decomposition and no longer sums to its own total. So the numeric part is built first and is
+ * always short enough to fit, and the explanatory note is added only if what remains of the column
+ * will hold all of it. A note is dropped whole rather than clipped, because half of `2/m × 248m`
+ * reads as a rate or an age that is not the one the program is applying.
+ */
+export function spreadRow(
+  stack: {
+    totalBps: number
+    baseBps: number
+    volatilityBps: number
+    markoutBps: number
+    stalenessBps: number
+  },
+  widenBpsPerMinute: number,
+  ageMinutes: number,
+  width: number,
+): { numbers: string; note: string } {
+  const numbers =
+    `spread ${stack.totalBps} ` +
+    `${stack.baseBps}+${stack.volatilityBps}+${stack.markoutBps}+${stack.stalenessBps}`
+  if (stack.stalenessBps === 0) return { numbers, note: '' }
+
+  const note = ` (${widenBpsPerMinute}/m × ${ageMinutes}m)`
+  return { numbers, note: numbers.length + note.length <= width ? note : '' }
 }

@@ -1,18 +1,29 @@
 import { Box, Text } from "ink";
 import { type LegSnapshot, offMidBps, weightPercent, why } from "@zentis/console-data";
-import { amount, clampToRows, signed, stackedGauge, weiish } from "../format.js";
+import { amount, clampToRows, signed, spreadRow, stackedGauge, weiish } from "../format.js";
 import { TERM, UI } from "../theme.js";
 
 const WIDTH = 38;
 
-/** The three terms of the spread, drawn as one bar so their proportions are readable, not just their sums. */
+/**
+ * The spread's terms, each in its own colour.
+ *
+ * The widths come from `spreadRow`, which guarantees the row fits the column. That guarantee is the
+ * point: asked to render something too wide, Ink drops characters out of the middle, and on a row of
+ * numbers the result still looks like a decomposition while no longer summing to its own total.
+ */
 function SpreadRow({ leg }: { leg: LegSnapshot }) {
   const spread = leg.spread;
   if (spread === null) return <Text color={UI.muted}>spread —</Text>;
+  const { note } = spreadRow(
+    spread,
+    leg.position?.widenBpsPerMinute ?? 0,
+    Math.floor(spread.referenceAgeSeconds / 60),
+    WIDTH - 1,
+  );
   return (
     <Box>
-      <Text color={UI.muted}>spread </Text>
-      <Text color={UI.heading}>{String(spread.totalBps).padEnd(4)}</Text>
+      <Text color={UI.muted}>{`spread ${spread.totalBps} `}</Text>
       <Text color={TERM.base}>{spread.baseBps}</Text>
       <Text color={UI.muted}>+</Text>
       <Text color={TERM.volatility}>{spread.volatilityBps}</Text>
@@ -20,13 +31,7 @@ function SpreadRow({ leg }: { leg: LegSnapshot }) {
       <Text color={TERM.markout}>{spread.markoutBps}</Text>
       <Text color={UI.muted}>+</Text>
       <Text color={TERM.staleness}>{spread.stalenessBps}</Text>
-      {/* The ramp's arithmetic, not just its total: a bare 86 reads as a policy choice, when it is
-          the reference's age times the rate the maker signed into the program. */}
-      <Text color={UI.muted}>
-        {` (${leg.position?.widenBpsPerMinute ?? 0}/m × ${Math.floor(spread.referenceAgeSeconds / 60)}m${
-          spread.stalenessBps === (leg.position?.maxWidenBps ?? 0) ? ", capped" : ""
-        })`}
-      </Text>
+      {note !== "" && <Text color={UI.muted}>{note}</Text>}
     </Box>
   );
 }

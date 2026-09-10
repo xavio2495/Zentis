@@ -56,3 +56,26 @@ test("the why line is clamped to whole rows, and clamps on a word where it can",
   const short = "every term is at zero";
   expect(clampToRows(short, 37, 2)).toBe(short); // nothing to clamp, nothing added
 });
+
+test("the why line is clamped by wrapped rows, not by a character count", () => {
+  const columns = 37;
+  // Wrapping is greedy on whole words, so a character budget of columns * rows overshoots whenever a
+  // word straddles a line end — which is what pushed a column to three rows and the layout to 41.
+  const long =
+    "the reference is 251 minutes old, so the quote has widened 200 bps, which is the most it will widen";
+  const clamped = clampToRows(`why: ${long}`, columns, 2);
+
+  const wrapped: string[] = [];
+  let line = "";
+  for (const word of clamped.split(" ")) {
+    const candidate = line === "" ? word : `${line} ${word}`;
+    if (candidate.length <= columns) line = candidate;
+    else {
+      wrapped.push(line);
+      line = word;
+    }
+  }
+  wrapped.push(line);
+  expect(wrapped.length).toBeLessThanOrEqual(2);
+  expect(clamped.endsWith("…")).toBe(true);
+});
