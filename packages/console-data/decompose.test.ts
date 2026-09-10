@@ -116,3 +116,33 @@ test("a leg whose shift sits at the signed cap reports its room as unknown, not 
   expect(base.roomBps).toBe(0n);
   expect(base.roomUnknownAtCap).toBe(false);
 });
+
+test("a boundary on the cap is unrecoverable even when the shift is below it", () => {
+  // The case that makes the boundary, not the shift, the thing to test: a shift of 480 with 55 bps
+  // of room publishes a boundary of 535, which clamps to 500 and loses the room. Keying off the
+  // shift would read 20 bps of budget out of a number that carries none.
+  const clamped = inputs.map((input, i) =>
+    i === 0
+      ? { ...input, ref: { ...input.ref, tiltBps: -480, bandEdgeBps: BOOK.maxTiltBps } }
+      : input,
+  );
+  const leg = decomposeBook(clamped, ASSUMED_GAINS, BOOK.maxTiltBps).legs[0]!;
+  expect(leg.roomUnknownAtCap).toBe(true);
+  expect(leg.roomBps).toBe(0n);
+});
+
+test("a boundary below the cap still yields the room it carries", () => {
+  const room = decomposeBook(inputs, ASSUMED_GAINS, BOOK.maxTiltBps).legs;
+  const arbitrum = room.find((l) => l.label === "Arbitrum Sepolia")!;
+  expect(arbitrum.roomUnknownAtCap).toBe(false);
+  expect(arbitrum.roomBps).toBeGreaterThan(0n);
+});
+
+test("a stale boundary sitting below the shift is no room, not negative room", () => {
+  const stale = inputs.map((input, i) =>
+    i === 0 ? { ...input, ref: { ...input.ref, tiltBps: -300, bandEdgeBps: 100 } } : input,
+  );
+  const leg = decomposeBook(stale, ASSUMED_GAINS, BOOK.maxTiltBps).legs[0]!;
+  expect(leg.roomBps).toBe(0n);
+  expect(leg.roomUnknownAtCap).toBe(false);
+});

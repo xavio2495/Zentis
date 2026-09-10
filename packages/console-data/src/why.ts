@@ -48,11 +48,11 @@ export function why(leg: LegSnapshot): string {
     { size: spread.markoutBps, say: `recent fills went against the maker, so ${spread.markoutBps} bps is charged for it` },
   ];
 
-  // The room at the cap is an artefact and not a budget: the boundary is published as the shift plus
-  // the room and then clamped, so a leg at the cap cannot say how much room it had. Reading the zero
-  // as a refusal to concede would be the screen inventing a decision the enclave never made.
+  // A boundary on the cap is an artefact and not a budget: it is published as the shift plus the
+  // room and then clamped, so on the cap it could be any shift plus any room. Reading the zero it
+  // arithmetically comes to as a refusal to concede would invent a decision the enclave never made.
   if (shift.roomUnknownAtCap) {
-    return `this leg quotes at its shift cap, so how much room it had left to concede cannot be read back`;
+    return `this leg's boundary sits on the cap, so how much room it has left to concede cannot be read back`;
   }
   // The boundary running out is a bigger fact than any term's size: it means the leg wanted to
   // concede and was not allowed to, which no basis-point figure on the screen says by itself.

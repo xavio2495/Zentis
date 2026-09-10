@@ -1,4 +1,4 @@
-import { type LegWeight, ONE, anchorTiltBps, legWeight, reservation } from "@zentis/strategy-sdk";
+import { type LegWeight, ONE, anchorTiltBps, legWeight, recoverRoom, reservation } from "@zentis/strategy-sdk";
 import type { LegConfig } from "./config.js";
 import type { LegHistory } from "./fills.js";
 import type { StoredRef } from "./registry.js";
@@ -49,10 +49,11 @@ export interface LegDecomposition {
   /**
    * True when `roomBps` is zero only because the shift is at the signed cap.
    *
-   * The workflow publishes `boundary = |shift| + room` and clamps the boundary, so a leg quoting at
-   * the cap publishes a boundary equal to the cap and the recovered room is zero whatever room the
-   * enclave actually allowed. That is the invariant behaving at its edge, and it is a different
-   * fact from a leg whose boundary sits below the cap and genuinely has nothing left to concede.
+   * The workflow publishes `boundary = |shift| + room` and clamps the boundary at the maker's signed
+   * cap, so a boundary sitting on that cap could be any shift plus any room. It is the *boundary*
+   * that has to be on the cap, not the shift: a shift of 480 with 55 bps of room publishes 535,
+   * which clamps to 500 and loses the room just as completely. Different from a leg whose boundary
+   * sits below the cap and genuinely has nothing left to concede.
    */
   readonly roomUnknownAtCap: boolean;
   readonly cappedByRoom: boolean;
@@ -92,20 +93,16 @@ export function decomposeBook(inputs: LegInput[], gains: Gains, maxTiltBps: numb
     return legWeight({ balanceA: position.balanceA, balanceB: position.balanceB, mid: ref.mid });
   });
 
-  // Bug 8's invariant, read back: the workflow publishes `boundary = |shift| + room`, so the room a
-  // leg has left to concede is what the boundary carries above the shift it is already quoting.
-  const caps = inputs.map(({ ref }) => {
-    const room = BigInt(ref.bandEdgeBps) - abs(BigInt(ref.tiltBps));
-    return room < 0n ? 0n : room;
-  });
+  // The room is read back through the shared package, so the console and the fast workflow recover
+  // the same number from the same boundary. Null is "unknowable", not "none": a boundary sitting on
+  // the maker's signed cap could be any shift plus any room, so the concession runs uncapped and the
+  // total still clamps at the cap. Keying this off the *boundary* rather than the shift is what
+  // catches a shift of 480 with 55 bps of room, whose boundary of 535 clamps and loses the room.
+  const rooms = inputs.map(({ ref }) =>
+    recoverRoom(BigInt(ref.bandEdgeBps), BigInt(ref.tiltBps), BigInt(maxTiltBps)),
+  );
 
-  // A leg at the cap cannot have its room recovered at all, so the cap it is given is the whole
-  // budget rather than a zero: reading the artefact as a refusal to concede would make the console
-  // recompute a shift the enclave never intended.
-  const atCap = inputs.map(({ ref }) => abs(BigInt(ref.tiltBps)) >= BigInt(maxTiltBps));
-  const effectiveCaps = caps.map((cap, i) => (atCap[i] === true ? null : cap));
-
-  const applied = reservation(weights, gains.kappaOwnBps, gains.kappaBookBps, BigInt(maxTiltBps), effectiveCaps);
+  const applied = reservation(weights, gains.kappaOwnBps, gains.kappaBookBps, BigInt(maxTiltBps), rooms);
   const uncapped = reservation(weights, gains.kappaOwnBps, gains.kappaBookBps, UNCLAMPED);
   const ownOnly = reservation(weights, gains.kappaOwnBps, 0n, UNCLAMPED);
 
@@ -130,9 +127,9 @@ export function decomposeBook(inputs: LegInput[], gains: Gains, maxTiltBps: numb
       tiltBps,
       published,
       agrees: tiltBps === BigInt(published),
-      roomBps: caps[i]!,
-      roomUnknownAtCap: atCap[i] === true && caps[i] === 0n,
-      cappedByRoom: atCap[i] !== true && abs(concessionUncapped) > caps[i]!,
+      roomBps: rooms[i] ?? 0n,
+      roomUnknownAtCap: rooms[i] === null,
+      cappedByRoom: rooms[i] !== null && abs(concessionUncapped) > rooms[i]!,
       clampedByMaxTilt: abs(correction + concessionUncapped) > BigInt(maxTiltBps),
       balancesMatchEnclave: input.history.position!.balanceA === input.ref.refBalanceA,
       referenceAgeSeconds:
