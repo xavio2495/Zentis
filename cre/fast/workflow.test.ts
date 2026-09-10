@@ -331,6 +331,17 @@ describe('fast workflow', () => {
 		expect(BigInt(refs[0]!.updatedAt)).toBe(LEG_A.ts)
 	})
 
+	test('a boundary on the cap is carried forward as the cap, not erased', () => {
+		// Its room cannot be read back, so the concession runs free; but publishing zero would tell
+		// the instruction and every reader that no boundary exists, which is false. The stored value
+		// is carried until the slow workflow republishes it.
+		const stored = { mid: 1n, spreadBps: 59, markoutBps: 0, bandEdgeBps: 500, tiltBps: -500 }
+		const { runtime, reports } = makeRuntime(withLeg(CHAIN, 0, { stored }))
+		onCronTrigger(runtime)
+		const [, refA] = decodeRef(reports[0]!)
+		expect(refA.bandEdgeBps).toBe(500)
+	})
+
 	test('the published seq and updatedAt are shared by both legs', () => {
 		const { runtime, reports } = makeRuntime()
 		onCronTrigger(runtime)
