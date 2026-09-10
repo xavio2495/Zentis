@@ -199,7 +199,13 @@ async function handleCrowding(url: URL): Promise<Response> {
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: {
+      "content-type": "application/json",
+      // Everything this service returns is public: a quote read off a deployed router and a venue's
+      // committed totals. The console runs in a browser on another origin, so without this it can
+      // show every other source and a blank where the only price a taker could act on should be.
+      "access-control-allow-origin": "*"
+    }
   });
 }
 

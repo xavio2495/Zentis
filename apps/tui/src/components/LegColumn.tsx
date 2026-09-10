@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import { type LegSnapshot, offMidBps, weightPercent, why } from "@zentis/console-data";
-import { amount, signed, stackedGauge, weiish } from "../format.js";
+import { amount, clampToRows, signed, stackedGauge, weiish } from "../format.js";
 import { TERM, UI } from "../theme.js";
 
 const WIDTH = 38;
@@ -140,14 +140,16 @@ export function LegColumn({ leg }: { leg: LegSnapshot }) {
       <ShiftRows leg={leg} />
       <SpreadRow leg={leg} />
       <QuoteRow leg={leg} />
-      {/* Allowed to wrap rather than truncated: this is the one line on the screen written for a
-          reader who does not already know the policy, and half of it says nothing. */}
-      <Text color={UI.muted}>why: {why(leg)}</Text>
-      {leg.caveats.slice(0, 2).map((caveat, i) => (
-        <Text key={i} color={UI.caveat} wrap="truncate-end">
-          ! {caveat}
+      {/* Wrapped rather than truncated — this is the one line written for a reader who does not
+          already know the policy, and half of it says nothing — but clamped to two rows, so the
+          column's height does not depend on how much there was to say. */}
+      <Text color={UI.muted}>{clampToRows(`why: ${why(leg)}`, WIDTH - 1, 2)}</Text>
+      {leg.caveats.length > 0 && (
+        <Text color={UI.caveat} wrap="truncate-end">
+          ! {leg.caveats[0]}
+          {leg.caveats.length > 1 ? ` (+${leg.caveats.length - 1} more)` : ""}
         </Text>
-      ))}
+      )}
     </Box>
   );
 }

@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import type { Snapshot } from "@zentis/console-data";
-import type { Action } from "../actions.js";
+import type { Action } from "../action-types.js";
 import { Divider } from "./Divider.js";
 import { UI } from "../theme.js";
 

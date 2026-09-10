@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { render } from "ink";
 import { App } from "./App.js";
+import { buildActions } from "./actions.js";
+import { run, summarise } from "./runner.js";
+import type { Action } from "./action-types.js";
 
 /**
  * The operator console.
@@ -16,4 +19,7 @@ import { App } from "./App.js";
 const watchOnly = process.argv.slice(2).includes("watch");
 const envFile = watchOnly ? null : (process.env.ZENTIS_ENV ?? null);
 
-render(<App envFile={envFile} />);
+const runAction = async (action: Action): Promise<string> =>
+  summarise(action, await run(action.command!));
+
+render(<App actions={buildActions(envFile)} runAction={runAction} />);

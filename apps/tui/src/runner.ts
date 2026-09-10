@@ -1,4 +1,4 @@
-import type { Action, ActionCommand } from "./actions.js";
+import type { Action, ActionCommand } from "./action-types.js";
 
 export interface RunResult {
   readonly exitCode: number;

@@ -100,3 +100,19 @@ export function stackedGauge(
   // rather than the position.
   return total < 0n ? [pad, ...run.reverse(), rest] : [rest, ...run, pad];
 }
+
+/**
+ * Clamps a sentence to a whole number of wrapped rows.
+ *
+ * The `why` line is the one piece of variable-height content in a leg column, and a column that
+ * grows by a row pushes every panel below it down — which is how a layout that fits a 720p recording
+ * stops fitting one. Clamping here rather than letting Ink wrap freely keeps the column's height a
+ * constant, and the sentences are written to say the important half first.
+ */
+export function clampToRows(text: string, columns: number, rows: number): string {
+  const limit = columns * rows;
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit - 1);
+  const atWord = cut.lastIndexOf(" ");
+  return `${(atWord > limit / 2 ? cut.slice(0, atWord) : cut).trimEnd()}…`;
+}

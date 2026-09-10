@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 import { ASSUMED_GAINS, BOOK, LEGS, QUOTE_SIZE_A } from "@zentis/console-data";
+import type { Action, ActionCommand } from "./action-types.js";
 
 /**
  * The operator's own commands, run as children.
@@ -15,22 +16,7 @@ import { ASSUMED_GAINS, BOOK, LEGS, QUOTE_SIZE_A } from "@zentis/console-data";
  * process's environment. Nothing read from that file is ever loaded here, printed, or put on a
  * command line where `ps` would show it.
  */
-export interface ActionCommand {
-  readonly cmd: string[];
-  readonly cwd: string;
-  /** extra environment for the child; never contains anything read from the env file */
-  readonly env?: Record<string, string>;
-}
-
-export interface Action {
-  readonly key: string;
-  readonly label: string;
-  /** null when the action can run; otherwise why it cannot, said plainly */
-  readonly disabledReason: string | null;
-  /** null for actions the console performs itself rather than shelling out for */
-  readonly command: ActionCommand | null;
-  readonly describe: string;
-}
+export type { Action, ActionCommand } from "./action-types.js";
 
 /** The repo root, found from this file rather than from the working directory the binary was run in. */
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..", "..");

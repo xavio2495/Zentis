@@ -233,7 +233,7 @@ export type FeedRow = IndexedFill | IndexedRejection | FeedRound
  * How many rows the screen gives the feed. Shared with the tests so that "the fill and the refusals
  * are visible" is asserted about the feed the operator actually sees, and not about a longer one.
  */
-export const FEED_ROWS = 14
+export const FEED_ROWS = 13
 
 export function collapseFeed(events: FeedEvent[], limit: number): FeedRow[] {
 	const rows: FeedRow[] = []
