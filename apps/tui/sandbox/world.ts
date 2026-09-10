@@ -21,7 +21,7 @@ import refBase from "../../../packages/console-data/fixtures/ref-base-sepolia.js
  *
  * It is also what the site can show a visitor when the live reference is stale.
  */
-export type Scenario = "fresh" | "stale" | "docked" | "landing" | "outage";
+export type Scenario = "fresh" | "stale" | "docked" | "landing" | "outage" | "partial";
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;
@@ -120,6 +120,38 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
         : [],
     };
   });
+
+  if (scenario === "partial") {
+    // What the user's first outage screenshot actually showed: Sepolia's fills endpoint answering,
+    // Base's and Arbitrum's refusing. The feed then holds one leg's publishes, and has to say the
+    // other two were unread rather than that the workflow only wrote one.
+    const refusal = "subgraph HTTP 429, resets 21:52Z";
+    const sepoliaOnly = active.filter((e) => e.leg.name === "sepolia").map((e) => e.history);
+    return {
+      pair: PAIR,
+      positionId: BOOK.positionId,
+      takenAtSeconds: now,
+      seq,
+      bookWeightA: book.weightA,
+      gains: ASSUMED_GAINS,
+      legs: legs.map((leg) =>
+        leg.config.name === "sepolia"
+          ? leg
+          : {
+              ...leg,
+              position: null,
+              shift: null,
+              spread: null,
+              quoteAToB: null,
+              quoteBToA: null,
+              sources: { fills: refusal, registry: null, pool: null },
+            },
+      ),
+      feed: collapseFeed(mergeFeed(sepoliaOnly, 200), 40),
+      sim: loadSimReport(),
+      caveats: [],
+    } as unknown as Snapshot;
+  }
 
   if (scenario === "outage") {
     // What the user's screenshot caught: every fills read refused with a cold cache, so every leg

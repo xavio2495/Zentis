@@ -258,3 +258,66 @@ export function collapseFeed(events: FeedEvent[], limit: number): FeedRow[] {
 	}
 	return rows
 }
+
+/**
+ * A run of consecutive publishes that changed no shift, shown as one row.
+ *
+ * The workflow publishes every few minutes whether or not anything moved, so the feed filled with
+ * the same three shifts row after row, and the rows that record something happening — a fill, a
+ * refusal, a shift that actually changed — were pushed off the bottom. Folding happens at display
+ * time, never in the snapshot: the chart counts every publish as a tick from the same list.
+ */
+export interface FeedFold {
+  readonly kind: 'fold'
+  /** the newest publish in the run, which is where it sits in time order */
+  readonly timestamp: bigint
+  readonly from: bigint
+  readonly to: bigint
+  readonly count: number
+  readonly firstSeq: number
+  readonly lastSeq: number
+  readonly legs: FeedRound['legs']
+}
+
+export type FoldedRow = FeedRow | FeedFold
+
+const sameShifts = (a: FeedRound, b: FeedRound): boolean =>
+	a.legs.length === b.legs.length &&
+	a.legs.every((leg) => b.legs.some((other) => other.chainId === leg.chainId && other.tiltBps === leg.tiltBps))
+
+export function foldRounds(rows: FeedRow[]): FoldedRow[] {
+	const out: FoldedRow[] = []
+	for (let i = 0; i < rows.length; ) {
+		const row = rows[i]!
+		if (row.kind !== 'round') {
+			out.push(row)
+			i += 1
+			continue
+		}
+		// Only adjacent rounds fold: anything between two identical publishes breaks the run, so the
+		// feed's time order survives and a fill is never hidden inside a fold.
+		let j = i + 1
+		while (j < rows.length) {
+			const next = rows[j]!
+			if (next.kind !== 'round' || !sameShifts(row, next)) break
+			j += 1
+		}
+		if (j - i === 1) {
+			out.push(row)
+		} else {
+			const run = rows.slice(i, j) as FeedRound[]
+			out.push({
+				kind: 'fold',
+				timestamp: run[0]!.timestamp,
+				from: run[run.length - 1]!.timestamp,
+				to: run[0]!.timestamp,
+				count: run.length,
+				firstSeq: run[run.length - 1]!.seq,
+				lastSeq: run[0]!.seq,
+				legs: row.legs,
+			})
+		}
+		i = j
+	}
+	return out
+}

@@ -1,7 +1,7 @@
 import { ASSUMED_GAINS, BOOK, LEGS, PAIR, type LegConfig } from "./config.js";
 import { CADENCE_MS, type Cache, createCache } from "./cache.js";
 import { type LegDecomposition, decomposeBook } from "./decompose.js";
-import { FEED_ROWS, type FeedRow, type IndexedPosition, type LegHistory, collapseFeed, fetchHistory, mergeFeed } from "./fills.js";
+import { type FeedRow, type IndexedPosition, type LegHistory, collapseFeed, fetchHistory, mergeFeed } from "./fills.js";
 import type { PoolSeries } from "./pool.js";
 import { type PriceReader, createPriceReader } from "./prices.js";
 import { type LegQuote, type QuoteSet, fetchQuotes } from "./quotes.js";
@@ -54,6 +54,9 @@ export interface Snapshot {
 
 /** The quoted size, in tokenA's own units: small enough to be honest against a 15-unit leg. */
 export const QUOTE_SIZE_A = 150_000n;
+
+/** How many collapsed feed rows a snapshot keeps: several screens' worth, for the chart and the fold. */
+export const FEED_HISTORY = 120;
 
 /**
  * One pass over every source, in parallel, tolerating any of them being down.
@@ -204,7 +207,10 @@ export async function takeSnapshot(
     legs,
     feed: collapseFeed(
       mergeFeed(histories.map((h) => h.value).filter((h): h is LegHistory => h !== null), 200),
-      FEED_ROWS,
+      // Kept longer than any screen shows: the feed folds unchanged publishes at display time, and
+      // the chart draws every publish in its window as a tick, so both need the history behind the
+      // rows that happen to be visible.
+      FEED_HISTORY,
     ),
     sim: loadSimReport(),
     caveats,
