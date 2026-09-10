@@ -26,6 +26,7 @@ import {
 	allocateBandEdge,
 	crowdingBpsOf,
 	markoutBps,
+	midFromUsdPrices,
 	publishedBoundary,
 	toBase64,
 	type MarkoutFill,
@@ -74,6 +75,13 @@ const legSchema = z.object({
 	 */
 	crowdingTokenA: z.string().default(''),
 	crowdingTokenB: z.string().default(''),
+	/**
+	 * Where the venue's tokens are priced: the mainnet chain id the pair lives on and the tokens'
+	 * decimals, so crowding is valued at a mainnet mid rather than at this testnet leg's own.
+	 */
+	crowdingChainId: z.number().default(0),
+	crowdingDecimalsA: z.number().default(0),
+	crowdingDecimalsB: z.number().default(0),
 })
 
 /**
@@ -456,6 +464,29 @@ const readVolatility = (runtime: TeeRuntime<Config>, leg: z.infer<typeof legSche
  * lives on, while the fast workflow writes every minute. A read-modify-write against the finalized
  * slot would therefore be stale on every run, and rejected on every run.
  */
+/**
+ * The mainnet mid the venue's crowding is valued at, from the 1inch spot-price API. The key never
+ * leaves the enclave. A failed read returns zero, which the caller treats as no evidence about
+ * crowding and allocates the leg its full budget — a broken price feed must not throttle a leg.
+ */
+const readMainnetMid = (runtime: TeeRuntime<Config>, leg: z.infer<typeof legSchema>, apiKey: string): bigint => {
+	const a = leg.crowdingTokenA.toLowerCase()
+	const b = leg.crowdingTokenB.toLowerCase()
+	const response = new cre.capabilities.HTTPClient()
+		.sendRequest(runtime, {
+			url: `https://api.1inch.dev/price/v1.1/${leg.crowdingChainId}/${a},${b}?currency=USD`,
+			method: 'GET',
+			multiHeaders: { Authorization: { values: [`Bearer ${apiKey}`] } },
+		})
+		.result()
+	if (!ok(response)) return 0n
+	const prices = JSON.parse(text(response)) as Record<string, string>
+	const priceA = prices[a]
+	const priceB = prices[b]
+	if (priceA === undefined || priceB === undefined) return 0n
+	return midFromUsdPrices(priceA, priceB, leg.crowdingDecimalsA, leg.crowdingDecimalsB)
+}
+
 const readRef = (don: Runtime<Config>, leg: z.infer<typeof legSchema>, positionId: Hex): StoredRef => {
 	const client = new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 	const reply = client
@@ -527,7 +558,9 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const signals = config.legs.map((leg) => readMarkout(runtime, leg, positionId))
 	const volatility = config.legs.map((leg) => readVolatility(runtime, leg))
 	const crowding = config.legs.map((leg, i) => {
-		const mid = (signals[i] as LegSignals).mid
+		// The venue is on a mainnet; value it at a mainnet mid when the leg names one, and only
+		// fall back to the leg's own mid when it does not.
+		const mid = leg.crowdingChainId === 0 ? (signals[i] as LegSignals).mid : readMainnetMid(runtime, leg, apiKey)
 		return mid === 0n ? 0n : readCrowding(runtime, leg, mid)
 	})
 

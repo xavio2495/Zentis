@@ -12,8 +12,9 @@ describe('a mid from two USD prices', () => {
 	})
 
 	test('decimal strings are read exactly, not through a float', () => {
+		// Both prices scaled to 1e18 exactly, then 1e18 * A * 10^(18-6) / B.
 		expect(midFromUsdPrices('0.9999433772089861', '2480.13345567', 6, 18)).toBe(
-			(10n ** 18n * 9999433772089861n * 10n ** 12n) / 24801334556700000n,
+			(10n ** 18n * 999943377208986100n * 10n ** 12n) / 2480133455670000000000n,
 		)
 	})
 

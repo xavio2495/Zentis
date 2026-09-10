@@ -46,7 +46,10 @@
       "referencePool": "0x66eeab70ac52459dd74c6ad50d578ef76a441bbf",
       "crowdingSubgraphUrl": "https://api.studio.thegraph.com/query/1758742/aqua-standard/v0.2.0",
       "crowdingTokenA": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-      "crowdingTokenB": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1"
+      "crowdingTokenB": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+      "crowdingChainId": 42161,
+      "crowdingDecimalsA": 6,
+      "crowdingDecimalsB": 18
     },
     {
       "chainSelector": "16015286601757825753",
@@ -56,7 +59,10 @@
       "referencePool": "0x6418eec70f50913ff0d756b48d32ce7c02b47c47",
       "crowdingSubgraphUrl": "https://api.studio.thegraph.com/query/1760020/aqua-standard-ethereum/v0.2.0",
       "crowdingTokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-      "crowdingTokenB": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      "crowdingTokenB": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "crowdingChainId": 1,
+      "crowdingDecimalsA": 6,
+      "crowdingDecimalsB": 18
     }
   ]
 }

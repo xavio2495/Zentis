@@ -219,6 +219,35 @@ export const publishedBoundary = (
 	return room < minEdgeBps ? minEdgeBps : room > maxEdgeBps ? maxEdgeBps : room
 }
 
+/**
+ * A mid, in raw tokenB per 1e18 raw tokenA, from two USD prices given as decimal strings.
+ *
+ * Crowding is a mainnet quantity and has to be valued at a mainnet price. A testnet leg's own mid
+ * can sit an order of magnitude off the market, and valuing the venue at it reports a lean the
+ * venue does not have. The strings are read digit by digit rather than through a float, so the
+ * result is the same on every node. Zero or malformed input is no evidence and returns zero.
+ */
+export const midFromUsdPrices = (
+	priceA: string,
+	priceB: string,
+	decimalsA: number,
+	decimalsB: number,
+): bigint => {
+	const SCALE = 18
+	const parse = (s: string): bigint | null => {
+		if (!/^\d+(\.\d+)?$/.test(s)) return null
+		const [whole, frac = ''] = s.split('.')
+		const digits = (whole + frac.slice(0, SCALE).padEnd(SCALE, '0')).replace(/^0+(?=\d)/, '')
+		return BigInt(digits)
+	}
+	const a = parse(priceA)
+	const b = parse(priceB)
+	if (a === null || b === null || a === 0n || b === 0n) return 0n
+	const shift = BigInt(decimalsB - decimalsA)
+	const scaled = shift >= 0n ? a * 10n ** shift : a / 10n ** -shift
+	return (ONE * scaled) / b
+}
+
 export const crowdingBpsOf = (totalA: bigint, totalB: bigint, mid: bigint): bigint => {
 	if (mid <= 0n) throw new Error('mid must be positive')
 	const aInB = (totalA * mid) / ONE
