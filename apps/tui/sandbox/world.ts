@@ -21,7 +21,7 @@ import refBase from "../../../packages/console-data/fixtures/ref-base-sepolia.js
  *
  * It is also what the site can show a visitor when the live reference is stale.
  */
-export type Scenario = "fresh" | "stale" | "docked" | "landing" | "outage" | "partial";
+export type Scenario = "fresh" | "stale" | "docked" | "landing" | "outage" | "partial" | "refused";
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;
@@ -120,6 +120,27 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
         : [],
     };
   });
+
+  if (scenario === "refused") {
+    // Seen live: the router answers USDC → WETH on Sepolia and reverts WETH → USDC. The quote service
+    // reports the revert as a caveat with no amount.
+    const base = fakeSnapshot("fresh", now);
+    return {
+      ...base,
+      legs: base.legs.map((leg) =>
+        leg.config.name !== "sepolia" || leg.quoteBToA === null
+          ? leg
+          : {
+              ...leg,
+              quoteBToA: {
+                ...leg.quoteBToA,
+                amountOut: null,
+                caveats: ["the router refused this quote: execution reverted"],
+              },
+            },
+      ),
+    } as unknown as Snapshot;
+  }
 
   if (scenario === "partial") {
     // What the user's first outage screenshot actually showed: Sepolia's fills endpoint answering,

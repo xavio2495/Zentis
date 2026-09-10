@@ -49,3 +49,18 @@ test("the card is titled with the same name the detail uses", async () => {
   expect(frame).toContain("┌ 2 Base Sepolia");
   expect(frame).toContain("┌ 3 Arbitrum Sepolia");
 });
+
+test("with the decomposition withheld, the card still shows the shift the registry published", async () => {
+  // Two legs unread withholds the decomposition — it reads every leg — but the published shift comes
+  // from the registry over RPC and is known. Hiding it hid the product's own number exactly when a
+  // viewer most needed it.
+  const card = cardOf((await drive(120, 40, { scenario: "partial" })).lines, "2 Base Sepolia").join("\n");
+  expect(card).toMatch(/shift [-+]?\d+/);
+  expect(card).toContain("published");
+});
+
+test("a side the router refuses is shown as refused, not silently left out", async () => {
+  const card = cardOf((await drive(120, 40, { scenario: "refused" })).lines, "1 Sepolia").join("\n");
+  expect(card).toMatch(/USDC → .*WETH/);
+  expect(card).toMatch(/WETH → USDC.*refused|refused.*WETH/);
+});

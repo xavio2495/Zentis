@@ -206,3 +206,14 @@ test("the plot reports the prices at its top and bottom, so the axis can be labe
   expect(p.lowMid).toBe(10n ** 18n);
   expect(p.highMid).toBe(2n * 10n ** 18n);
 });
+
+test("the band always contains the newest price, so the title never sits off its own axis", () => {
+  // Banding a 20x range to its bulk clipped the current price off the top: the live title read 3,845
+  // above an axis that stopped at 3,706.
+  const samples = [
+    { timestamp: 10_000n, mid: 30n * 10n ** 18n }, // now, far above the rest
+    ...Array.from({ length: 60 }, (_, i) => ({ timestamp: BigInt(9_000 - i * 10), mid: 10n ** 18n + BigInt(i) * 10n ** 15n })),
+  ];
+  const p = plot([{ key: "a", samples }], 30, 6, 604_800n).byKey.get("a")!;
+  expect(p.highMid).toBeGreaterThanOrEqual(30n * 10n ** 18n - 10n ** 15n);
+});
