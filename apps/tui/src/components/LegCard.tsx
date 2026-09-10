@@ -1,12 +1,12 @@
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { BACKFILLING, type LegSnapshot, humanDuration } from "@zentis/console-data";
-import { chooseFit, duration, pairPrice, signed, tokenAmount } from "../format.js";
+import { BACKFILLING, type LegSnapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
+import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weightBar } from "../format.js";
 import { plot } from "../chart.js";
 import { Panel, panelInner } from "./Panel.js";
 import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
-import { STATE, UI, legColour } from "../theme.js";
+import { STATE, TERM, UI, legColour } from "../theme.js";
 
 /**
  * One leg, reduced to what a glance needs.
@@ -33,24 +33,36 @@ export function legState(leg: LegSnapshot): { word: string; short: string; tone:
   return { word: "live", short: "live", tone: STATE.live };
 }
 
-/** The quote, or the single reason there is not one. */
-function quoteLine(leg: LegSnapshot, width: number): { text: string; tone: string } {
-  const quote = leg.quoteAToB;
-  if (quote?.amountOut == null) {
-    const reason =
-      leg.sources.fills !== null
-        ? "this leg could not be read"
-        : leg.spread?.tooStaleToQuote === true
-          ? "reference too stale"
-          : "not priced";
-    return { text: trunc(`quote — ${reason}`, width), tone: UI.muted };
-  }
-  const inAmount = `${tokenAmount(quote.amountIn, leg.config.tokenA.decimals)} ${leg.config.tokenA.symbol}`;
-  const outAmount = `${tokenAmount(quote.amountOut, leg.config.tokenB.decimals)} ${leg.config.tokenB.symbol}`;
-  return {
-    text: chooseFit([`${inAmount} → ${outAmount}`, `→ ${outAmount}`, outAmount], width),
-    tone: UI.heading,
-  };
+/**
+ * One side of the quote, with how far it sits from the mid.
+ *
+ * Both sides are shown because one alone hides two things: the spread (the gap between them) and the
+ * shift's direction (which side is dearer). The distance is against the reference's own mid, so a
+ * leg quoting at its cap reads as a large number here rather than as an ordinary price.
+ */
+function side(leg: LegSnapshot, isAToB: boolean, width: number): Seg[] | null {
+  const quote = isAToB ? leg.quoteAToB : leg.quoteBToA;
+  if (quote?.amountOut == null) return null;
+  const [from, to] = isAToB ? [leg.config.tokenA, leg.config.tokenB] : [leg.config.tokenB, leg.config.tokenA];
+  const inText = `${tokenAmount(quote.amountIn, from.decimals)} ${from.symbol}`;
+  const outText = `${tokenAmount(quote.amountOut, to.decimals)} ${to.symbol}`;
+  const off = offMidBps(quote, isAToB);
+  const away = off === null ? "" : `  ${signed(off)} bps`;
+  return fitSegments(
+    [
+      [
+        { text: `${inText} → ${outText}`, color: UI.heading },
+        { text: away, color: UI.muted },
+      ],
+      [{ text: `${inText} → ${outText}`, color: UI.heading }],
+      [
+        { text: `→ ${outText}`, color: UI.heading },
+        { text: away, color: UI.muted },
+      ],
+      [{ text: `→ ${outText}`, color: UI.heading }],
+    ],
+    width,
+  );
 }
 
 export function LegCard({
@@ -71,36 +83,45 @@ export function LegCard({
   const colour = legColour(leg.config.chainId);
   const state = legState(leg);
   const { width: inner, height: innerRows } = panelInner(width, height);
-  const quote = quoteLine(leg, inner);
-  const shift = leg.shift;
-  const position = leg.position;
+  const { shift, position, spread } = leg;
 
+  // The rows in the order a short card gives them up: the numbers first, the picture last. The
+  // sparkline is the card's least essential row because the chart beside it draws the same line
+  // larger.
   const rows: ReactNode[] = [];
 
-  // What this chain holds, in the tokens it holds them in. The first question anyone asks of a leg.
-  rows.push(
-    position === null ? (
-      // The panel's title already says `unread`, and the status bar carries the reason in full;
-      // repeating a truncated copy of it here spends the card's widest line on nothing.
-      <Text color={UI.muted}>{trunc(leg.sources.fills === null ? "no position" : "could not be read", inner)}</Text>
-    ) : (
+  if (leg.sources.fills !== null) {
+    // Once, and saying what *was* read: the pool price comes over RPC and is fine, and a card that
+    // only said "could not be read" above a working price line contradicted itself.
+    rows.push(
+      <Text color={UI.caveat}>
+        {chooseFit(
+          [
+            `position unread (${leg.sources.fills.replace(/^subgraph /, "")})`,
+            "position unread",
+          ],
+          inner,
+        )}
+      </Text>,
+    );
+    if (leg.series !== null) rows.push(<Text color={UI.muted}>{trunc("pool price from RPC", inner)}</Text>);
+  } else if (position === null) {
+    rows.push(<Text color={UI.muted}>{trunc("no position on this chain", inner)}</Text>);
+  } else {
+    rows.push(
       <Segments
         segs={fitSegments(
           [
             [
               { text: "holds ", color: UI.muted },
               {
-                text: `${tokenAmount(position.balanceA, leg.config.tokenA.decimals)} ${leg.config.tokenA.symbol}`,
-                color: UI.heading,
-              },
-              { text: " · ", color: UI.muted },
-              {
-                text: `${tokenAmount(position.balanceB, leg.config.tokenB.decimals)} ${leg.config.tokenB.symbol}`,
+                text:
+                  `${tokenAmount(position.balanceA, leg.config.tokenA.decimals)} ${leg.config.tokenA.symbol}` +
+                  ` · ${tokenAmount(position.balanceB, leg.config.tokenB.decimals)} ${leg.config.tokenB.symbol}`,
                 color: UI.heading,
               },
             ],
             [
-              { text: "holds ", color: UI.muted },
               {
                 text: `${tokenAmount(position.balanceA, leg.config.tokenA.decimals)} / ${tokenAmount(position.balanceB, leg.config.tokenB.decimals)}`,
                 color: UI.heading,
@@ -109,27 +130,63 @@ export function LegCard({
           ],
           inner,
         )}
-      />
-    ),
-  );
+      />,
+    );
+    if (shift !== null) {
+      // The split in percent beside the bar, the even point marked, so "how lopsided is this leg" is
+      // a glance rather than arithmetic on two balances in different tokens.
+      const pct = `${weightPercent(shift.weightA)}% ${leg.config.tokenA.symbol}`;
+      rows.push(
+        <Segments
+          segs={[
+            { text: "▕", color: UI.frame },
+            { text: weightBar(shift.weightA, Math.max(6, inner - pct.length - 3)), color: colour },
+            { text: "▏", color: UI.frame },
+            { text: ` ${pct}`, color: UI.muted },
+          ]}
+        />,
+      );
+    }
+  }
 
-  rows.push(<Text color={quote.tone}>{quote.text}</Text>);
+  for (const isAToB of [true, false]) {
+    const segs = side(leg, isAToB, inner);
+    if (segs !== null) rows.push(<Segments segs={segs} />);
+  }
+  if (leg.sources.fills === null && leg.quoteAToB?.amountOut == null && position !== null) {
+    const reason = spread?.tooStaleToQuote === true ? "reference too stale to quote" : "not priced";
+    rows.push(<Text color={UI.muted}>{trunc(`quote — ${reason}`, inner)}</Text>);
+  }
 
   if (shift !== null) {
+    // One signed number with a small centred gauge. "at cap" is said, because −500 on a leg whose
+    // cap is 500 is not a size, it is a limit.
+    const atCap = shift.clampedByMaxTilt ? " at cap" : "";
+    const label = `shift ${signed(shift.tiltBps)}${atCap}`;
+    const tail = spread === null ? "" : `  spread ${spread.totalBps}`;
+    const gaugeWidth = Math.max(0, Math.min(12, inner - label.length - tail.length - 2));
+    const gauge =
+      gaugeWidth >= 6
+        ? stackedGauge(shift.correction, shift.concession, BigInt(position?.maxTiltBps ?? 500), gaugeWidth)
+        : [];
     rows.push(
       <Segments
         segs={fitSegments(
           [
             [
-              { text: "shift ", color: UI.muted },
-              { text: signed(shift.tiltBps).padEnd(6), color: UI.heading },
-              { text: "spread ", color: UI.muted },
-              { text: `${leg.spread?.totalBps ?? 0}`, color: UI.heading },
+              { text: `${label} `, color: UI.heading },
+              ...gauge.map((span) => ({
+                text: span.text,
+                color:
+                  span.term === "correction" ? TERM.correction : span.term === "concession" ? TERM.concession : UI.frame,
+              })),
+              { text: tail, color: UI.muted },
             ],
             [
-              { text: "shift ", color: UI.muted },
-              { text: signed(shift.tiltBps), color: UI.heading },
+              { text: label, color: UI.heading },
+              { text: tail, color: UI.muted },
             ],
+            [{ text: label, color: UI.heading }],
           ],
           inner,
         )}
@@ -137,30 +194,27 @@ export function LegCard({
     );
   }
 
-  // The leg's own price line, small. The card answers "is this chain moving?" at a glance; the
-  // detail view behind its number answers why.
-  const sparkRows = Math.max(0, innerRows - rows.length - 1);
-  if (sparkRows > 0 && leg.series !== null) {
-    const p = plot([{ key: "s", samples: leg.series.samples }], inner, sparkRows, windowSeconds)
-      .byKey.get("s")!;
-    for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
+  // The price, labelled with the window it is drawn over, and then the line itself in whatever rows
+  // are left — three or four at most. Everything the card has to say comes first.
+  if (leg.series !== null) {
     const price = pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB);
-    const over = duration(Number((p.to ?? 0n) - (p.from ?? 0n)));
-    rows.push(
-      <Text color={UI.muted}>
-        {chooseFit([`${price} · ${over}`, price, `×${p.minRatio.toFixed(2)}–×${p.maxRatio.toFixed(2)}`], inner)}
-      </Text>,
-    );
-  } else if (sparkRows > 0 && leg.sources.pool !== null) {
+    const over = duration(Number(windowSeconds));
+    const lineRows = Math.min(4, innerRows - rows.length - 1);
+    if (lineRows >= 2) {
+      const p = plot([{ key: "s", samples: leg.series.samples }], inner, lineRows, windowSeconds).byKey.get("s")!;
+      for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
+    }
+    rows.push(<Text color={UI.muted}>{chooseFit([`${price} · ${over} window`, price], inner)}</Text>);
+  } else if (leg.sources.pool !== null) {
     const reading = leg.sources.pool === BACKFILLING;
     rows.push(
-      <Text color={reading ? UI.muted : UI.caveat}>{trunc(`price history: ${leg.sources.pool}`, inner)}</Text>,
+      <Text color={reading ? UI.muted : UI.caveat}>{trunc(`pool price: ${leg.sources.pool}`, inner)}</Text>,
     );
   }
 
   return (
     <Panel
-      title={`${index + 1} ${leg.config.label.split(" ")[0]}`}
+      title={`${index + 1} ${leg.config.label}`}
       right={state.short}
       width={width}
       height={height}

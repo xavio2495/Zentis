@@ -79,23 +79,39 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
       series,
       spread,
       shift,
-      quoteAToB: priced
-        ? {
-            chainId: entry.leg.chainId,
-            chain: entry.leg.name,
+      // Both directions, each a spread's width worse than the mid, so the card has a real two-sided
+      // quote to draw. Amounts are derived from the leg's own mid, never typed.
+      ...(() => {
+        if (!priced) return { quoteAToB: null, quoteBToA: null };
+        const cut = (raw: bigint) => (raw * BigInt(10_000 - spread.totalBps)) / 10_000n;
+        const base = {
+          chainId: entry.leg.chainId,
+          chain: entry.leg.name,
+          reason: null,
+          refMid: entry.ref.mid,
+          tiltBps: entry.ref.tiltBps,
+          seq,
+          refAgeSeconds: ageSeconds,
+          caveats: [],
+        };
+        const inB = (150_000n * entry.ref.mid) / 10n ** 18n;
+        return {
+          quoteAToB: {
+            ...base,
             amountIn: 150_000n,
-            amountOut: (150_000n * entry.ref.mid) / 10n ** 18n,
+            amountOut: cut(inB),
             tokenIn: entry.leg.tokenA.address,
             tokenOut: entry.leg.tokenB.address,
-            reason: null,
-            refMid: entry.ref.mid,
-            tiltBps: entry.ref.tiltBps,
-            seq,
-            refAgeSeconds: ageSeconds,
-            caveats: [],
-          }
-        : null,
-      quoteBToA: null,
+          },
+          quoteBToA: {
+            ...base,
+            amountIn: inB,
+            amountOut: cut((inB * 10n ** 18n) / entry.ref.mid),
+            tokenIn: entry.leg.tokenB.address,
+            tokenOut: entry.leg.tokenA.address,
+          },
+        };
+      })(),
       finality: { head: 11_674_000n, finalized: 11_673_920n },
       // Every source answered in the fake world; the outage scenario is the one that sets these.
       sources: { fills: null, registry: null, pool: null },
@@ -123,12 +139,13 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
         position: null,
         shift: null,
         spread: null,
+        // The quote service reads the same fills subgraph, so its quotes go with the position.
         quoteAToB: null,
-        // The allowance is per endpoint but the console reads six of them; when the fills are out
-        // the pools usually are too. A scenario that leaves the charts working is kinder than the
-        // outage the user actually saw.
-        series: null,
-        sources: { fills: refusal, registry: null, pool: refusal },
+        quoteBToA: null,
+        // The pool price is read over RPC, not from Studio, so a subgraph outage leaves it standing.
+        // This scenario used to blank it too, which was true before the price moved off the subgraph
+        // and is now an outage worse than the real one.
+        sources: { fills: refusal, registry: null, pool: null },
         caveats: [`fills subgraph unavailable (${refusal})`],
       })),
       feed: [],

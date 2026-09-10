@@ -29,9 +29,12 @@ test("a leg's number opens its detail where the chart was, and the same number c
   const closed = await text(["2", "2"]);
   expect(closed).toContain("market price ·");
 
+  // The detail panel is the one whose title carries "esc to close"; the cards carry the same leg
+  // names, so the leg shown in detail has to be read off that line specifically.
+  const detailTitle = (frame: string) => frame.split("\n").find((line) => line.includes("esc to close")) ?? "";
   const jumped = await text(["2", "3"]);
-  expect(jumped).toContain("3 Arbitrum Sepolia");
-  expect(jumped).not.toContain("2 Base Sepolia ─");
+  expect(detailTitle(jumped)).toContain("3 Arbitrum Sepolia");
+  expect(detailTitle(jumped)).not.toContain("2 Base Sepolia");
 });
 
 test("the detail carries the position, the pool, the pricing and the leg's own price line", async () => {
