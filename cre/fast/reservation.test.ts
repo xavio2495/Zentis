@@ -14,7 +14,8 @@ describe('reservation policy against the reference model', () => {
 	for (const c of vectors.cases) {
 		test(c.name, () => {
 			const legs = c.legs.map(([a, b]) => legWeight({ balanceA: BigInt(a), balanceB: BigInt(b), mid }))
-			const out = reservation(legs, BigInt(c.kappaOwnBps), BigInt(c.kappaBookBps), maxTilt)
+			const caps = c.concessionCaps === null ? undefined : c.concessionCaps.map((x) => (x === null ? null : BigInt(x)))
+			const out = reservation(legs, BigInt(c.kappaOwnBps), BigInt(c.kappaBookBps), maxTilt, caps)
 			expect(out.map((p) => p.tiltBps.toString())).toEqual(c.expected.map((e) => e.tiltBps))
 			expect(out.map((p) => p.dTiltPerA.toString())).toEqual(c.expected.map((e) => e.dTiltPerA))
 		})

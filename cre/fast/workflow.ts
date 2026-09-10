@@ -86,7 +86,15 @@ const STORED_TUPLE = parseAbiParameters(
  * forward rather than rebuild the slot from config — or an hour's measurement would live for at
  * most sixty seconds. A zero mid means nothing has been published yet, and the config bootstraps.
  */
-type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number }
+type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number; tiltBps: number }
+
+/** Shift plus room, never zero once a boundary exists, never past the cap the maker signed. */
+const boundaryFor = (tiltBps: bigint, room: bigint | null, maxTiltBps: bigint): number => {
+	if (room === null) return 0
+	const magnitude = tiltBps < 0n ? -tiltBps : tiltBps
+	const boundary = magnitude + room
+	return Number(boundary < 1n ? 1n : boundary > maxTiltBps ? maxTiltBps : boundary)
+}
 type Leg = z.infer<typeof legSchema>
 
 const SLOT0_ABI = [
@@ -235,6 +243,7 @@ const observeLeg = (
 		spreadBps: current.spreadBps,
 		markoutBps: current.markoutBps,
 		bandEdgeBps: current.bandEdgeBps,
+		tiltBps: current.tiltBps,
 	}
 
 	return {
@@ -272,11 +281,20 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const observed = config.legs.map((leg, i) =>
 		observeLeg(don, leg, maker, config.positionId as Hex, `leg${i}`),
 	)
+	// The room the slow workflow granted each leg, recovered from the boundary it published: that
+	// boundary is the shift it saw plus the allocated room, and every writer keeps that difference.
+	// Zero means no boundary has been published, and the concession runs free until one is.
+	const room = observed.map((o) => {
+		if (o.stored.bandEdgeBps === 0) return null
+		const r = BigInt(o.stored.bandEdgeBps) - BigInt(Math.abs(o.stored.tiltBps))
+		return r < 0n ? 0n : r
+	})
 	const policies = reservation(
 		observed.map((o) => o.weight),
 		kappaOwnBps,
 		kappaBookBps,
 		BigInt(config.maxTiltBps),
+		room,
 	)
 
 	// One updatedAt and one seq across every leg: they describe a single cross-chain instant, and a
@@ -301,7 +319,10 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 				dTiltPerA: policies[i].dTiltPerA,
 				maxExtrapBps: config.maxExtrapBps,
 				markoutBps: o.stored.mid === 0n ? config.markoutBps : o.stored.markoutBps,
-				bandEdgeBps: o.stored.bandEdgeBps, // published by the slow workflow; zero until it has
+				// The instruction caps the whole shift at this boundary, and the slow workflow only
+				// republishes it hourly, so it has to follow the shift here or a large correction would
+				// be clamped to a stale one. The room stays what the slow workflow allocated.
+				bandEdgeBps: boundaryFor(policies[i]!.tiltBps, room[i] ?? null, BigInt(config.maxTiltBps)),
 			},
 		])
 

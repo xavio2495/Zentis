@@ -42,6 +42,12 @@ def _named() -> list[dict]:
          "legs": [[a, b * 105 // 100], [a, b], [2 * a, 2 * b]]},
         {"name": "a leg holding no tokenB", "kappaOwnBps": 10_000, "kappaBookBps": 5_000,
          "legs": [[a, 0], [a, b]]},
+        {"name": "budget of zero leaves the correction alone", "kappaOwnBps": 10_000, "kappaBookBps": 5_000,
+         "legs": [[a, b * 96 // 100], [a, b]], "concessionCaps": [0, 0]},
+        {"name": "budget binds on one leg only", "kappaOwnBps": 10_000, "kappaBookBps": 5_000,
+         "legs": [[a, b * 96 // 100], [a, b]], "concessionCaps": [20, None]},
+        {"name": "budget wider than the concession changes nothing", "kappaOwnBps": 10_000, "kappaBookBps": 5_000,
+         "legs": [[a, b * 96 // 100], [a, b]], "concessionCaps": [500, 500]},
     ]
 
 
@@ -54,8 +60,9 @@ def _random(rng: random.Random) -> list[dict]:
             a = rng.randrange(1_000_000, 50_000_000)
             off = rng.uniform(-0.12, 0.12)
             legs.append([a, int(a * MID // 10**18 * (1 + off))])
+        caps = [rng.choice((None, 0, 20, 55, 133, 500)) for _ in legs] if rng.random() < 0.5 else None
         cases.append({"name": f"random {i}", "kappaOwnBps": rng.choice((0, 5_000, 10_000, 15_000)),
-                      "kappaBookBps": rng.choice((0, 2_000, 5_000)), "legs": legs})
+                      "kappaBookBps": rng.choice((0, 2_000, 5_000)), "legs": legs, "concessionCaps": caps})
     return cases
 
 
@@ -64,9 +71,12 @@ def main() -> None:
     cases = []
     for case in _named() + _random(rng):
         weights = [leg_weight(a, b, MID) for a, b in case["legs"]]
-        policies = reservation(weights, case["kappaOwnBps"], case["kappaBookBps"], MAX_TILT_BPS)
+        policies = reservation(
+            weights, case["kappaOwnBps"], case["kappaBookBps"], MAX_TILT_BPS, case.get("concessionCaps")
+        )
         cases.append({
             **case,
+            "concessionCaps": case.get("concessionCaps"),
             "legs": [[str(a), str(b)] for a, b in case["legs"]],
             "expected": [{"tiltBps": str(p["tiltBps"]), "dTiltPerA": str(p["dTiltPerA"])} for p in policies],
         })

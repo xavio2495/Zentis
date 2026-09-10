@@ -120,7 +120,13 @@ def anchor_tilt_bps(weight_a: int) -> int:
     return trunc_div((ONE_E18 - 2 * weight_a) * BPS, weight_a)
 
 
-def reservation(legs: list[dict], kappa_own_bps: int, kappa_book_bps: int, max_tilt_bps: int) -> list[dict]:
+def reservation(
+    legs: list[dict],
+    kappa_own_bps: int,
+    kappa_book_bps: int,
+    max_tilt_bps: int,
+    concession_caps_bps: list[int | None] | None = None,
+) -> list[dict]:
     """The reservation policy. `legs` are `leg_weight` results; one ref input per leg comes back.
 
         tilt_c = anchor(w_c) + kappa_own * (w_c - 1/2) + kappa_book * (mean(w) - 1/2)
@@ -129,6 +135,11 @@ def reservation(legs: list[dict], kappa_own_bps: int, kappa_book_bps: int, max_t
     two skews are concessions: the leg pays to shed what it holds, and the whole book pays the same
     way on every leg. Near an even split the anchor is `-4 (w - 1/2)`, so the own-leg gain is a dial
     from the plain curve (four times the basis) to a curve pinned at the mid (zero).
+
+    `concession_caps_bps` is the bridge-parity budget per leg: the room the slow workflow allocated
+    for the concession, recovered from the published boundary. It bounds the two skews together and
+    never the anchor, because a correction is not a cost the maker chooses to pay. `None` for a leg
+    means no budget has been published and the concession runs free.
 
     `dTiltPerA` is this policy's own derivative in raw tokenA, so the instruction's extrapolation
     between references follows the rule the reference was computed under. With `w = A / T` and
@@ -142,14 +153,21 @@ def reservation(legs: list[dict], kappa_own_bps: int, kappa_book_bps: int, max_t
     n = len(legs)
     if n == 0:
         raise ValueError("a book needs at least one leg")
+    caps = concession_caps_bps or [None] * n
+    if len(caps) != n:
+        raise ValueError("one concession cap per leg, or none at all")
     ws = [leg["weightA"] for leg in legs]
     mean_w = sum(ws) // n
     half = ONE_E18 // 2
     out = []
-    for leg, w in zip(legs, ws):
-        tilt = anchor_tilt_bps(w)
-        tilt += trunc_div(kappa_own_bps * (w - half), ONE_E18)
-        tilt += trunc_div(kappa_book_bps * (mean_w - half), ONE_E18)
+    for leg, w, cap in zip(legs, ws, caps):
+        concession = trunc_div(kappa_own_bps * (w - half), ONE_E18)
+        concession += trunc_div(kappa_book_bps * (mean_w - half), ONE_E18)
+        if cap is not None:
+            if cap < 0:
+                raise ValueError("a concession budget cannot be negative")
+            concession = max(-cap, min(cap, concession))
+        tilt = anchor_tilt_bps(w) + concession
         tilt = max(-max_tilt_bps, min(max_tilt_bps, tilt))
 
         a, b_in_a, total = leg["balanceA"], leg["bInA"], leg["totalInA"]

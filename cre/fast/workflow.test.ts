@@ -263,7 +263,9 @@ describe('fast workflow', () => {
 		const [, refB] = decodeRef(reports[1]!)
 		expect(refA.spreadBps).toBe(22)
 		expect(refA.markoutBps).toBe(37)
-		expect(refA.bandEdgeBps).toBe(54)
+		// The boundary is republished as the new shift plus the room the slow workflow granted,
+		// which was 54 above the shift of -2 it saw.
+		expect(refA.bandEdgeBps).toBe(Math.abs(refA.tiltBps) + 52)
 		// Nothing published on leg B yet, so it bootstraps from the config.
 		expect(refB.spreadBps).toBe(config.spreadBps)
 		expect(refB.markoutBps).toBe(0)
@@ -293,11 +295,13 @@ describe('fast workflow', () => {
 		// it. So this workflow republishes the boundary as the new shift plus the same room, and
 		// spends that room on the concession inside the enclave, where the budget belongs.
 		const stored = { mid: 1n, spreadBps: 22, markoutBps: 0, bandEdgeBps: 57 } // room = 57 - |-2|
+		// A mild excess, so the shift sits well inside the signed cap and the sum is not clamped.
 		const { runtime, reports } = makeRuntime(
-			withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal: [25_000_000n, 4137282795001288n] }),
+			withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal: [15_300_000n, 4137282795001288n] }),
 		)
 		onCronTrigger(runtime)
 		const [, refA] = decodeRef(reports[0]!)
+		expect(Math.abs(refA.tiltBps)).toBeLessThan(400)
 		expect(refA.bandEdgeBps).toBe(Math.abs(refA.tiltBps) + 55)
 		expect(refA.bandEdgeBps).toBeGreaterThan(57)
 	})

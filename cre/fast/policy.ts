@@ -126,16 +126,26 @@ export const reservation = (
 	kappaOwnBps: bigint,
 	kappaBookBps: bigint,
 	maxTiltBps: bigint,
+	concessionCapsBps?: (bigint | null)[],
 ): LegPolicy[] => {
 	const n = BigInt(legs.length)
 	if (n === 0n) throw new Error('a book needs at least one leg')
+	const caps = concessionCapsBps ?? legs.map(() => null)
+	if (caps.length !== legs.length) throw new Error('one concession cap per leg, or none at all')
 	const meanW = legs.reduce((sum, leg) => sum + leg.weightA, 0n) / n
 	const half = ONE / 2n
-	return legs.map((leg) => {
+	return legs.map((leg, i) => {
 		const w = leg.weightA
-		let tilt = anchorTiltBps(w)
-		tilt += truncDiv(kappaOwnBps * (w - half), ONE)
-		tilt += truncDiv(kappaBookBps * (meanW - half), ONE)
+		// The bridge-parity budget bounds the two skews together and never the anchor: a correction
+		// is not a cost the maker chooses to pay. Null means no budget has been published yet.
+		let concession = truncDiv(kappaOwnBps * (w - half), ONE)
+		concession += truncDiv(kappaBookBps * (meanW - half), ONE)
+		const cap = caps[i] ?? null
+		if (cap !== null) {
+			if (cap < 0n) throw new Error('a concession budget cannot be negative')
+			concession = clamp(concession, -cap, cap)
+		}
+		let tilt = anchorTiltBps(w) + concession
 		tilt = clamp(tilt, -maxTiltBps, maxTiltBps)
 
 		const { balanceA: a, bInA, totalInA: total } = leg
