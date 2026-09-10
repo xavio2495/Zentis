@@ -73,7 +73,7 @@ class TestReservation:
             a = 10_000_000
             leg = leg_weight(a, a * (100 - eps) // 100, ONE)
             [p] = reservation([leg], 40_000, 0, 10_000)
-            assert abs(p["tiltBps"]) <= 2 * eps, (eps, p["tiltBps"])
+            assert abs(p["tiltBps"]) <= eps * eps, (eps, p["tiltBps"])  # second-order residual
 
     def test_the_cap_binds(self):
         from reference_model.crosschain import reservation

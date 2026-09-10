@@ -105,3 +105,58 @@ def distribute(legs: list[dict], kappa_bps: int, max_tilt_bps: int) -> list[dict
 def _slope(leg: dict, kappa_bps: int) -> int:
     """d(tiltBps)/d(raw tokenA), 1e18-scaled — the `dTiltPerA` field's units."""
     return (kappa_bps * leg["bInA"] * ONE_E18) // (2 * leg["totalInA"] ** 2)
+
+
+def anchor_tilt_bps(weight_a: int) -> int:
+    """The tilt that reprices a constant-product leg's effective price back onto the mid.
+
+    The leg's own price is `balanceB / balanceA`, which in weight terms is `(1 - w) / w` of the mid,
+    so in the instruction's sign convention the correction is `(1 - 2w) / w`: negative when the leg
+    holds excess tokenA, because excess tokenA is already cheap on the curve and must be made dear
+    again. Exact for a tokenA-in fill, second-order off for tokenB-in. The caller caps it.
+    """
+    if weight_a <= 0:
+        return 0
+    return trunc_div((ONE_E18 - 2 * weight_a) * BPS, weight_a)
+
+
+def reservation(legs: list[dict], kappa_own_bps: int, kappa_book_bps: int, max_tilt_bps: int) -> list[dict]:
+    """The reservation policy. `legs` are `leg_weight` results; one ref input per leg comes back.
+
+        tilt_c = anchor(w_c) + kappa_own * (w_c - 1/2) + kappa_book * (mean(w) - 1/2)
+
+    The anchor is a correction: it puts the leg's curve on the mid whatever its reserves say. The
+    two skews are concessions: the leg pays to shed what it holds, and the whole book pays the same
+    way on every leg. Near an even split the anchor is `-4 (w - 1/2)`, so the own-leg gain is a dial
+    from the plain curve (four times the basis) to a curve pinned at the mid (zero).
+
+    `dTiltPerA` is this policy's own derivative in raw tokenA, so the instruction's extrapolation
+    between references follows the rule the reference was computed under. With `w = A / T` and
+    `T = A + B_in_A`:
+
+        d anchor / dA  = -BPS * B_in_A / A^2
+        d w / dA       =  B_in_A / T^2
+
+    and the book term sees a 1/n share of the leg's own weight change.
+    """
+    n = len(legs)
+    if n == 0:
+        raise ValueError("a book needs at least one leg")
+    ws = [leg["weightA"] for leg in legs]
+    mean_w = sum(ws) // n
+    half = ONE_E18 // 2
+    out = []
+    for leg, w in zip(legs, ws):
+        tilt = anchor_tilt_bps(w)
+        tilt += trunc_div(kappa_own_bps * (w - half), ONE_E18)
+        tilt += trunc_div(kappa_book_bps * (mean_w - half), ONE_E18)
+        tilt = max(-max_tilt_bps, min(max_tilt_bps, tilt))
+
+        a, b_in_a, total = leg["balanceA"], leg["bInA"], leg["totalInA"]
+        slope = 0
+        if a > 0:
+            slope += trunc_div(-BPS * b_in_a * ONE_E18, a * a)
+        slope += trunc_div(kappa_own_bps * b_in_a * ONE_E18, total * total)
+        slope += trunc_div(kappa_book_bps * b_in_a * ONE_E18, n * total * total)
+        out.append({"x": w - half, "tiltBps": tilt, "dTiltPerA": slope})
+    return out

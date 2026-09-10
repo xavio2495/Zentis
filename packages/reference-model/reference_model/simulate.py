@@ -25,7 +25,7 @@ reproducible and the assumptions are readable next to the results rather than bu
 import random
 from dataclasses import dataclass, field
 
-from reference_model.crosschain import distribute, leg_weight
+from reference_model.crosschain import anchor_tilt_bps, distribute, leg_weight, reservation
 from reference_model.tilt import trunc_div
 
 #: The candidate signals. Each names what the tilt is a function of, and they compose: a name that
@@ -144,25 +144,14 @@ def price_path(series: Series) -> list[float]:
     return out
 
 
-def anchor_tilt_bps(weight_a: int) -> int:
-    """The tilt that moves a constant-product leg's effective price back onto the mid.
-
-    The leg's own price is `balanceB / balanceA`, which in weight terms is `(1 - w) / w` of the mid.
-    Scaling balanceIn by `(1 - w) / w` on the way in reprices the curve at the mid, and in the
-    instruction's sign convention that is a tilt of `(1 - 2w) / w`: negative when the leg holds
-    excess tokenA, because excess tokenA is already cheap on the curve and must be made dear again.
-    Exact for one direction, second-order off for the other, and capped by the caller.
-    """
-    if weight_a <= 0:
-        return 0
-    return trunc_div((ONE_E18 - 2 * weight_a) * BPS, weight_a)
-
-
 def _tilts(legs: list[Leg], book: Book, bounded: bool) -> list[int]:
     if book.signal not in SIGNALS:
         raise ValueError(f"unknown signal {book.signal!r}")
     weights = [leg_weight(leg.balance_a, leg.balance_b, leg.mid) for leg in legs]
     cap = book.max_tilt_bps if bounded else BPS  # unbounded means "no clamp that ever binds"
+    if book.signal == "anchor_own_book":
+        # The shipped policy itself, so the harness cannot drift from what the workflow publishes.
+        return [p["tiltBps"] for p in reservation(weights, book.kappa_bps, book.kappa_book_bps, cap)]
     ws = [w["weightA"] for w in weights]
     mean_w = sum(ws) // len(ws)
     cross = [p["tiltBps"] for p in distribute(weights, book.kappa_bps, BPS)]
