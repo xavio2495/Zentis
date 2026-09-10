@@ -1,0 +1,95 @@
+{
+  "generatedAt": "2026-09-10T08:28:01+00:00",
+  "modelCommit": "8c6013abcd17d3f596cab7c4f6f22e81af1e49af",
+  "unit": "raw tokenA (6dp), trading PnL with the hold removed, reservation policy minus static",
+  "book": {
+    "external_depth_a": 5000000,
+    "arrival_bps": 4000,
+    "fill_fraction_bps": 50,
+    "signal": "anchor_own_book",
+    "kappa_bps": 10000,
+    "kappa_book_bps": 5000
+  },
+  "series": {
+    "ticks": 2000,
+    "seeds": 1,
+    "seedsTo": 24
+  },
+  "regimes": [
+    {
+      "regime": "trend",
+      "trendBps": 300,
+      "volBpsPerTick": 25,
+      "seeds": 24,
+      "meanVsStatic": 161158,
+      "sdVsStatic": 13930,
+      "worstVsStatic": 142676,
+      "seedsAhead": 24,
+      "meanStaticTradingPnl": -45034,
+      "meanBookDrift": 0.0121,
+      "meanFills": 419.2,
+      "meanRefused": 0,
+      "meanTransfers": 0.04
+    },
+    {
+      "regime": "flat",
+      "trendBps": 0,
+      "volBpsPerTick": 25,
+      "seeds": 24,
+      "meanVsStatic": 162464,
+      "sdVsStatic": 14368,
+      "worstVsStatic": 143317,
+      "seedsAhead": 24,
+      "meanStaticTradingPnl": -38447,
+      "meanBookDrift": 0.012,
+      "meanFills": 422.8,
+      "meanRefused": 0,
+      "meanTransfers": 0
+    },
+    {
+      "regime": "reversed",
+      "trendBps": -300,
+      "volBpsPerTick": 25,
+      "seeds": 24,
+      "meanVsStatic": 162480,
+      "sdVsStatic": 15783,
+      "worstVsStatic": 139528,
+      "seedsAhead": 24,
+      "meanStaticTradingPnl": -45597,
+      "meanBookDrift": 0.0116,
+      "meanFills": 425.8,
+      "meanRefused": 0,
+      "meanTransfers": 0
+    },
+    {
+      "regime": "calm",
+      "trendBps": 0,
+      "volBpsPerTick": 5,
+      "seeds": 24,
+      "meanVsStatic": 97670,
+      "sdVsStatic": 7581,
+      "worstVsStatic": 85823,
+      "seedsAhead": 24,
+      "meanStaticTradingPnl": 25971,
+      "meanBookDrift": 0.0059,
+      "meanFills": 391.8,
+      "meanRefused": 0,
+      "meanTransfers": 0
+    },
+    {
+      "regime": "volatile",
+      "trendBps": 300,
+      "volBpsPerTick": 50,
+      "seeds": 24,
+      "meanVsStatic": 333312,
+      "sdVsStatic": 45998,
+      "worstVsStatic": 255659,
+      "seedsAhead": 24,
+      "meanStaticTradingPnl": -248582,
+      "meanBookDrift": 0.0255,
+      "meanFills": 440.5,
+      "meanRefused": 0.04,
+      "meanTransfers": 100.75
+    }
+  ]
+}

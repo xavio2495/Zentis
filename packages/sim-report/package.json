@@ -1,0 +1,15 @@
+{
+  "name": "@zentis/sim-report",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "run": "python3 run.py",
+    "render": "bun run render.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/bun": "latest"
+  }
+}
