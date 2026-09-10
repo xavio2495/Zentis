@@ -9,7 +9,7 @@
  * The policy, stated once:
  *
  *     w_c = A_c / (A_c + B_c * 1e18 / mid_c)      tokenA's share of leg c, valued in raw tokenA
- *     x   = (w_0 - w_1) / 2                        the imbalance BETWEEN the legs, in [-1, 1]
+ *     x   = (w_0 - w_1) / 2                        the imbalance BETWEEN the legs, in [-1/2, 1/2]
  *     tilt_0 = kappa * x,  tilt_1 = -kappa * x     anti-symmetric by construction
  *
  * It is the difference between the legs, not each leg's distance from an even split, because a maker
@@ -65,8 +65,10 @@ export type LegPolicy = {
 }
 
 /**
- * `kappaBps` is the gain: a leg holding 100% tokenA against a leg holding 0% tilts the full amount.
- * Set it equal to the position's `maxTiltBps` so the policy saturates exactly where ZentisSkew clamps.
+ * `kappaBps` is the gain. `x` is half the weight difference, so it lies in [-1/2, 1/2] and a leg
+ * holding 100% tokenA against a leg holding 0% tilts `kappaBps / 2`, not the full gain. For the
+ * policy to saturate exactly where ZentisSkew clamps, set `kappaBps` to twice `maxTiltBps`; set
+ * equal to it, the clamp is unreachable.
  */
 export const antiSymmetric = (
 	leg0: LegWeight,

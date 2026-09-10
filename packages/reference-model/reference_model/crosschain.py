@@ -9,9 +9,10 @@ The policy, stated once:
     Value each leg's inventory in raw tokenA units, using that leg's own mid.
         w_c = A_c / (A_c + B_c * 1e18 / mid_c)                     tokenA's share of leg c
     The signal is the DIFFERENCE between the legs, not either leg's distance from an even split:
-        x   = (w_0 - w_1) / 2                                       in [-1, 1]
+        x   = (w_0 - w_1) / 2                                       in [-1/2, 1/2]
         tilt_0 = kappa * x,   tilt_1 = -kappa * x
-    so the two refs are anti-symmetric by construction.
+    so the two refs are anti-symmetric by construction, and two legs saturate at kappa / 2: a gain
+equal to the clamp never reaches it. With n legs the extreme is kappa * (n - 1) / n.
 
 Why the difference and not `w_c - 1/2`: a maker whose total book is 70% tokenA cannot fix that by
 quoting differently on one chain — every fill that sheds tokenA here adds it there. Tilting can only
@@ -74,7 +75,7 @@ def anti_symmetric(leg0: dict, leg1: dict, kappa_bps: int, max_tilt_bps: int) ->
     # Truncating division, not Python's floor: the on-chain library and the TypeScript in the
     # workflow both truncate toward zero, and floor division disagreed with them whenever this
     # numerator was negative and odd.
-    x = trunc_div(leg0["weightA"] - leg1["weightA"], 2)  # 1e18-scaled, in [-1e18, 1e18]
+    x = trunc_div(leg0["weightA"] - leg1["weightA"], 2)  # 1e18-scaled, in [-0.5e18, 0.5e18]
 
     tilt0 = trunc_div(kappa_bps * x, ONE_E18)
     tilt0 = max(-max_tilt_bps, min(max_tilt_bps, tilt0))

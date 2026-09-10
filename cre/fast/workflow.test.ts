@@ -246,6 +246,14 @@ describe('policy', () => {
 		expect(p1.dTiltPerA).toBe(6249999999999n)
 	})
 
+	test('two legs saturate at half the gain, so a gain equal to the cap never clamps', () => {
+		const allA = legWeight({ balanceA: 1_000_000n, balanceB: 0n, mid: 10n ** 18n })
+		const allB = legWeight({ balanceA: 0n, balanceB: 1_000_000n, mid: 10n ** 18n })
+		const [p0, p1] = antiSymmetric(allA, allB, 500n, 500n)
+		expect(p0.tiltBps).toBe(250n)
+		expect(p1.tiltBps).toBe(-250n)
+	})
+
 	test('the tilt is clamped to maxTiltBps', () => {
 		const allA = legWeight({ balanceA: 1_000_000n, balanceB: 1n, mid: 10n ** 30n })
 		const allB = legWeight({ balanceA: 1n, balanceB: 1_000_000n, mid: 10n ** 18n })
