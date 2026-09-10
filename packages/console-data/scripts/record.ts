@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { BOOK, LEGS } from "../src/config.js";
 import { historyQuery } from "../src/fills.js";
 import { swapsQuery } from "../src/pool.js";
+import { momentProblems } from "../src/moment.js";
 import { fetchRef } from "../src/registry.js";
 
 /**
@@ -120,7 +121,6 @@ if (chosen.length === LEGS.length) {
 const problems: string[] = [];
 for (const leg of chosen) {
   for (const [name, expect] of [
-    [`history-${leg.name}`, (d: Record<string, unknown>) => d["position"] != null],
     [`pool-${leg.name}`, (d: Record<string, unknown>) => Array.isArray(d["swaps"]) && (d["swaps"] as unknown[]).length > 0],
     [`ref-${leg.name}`, (d: Record<string, unknown>) => Number(d["seq"]) > 0],
   ] as const) {
@@ -133,18 +133,14 @@ for (const leg of chosen) {
   }
 }
 
-const seqs = new Set(
-  chosen.map((leg) =>
-    Number(
-      (JSON.parse(readFileSync(join(dir, `ref-${leg.name}.json`), "utf8")) as { seq: number }).seq,
-    ),
-  ),
-);
-if (chosen.length === LEGS.length && seqs.size !== 1) {
-  // The fixture set is meant to be one moment across three legs; the first thing the tests assert
-  // is a shared seq. Catching it here names the run that produced it.
-  problems.push(`legs are on different seqs (${[...seqs].join(", ")}), so this is not one moment`);
-}
+const read = (name: string) => JSON.parse(readFileSync(join(dir, `${name}.json`), "utf8"));
+const recorded = chosen.map((leg) => ({
+  name: leg.name,
+  history: read(`history-${leg.name}`),
+  ref: read(`ref-${leg.name}`),
+}));
+problems.push(...momentProblems(recorded, LEGS.length));
+const seqs = new Set(recorded.map((leg) => Number(leg.ref.seq)));
 
 if (problems.length > 0) {
   console.error(`FAILED: ${problems.length} problem(s)`);
