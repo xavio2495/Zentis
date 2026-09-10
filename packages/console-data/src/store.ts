@@ -1,3 +1,4 @@
+import { FORCED_ON_REFRESH, type Cache, createCache } from "./cache.js";
 import { type Snapshot, QUOTE_SIZE_A, takeSnapshot } from "./snapshot.js";
 
 /**
@@ -20,7 +21,8 @@ export interface Store {
   getState(): StoreState;
   subscribe(listener: () => void): () => void;
   /** poll now, e.g. because the operator asked for a re-quote */
-  refresh(): Promise<void>;
+  /** `force` re-reads the cheap sources regardless of cadence; the background poll does not */
+  refresh(force?: boolean): Promise<void>;
   start(): void;
   stop(): void;
 }
@@ -33,6 +35,9 @@ export interface Store {
 export const POLL_INTERVAL_MS = 20_000;
 
 export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL_MS): Store {
+  // One cache for the store's lifetime: it is what makes a poll cheap, by asking each source only as
+  // often as that source is worth asking, and what keeps the screen populated when one refuses.
+  const cache: Cache = createCache();
   let state: StoreState = { snapshot: null, loading: false, error: null, lastPollSeconds: null };
   const listeners = new Set<() => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -43,12 +48,13 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
     for (const listener of listeners) listener();
   };
 
-  const refresh = async (): Promise<void> => {
+  const refresh = async (force = false): Promise<void> => {
+    if (force) for (const prefix of FORCED_ON_REFRESH) cache.invalidate(prefix);
     // A poll that is already running is the answer to a second request for one. Without this, a key
     // held down would fan out into overlapping snapshots that finish out of order.
     if (inFlight !== null) return inFlight;
     set({ loading: true });
-    inFlight = takeSnapshot(quoteSize)
+    inFlight = takeSnapshot(quoteSize, cache)
       .then((snapshot) => {
         set({ snapshot, error: null, loading: false, lastPollSeconds: Math.floor(Date.now() / 1000) });
       })

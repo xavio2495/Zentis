@@ -1,4 +1,5 @@
 import { ASSUMED_GAINS, BOOK, LEGS, PAIR, type LegConfig } from "./config.js";
+import { CADENCE_MS, type Cache, createCache } from "./cache.js";
 import { type LegDecomposition, decomposeBook } from "./decompose.js";
 import { FEED_ROWS, type FeedRow, type IndexedPosition, type LegHistory, collapseFeed, fetchHistory, mergeFeed } from "./fills.js";
 import { type PoolSeries, fetchSeries } from "./pool.js";
@@ -49,16 +50,30 @@ export const QUOTE_SIZE_A = 150_000n;
  * and calling it one. A whole snapshot is either the state at a moment or it says which part of it
  * could not be read.
  */
-export async function takeSnapshot(quoteSize = QUOTE_SIZE_A): Promise<Snapshot> {
+export async function takeSnapshot(
+  quoteSize = QUOTE_SIZE_A,
+  cache: Cache = createCache(),
+): Promise<Snapshot> {
   const now = Math.floor(Date.now() / 1000);
 
+  // Every read goes through the cache, which decides whether it is due and keeps the last good
+  // value when an endpoint refuses. The reference-pool series is the expensive one — a thousand
+  // swaps covering a week — and is read every ten minutes rather than every poll.
   const [histories, refs, series, finalities, aToB, bToA] = await Promise.all([
-    Promise.all(LEGS.map((leg) => fetchHistory(leg, BOOK.positionId))),
-    Promise.all(LEGS.map((leg) => fetchRef(leg, BOOK.positionId))),
-    Promise.all(LEGS.map((leg) => fetchSeries(leg, midOf))),
-    Promise.all(LEGS.map((leg) => fetchFinality(leg))),
-    fetchQuotes(BOOK.positionId, quoteSize, "AtoB"),
-    quoteForB(quoteSize),
+    Promise.all(
+      LEGS.map((leg) => cache.get(`fills:${leg.chainId}`, CADENCE_MS.fills, () => fetchHistory(leg, BOOK.positionId))),
+    ),
+    Promise.all(
+      LEGS.map((leg) => cache.get(`ref:${leg.chainId}`, CADENCE_MS.registry, () => fetchRef(leg, BOOK.positionId))),
+    ),
+    Promise.all(
+      LEGS.map((leg) => cache.get(`pool:${leg.chainId}`, CADENCE_MS.pool, () => fetchSeries(leg, midOf))),
+    ),
+    Promise.all(
+      LEGS.map((leg) => cache.get(`finality:${leg.chainId}`, CADENCE_MS.finality, () => fetchFinality(leg))),
+    ),
+    cache.get("quotes:AtoB", CADENCE_MS.quotes, () => fetchQuotes(BOOK.positionId, quoteSize, "AtoB")),
+    cache.get("quotes:BtoA", CADENCE_MS.quotes, () => quoteForB(quoteSize)),
   ]);
 
   const caveats: string[] = [];
@@ -87,11 +102,25 @@ export async function takeSnapshot(quoteSize = QUOTE_SIZE_A): Promise<Snapshot> 
     const position = history.value?.position ?? null;
 
     const legCaveats: string[] = [];
-    if (history.error !== null) legCaveats.push(`fills subgraph: ${history.error}`);
-    if (history.indexingErrors) legCaveats.push("the fills indexer reports errors, so this leg's state may be incomplete");
-    if (ref.error !== null) legCaveats.push(`registry: ${ref.error}`);
-    if (pool.error !== null) legCaveats.push(`reference pool: ${pool.error}`);
-    if (finalities[i]!.error !== null) legCaveats.push(`block heights: ${finalities[i]!.error}`);
+    // An error beside a surviving value means the console is showing what it last knew. Saying how
+    // old that is turns a silently frozen panel into an honest one.
+    const staleness = (label: string, read: { error: string | null; value: unknown; ageSeconds: number }) =>
+      read.error !== null && read.value !== null
+        ? `${label} unavailable (${read.error}); showing what was read ${read.ageSeconds}s ago`
+        : read.error !== null
+          ? `${label}: ${read.error}`
+          : null;
+    for (const caveat of [
+      staleness("fills subgraph", history),
+      staleness("registry", ref),
+      staleness("reference pool", pool),
+      staleness("block heights", finalities[i]!),
+    ]) {
+      if (caveat !== null) legCaveats.push(caveat);
+    }
+    if (history.indexingErrors) {
+      legCaveats.push("the fills indexer reports errors, so this leg's state may be incomplete");
+    }
     if (position !== null && !position.active) legCaveats.push("this leg is docked, so it holds no committed balance");
 
     const spread =

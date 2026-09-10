@@ -94,7 +94,7 @@ export function App({
         .catch((cause: unknown) => setTransient(`${action.label} could not start: ${String(cause)}`))
         .finally(() => {
           setRunning(null);
-          void store.refresh();
+          void store.refresh(true);
         });
       return;
     }
@@ -111,7 +111,7 @@ export function App({
         setOverlay("none");
         return;
       case "quote":
-        void store.refresh();
+        void store.refresh(true);
         return;
       case "leg":
         setLegIndex(Number(input) - 1);
