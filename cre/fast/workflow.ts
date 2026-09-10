@@ -32,6 +32,7 @@ export const configSchema = z.object({
 	positionId: z.string(),
 	kappaSecretId: z.string(),
 	kappaBookSecretId: z.string(),
+	/** Bootstrap base half-spread, used only until the slow workflow has published a measured one. */
 	spreadBps: z.number(),
 	markoutBps: z.number(),
 	maxTiltBps: z.number(),
@@ -48,6 +49,45 @@ export const configSchema = z.object({
 })
 
 export type Config = z.infer<typeof configSchema>
+
+const REF_OF_ABI = [
+	{
+		name: 'refOf',
+		type: 'function',
+		stateMutability: 'view',
+		inputs: [{ name: 'id', type: 'bytes32' }],
+		outputs: [
+			{
+				name: '',
+				type: 'tuple',
+				components: [
+					{ name: 'mid', type: 'uint128' },
+					{ name: 'spreadBps', type: 'uint16' },
+					{ name: 'tiltBps', type: 'int16' },
+					{ name: 'updatedAt', type: 'uint40' },
+					{ name: 'seq', type: 'uint32' },
+					{ name: 'refBalanceA', type: 'uint128' },
+					{ name: 'dTiltPerA', type: 'int64' },
+					{ name: 'maxExtrapBps', type: 'uint32' },
+					{ name: 'markoutBps', type: 'uint16' },
+					{ name: 'bandEdgeBps', type: 'uint16' },
+				],
+			},
+		],
+	},
+] as const
+
+const STORED_TUPLE = parseAbiParameters(
+	'(uint128 mid, uint16 spreadBps, int16 tiltBps, uint40 updatedAt, uint32 seq, uint128 refBalanceA, int64 dTiltPerA, uint32 maxExtrapBps, uint16 markoutBps, uint16 bandEdgeBps)',
+)
+
+/**
+ * The terms in the slot that this workflow does not own. The slow workflow measures the spread, the
+ * markout and the boundary and writes them into the same slot, so a write here has to carry them
+ * forward rather than rebuild the slot from config — or an hour's measurement would live for at
+ * most sixty seconds. A zero mid means nothing has been published yet, and the config bootstraps.
+ */
+type Stored = { mid: bigint; spreadBps: number; markoutBps: number; bandEdgeBps: number }
 type Leg = z.infer<typeof legSchema>
 
 const SLOT0_ABI = [
@@ -99,6 +139,7 @@ type Observation = {
 	pinnedTimestamp: bigint
 	mid: bigint
 	weight: LegWeight
+	stored: Stored
 }
 
 /**
@@ -110,7 +151,13 @@ type Observation = {
  * every subsequent read names that number explicitly. Reading at "latest" would let two nodes land on
  * different blocks and make consensus impossible to reach.
  */
-const observeLeg = (don: Runtime<Config>, leg: Leg, maker: Address, name: string): Observation => {
+const observeLeg = (
+	don: Runtime<Config>,
+	leg: Leg,
+	maker: Address,
+	positionId: Hex,
+	name: string,
+): Observation => {
 	const client = new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 
 	const header = client
@@ -163,6 +210,31 @@ const observeLeg = (don: Runtime<Config>, leg: Leg, maker: Address, name: string
 
 	const mid = midFromSqrtPriceX96(sqrtPriceX96 as bigint)
 
+	// Read at the same pinned block as everything else, so the run stays a pure function of that
+	// block. A slow write landing after the finalized block is carried forward on the next run, so
+	// it can be shadowed for one cadence but never lost.
+	const slot = client
+		.callContract(don, {
+			call: encodeCallMsg({
+				from: maker,
+				to: leg.registry as Address,
+				data: encodeFunctionData({
+					abi: REF_OF_ABI,
+					functionName: 'refOf',
+					args: [positionId],
+				}),
+			}),
+			blockNumber: at,
+		})
+		.result()
+	const [current] = decodeAbiParameters(STORED_TUPLE, bytesToHex(slot.data))
+	const stored: Stored = {
+		mid: current.mid,
+		spreadBps: current.spreadBps,
+		markoutBps: current.markoutBps,
+		bandEdgeBps: current.bandEdgeBps,
+	}
+
 	return {
 		leg,
 		name,
@@ -170,6 +242,7 @@ const observeLeg = (don: Runtime<Config>, leg: Leg, maker: Address, name: string
 		pinnedTimestamp: header.timestamp,
 		mid,
 		weight: legWeight({ balanceA: balanceA as bigint, balanceB: balanceB as bigint, mid }),
+		stored,
 	}
 }
 
@@ -195,8 +268,8 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 
 	const maker = config.maker as Address
 	const observed = [
-		observeLeg(don, config.legA, maker, 'legA'),
-		observeLeg(don, config.legB, maker, 'legB'),
+		observeLeg(don, config.legA, maker, config.positionId as Hex, 'legA'),
+		observeLeg(don, config.legB, maker, config.positionId as Hex, 'legB'),
 	] as [Observation, Observation]
 	const policies = reservation(
 		[observed[0].weight, observed[1].weight],
@@ -219,15 +292,15 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 			config.positionId as Hex,
 			{
 				mid: o.mid,
-				spreadBps: config.spreadBps,
+				spreadBps: o.stored.mid === 0n ? config.spreadBps : o.stored.spreadBps,
 				tiltBps: Number(policies[i].tiltBps),
 				updatedAt: Number(updatedAt),
 				seq: Number(seq),
 				refBalanceA: o.weight.balanceA,
 				dTiltPerA: policies[i].dTiltPerA,
 				maxExtrapBps: config.maxExtrapBps,
-				markoutBps: config.markoutBps,
-				bandEdgeBps: 0, // published by the slow workflow, which owns the impulse boundary
+				markoutBps: o.stored.mid === 0n ? config.markoutBps : o.stored.markoutBps,
+				bandEdgeBps: o.stored.bandEdgeBps, // published by the slow workflow; zero until it has
 			},
 		])
 
@@ -276,10 +349,10 @@ export function initWorkflow(config: Config) {
 export const restrictions = (config: Config) => ({
 	capabilities: {
 		type: 'CAPABILITY_RESTRICTION_TYPE_OPEN' as const,
-		maxTotalCalls: 16,
+		maxTotalCalls: 20,
 		restrictions: [config.legA, config.legB].flatMap((leg) => {
 			const r = new cre.restrictors.EVMRestrictor(BigInt(leg.chainSelector))
-			return [r.limitHeaderByNumber(2), r.limitCallContract(4), r.limitWriteReport(2)]
+			return [r.limitHeaderByNumber(2), r.limitCallContract(6), r.limitWriteReport(2)]
 		}),
 	},
 })
