@@ -38,7 +38,9 @@ from reference_model.tilt import trunc_div
 #:   anchor      the correction that brings this leg's own curve back to the reference mid: a
 #:               constant-product leg holding excess tokenA is already pricing tokenA below the mid,
 #:               and the anchor prices it back up
-SIGNALS = ("cross_leg", "book", "own", "anchor", "anchor_cross_leg", "anchor_book", "anchor_own")
+#:   anchor_own_book  the anchor, the own-leg skew at `kappa_bps`, and the book skew at its own gain
+#:               `kappa_book_bps`, so the two can be dialled apart
+SIGNALS = ("cross_leg", "book", "own", "anchor", "anchor_cross_leg", "anchor_book", "anchor_own", "anchor_own_book")
 
 BPS = 10_000
 ONE_E18 = 10**18
@@ -87,6 +89,9 @@ class Book:
     #: maker's half-spread, matching the shipped `spreadBps`
     spread_bps: int = 10
     kappa_bps: int = 500
+    #: gain on the book-level term when the signal carries one apart from `kappa_bps`; signed, so a
+    #: negative value leans the book the other way
+    kappa_book_bps: int = 0
     max_tilt_bps: int = 500
     #: the band's tolerance around the reference, matching `BAND_TOL_BPS`
     band_tol_bps: int = 500
@@ -166,9 +171,12 @@ def _tilts(legs: list[Leg], book: Book, bounded: bool) -> list[int]:
         tilt = 0
         if book.signal.endswith("cross_leg"):
             tilt += cross[i]
-        if book.signal.endswith("book"):
+        if book.signal.endswith("own_book"):
+            tilt += trunc_div(book.kappa_bps * (w - ONE_E18 // 2), ONE_E18)
+            tilt += trunc_div(book.kappa_book_bps * (mean_w - ONE_E18 // 2), ONE_E18)
+        elif book.signal.endswith("book"):
             tilt += trunc_div(book.kappa_bps * (mean_w - ONE_E18 // 2), ONE_E18)
-        if book.signal.endswith("own"):
+        elif book.signal.endswith("own"):
             tilt += trunc_div(book.kappa_bps * (w - ONE_E18 // 2), ONE_E18)
         if book.signal.startswith("anchor"):
             tilt += anchor_tilt_bps(w)
