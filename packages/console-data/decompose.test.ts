@@ -95,3 +95,24 @@ test("a leg the enclave priced from different balances is flagged, not silently 
   expect(book.legs[0]!.balancesMatchEnclave).toBe(false);
   expect(book.legs[1]!.balancesMatchEnclave).toBe(true);
 });
+
+test("a leg whose shift sits at the signed cap reports its room as unknown, not as zero", () => {
+  // `boundary = |shift| + room`, and the boundary is itself clamped, so a leg quoting at the cap
+  // publishes a boundary equal to the cap and the recovered room comes back zero whatever room the
+  // enclave actually allowed. That is the invariant behaving at its edge, and it is a different
+  // fact from Base's genuine zero, where the boundary sits below the cap.
+  const atCap = inputs.map((input, i) =>
+    i === 0
+      ? { ...input, ref: { ...input.ref, tiltBps: -BOOK.maxTiltBps, bandEdgeBps: BOOK.maxTiltBps } }
+      : input,
+  );
+  const book = decomposeBook(atCap, ASSUMED_GAINS, BOOK.maxTiltBps);
+
+  expect(book.legs[0]!.roomBps).toBe(0n);
+  expect(book.legs[0]!.roomUnknownAtCap).toBe(true);
+
+  // Base's zero is real: its boundary is below the cap, so the zero is a budget and not an artefact.
+  const base = book.legs.find((l) => l.label === "Base Sepolia")!;
+  expect(base.roomBps).toBe(0n);
+  expect(base.roomUnknownAtCap).toBe(false);
+});

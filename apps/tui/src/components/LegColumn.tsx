@@ -73,7 +73,11 @@ function ShiftRows({ leg }: { leg: LegSnapshot }) {
       </Box>
       <Box>
         <Text color={UI.muted}>room  </Text>
-        <Text color={TERM.boundary}>{String(shift.roomBps).padEnd(6)}</Text>
+        {/* A leg at its shift cap publishes a boundary equal to the cap, so the room cannot be
+            recovered. Printing the zero it arithmetically comes to would assert a budget of none. */}
+        <Text color={shift.roomUnknownAtCap ? UI.caveat : TERM.boundary}>
+          {(shift.roomUnknownAtCap ? "?" : String(shift.roomBps)).padEnd(6)}
+        </Text>
         <Text color={UI.muted}>boundary </Text>
         <Text color={TERM.boundary}>{ref.bandEdgeBps}</Text>
         <Text color={TERM.bookConcession}> book {signed(shift.bookConcession)}</Text>

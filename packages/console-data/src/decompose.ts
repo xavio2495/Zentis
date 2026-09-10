@@ -46,6 +46,15 @@ export interface LegDecomposition {
   readonly agrees: boolean;
   /** the boundary less the shift already quoted: how much this leg may still concede */
   readonly roomBps: bigint;
+  /**
+   * True when `roomBps` is zero only because the shift is at the signed cap.
+   *
+   * The workflow publishes `boundary = |shift| + room` and clamps the boundary, so a leg quoting at
+   * the cap publishes a boundary equal to the cap and the recovered room is zero whatever room the
+   * enclave actually allowed. That is the invariant behaving at its edge, and it is a different
+   * fact from a leg whose boundary sits below the cap and genuinely has nothing left to concede.
+   */
+  readonly roomUnknownAtCap: boolean;
   readonly cappedByRoom: boolean;
   readonly clampedByMaxTilt: boolean;
   /**
@@ -90,7 +99,13 @@ export function decomposeBook(inputs: LegInput[], gains: Gains, maxTiltBps: numb
     return room < 0n ? 0n : room;
   });
 
-  const applied = reservation(weights, gains.kappaOwnBps, gains.kappaBookBps, BigInt(maxTiltBps), caps);
+  // A leg at the cap cannot have its room recovered at all, so the cap it is given is the whole
+  // budget rather than a zero: reading the artefact as a refusal to concede would make the console
+  // recompute a shift the enclave never intended.
+  const atCap = inputs.map(({ ref }) => abs(BigInt(ref.tiltBps)) >= BigInt(maxTiltBps));
+  const effectiveCaps = caps.map((cap, i) => (atCap[i] === true ? null : cap));
+
+  const applied = reservation(weights, gains.kappaOwnBps, gains.kappaBookBps, BigInt(maxTiltBps), effectiveCaps);
   const uncapped = reservation(weights, gains.kappaOwnBps, gains.kappaBookBps, UNCLAMPED);
   const ownOnly = reservation(weights, gains.kappaOwnBps, 0n, UNCLAMPED);
 
@@ -116,7 +131,8 @@ export function decomposeBook(inputs: LegInput[], gains: Gains, maxTiltBps: numb
       published,
       agrees: tiltBps === BigInt(published),
       roomBps: caps[i]!,
-      cappedByRoom: abs(concessionUncapped) > caps[i]!,
+      roomUnknownAtCap: atCap[i] === true && caps[i] === 0n,
+      cappedByRoom: atCap[i] !== true && abs(concessionUncapped) > caps[i]!,
       clampedByMaxTilt: abs(correction + concessionUncapped) > BigInt(maxTiltBps),
       balancesMatchEnclave: input.history.position!.balanceA === input.ref.refBalanceA,
       referenceAgeSeconds:
