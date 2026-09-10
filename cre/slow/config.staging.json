@@ -53,10 +53,9 @@
       "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1",
       "referencePoolSubgraphUrl": "https://api.studio.thegraph.com/query/1760020/zentis-reference-pool-sepolia/v0.0.1",
       "referencePool": "0x6418eec70f50913ff0d756b48d32ce7c02b47c47",
-      "crowdingSubgraphUrl": "",
-      "crowdingTokenA": "",
-      "crowdingTokenB": "",
-      "_note": "Ethereum mainnet carries the most Aqua activity of any chain (262 Shipped in two days). Its aqua-standard deployment is pending a Studio slug; until then this leg has no positioning source."
+      "crowdingSubgraphUrl": "https://api.studio.thegraph.com/query/1760020/aqua-standard-ethereum/v0.2.0",
+      "crowdingTokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "crowdingTokenB": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
     }
   ]
 }
