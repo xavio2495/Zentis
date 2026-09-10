@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createStore } from "@zentis/console-data";
 import { Actions } from "./components/Actions.js";
 import type { Action } from "./action-types.js";
+import { type Pending, landed } from "./landed.js";
 import { BookStrip } from "./components/BookStrip.js";
 import { Feed } from "./components/Feed.js";
 import { LegColumn } from "./components/LegColumn.js";
@@ -52,6 +53,7 @@ export function App({
   const [running, setRunning] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [awaiting, setAwaiting] = useState<Pending | null>(null);
 
   useInput((input) => {
     if (input === "x") {
@@ -70,6 +72,9 @@ export function App({
         return;
       }
       setRunning(action.label);
+      // Captured before the command runs, so the comparison is against the state the operator acted
+      // from rather than whatever the next poll happens to find.
+      setAwaiting({ label: action.label, seqBefore: state.snapshot?.seq ?? null });
       void runAction(action)
         .then(setLastResult)
         .catch((cause: unknown) => setLastResult(`${action.label} could not start: ${String(cause)}`))
@@ -100,6 +105,15 @@ export function App({
   });
 
   const snapshot = state.snapshot;
+  // Only once the command has finished. The other workflow publishes on its own schedule, so a seq
+  // that moved while this one was still running is not evidence that this one landed.
+  const landing = running === null ? landed(awaiting, snapshot?.seq ?? null) : null;
+  useEffect(() => {
+    if (landing === null) return;
+    setLastResult(landing);
+    setAwaiting(null);
+  }, [landing]);
+
   if (snapshot === null) {
     return (
       <Box borderStyle="round" borderColor={UI.frame} paddingX={1} {...FRAME}>
