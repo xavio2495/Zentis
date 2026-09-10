@@ -50,9 +50,12 @@ export const BAR = { filled: "█", empty: "░", marker: "│" } as const;
  * wireframe; like the terms above they are placeholders until branding arrives.
  */
 export const LEG = {
-  11155111: "#e05252", // Sepolia
-  84532: "#5a6ee0", // Base Sepolia
-  421614: "#b0b0b0", // Arbitrum Sepolia
+  // Three hues that mean nothing else on this screen. The first set used red for Sepolia — the
+  // colour of a rejected row — and grey for Arbitrum, the colour of a disabled key, so a leg's own
+  // name read as a fault. Red, yellow, green and grey are reserved for state; a test holds the line.
+  11155111: "#b48cff", // Sepolia — violet
+  84532: "#4f8cff", // Base Sepolia — blue
+  421614: "#2fb3a0", // Arbitrum Sepolia — teal
 } as const
 
 /** The order the wireframe stacks them in, top to bottom. */
