@@ -1,4 +1,5 @@
-import { dirname, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, parse, resolve } from "node:path";
 import { ASSUMED_GAINS, BOOK, LEGS, QUOTE_SIZE_A } from "@zentis/console-data";
 import type { Action, ActionCommand } from "./action-types.js";
 
@@ -18,11 +19,50 @@ import type { Action, ActionCommand } from "./action-types.js";
  */
 export type { Action, ActionCommand } from "./action-types.js";
 
-/** The repo root, found from this file rather than from the working directory the binary was run in. */
-const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..", "..");
+/**
+ * Where the repository is, decided at startup rather than baked in.
+ *
+ * It cannot come from `import.meta.url`. Inside a compiled binary that path is under `/$bunfs`, so
+ * the derived `cre` directory does not exist, and Bun reports the resulting spawn failure against
+ * the *command* — `ENOENT ... posix_spawn 'cre'` — which reads as a missing binary or a broken PATH
+ * and is neither. The binary is meant to be run from anywhere, so the root is searched for.
+ *
+ * A candidate has to contain both `cre` and `contracts`, because those are the two directories the
+ * actions use as working directories. `ZENTIS_REPO` wins when it names such a directory and is
+ * ignored when it does not: falling back to the search beats spawning against a path the operator
+ * mistyped. The module's own location is tried last, and only when it is a real path, which is what
+ * keeps `bun run` working from outside the repo.
+ */
+export function findRepoRoot(
+  from: string = process.cwd(),
+  override: string | undefined = process.env["ZENTIS_REPO"],
+): string | null {
+  const isRoot = (path: string) =>
+    existsSync(join(path, "cre")) && existsSync(join(path, "contracts"));
+
+  if (override !== undefined && override !== "" && isRoot(resolve(override))) return resolve(override);
+
+  let current = resolve(from);
+  const { root } = parse(current);
+  while (true) {
+    if (isRoot(current)) return current;
+    if (current === root) break;
+    current = dirname(current);
+  }
+
+  const here = new URL(import.meta.url).pathname;
+  if (!here.startsWith("/$bunfs")) {
+    const fromModule = resolve(dirname(here), "..", "..", "..");
+    if (isRoot(fromModule)) return fromModule;
+  }
+  return null;
+}
 
 const NO_ENV =
   "no ZENTIS_ENV file was given, so this cannot sign — start with ZENTIS_ENV=/path/to/private.env";
+
+const NO_REPO =
+  "not inside the Zentis repository, so the scripts cannot be found — set ZENTIS_REPO=/path/to/Zentis";
 
 /**
  * A shell that sources only the assignments whose names a shell can actually take.
@@ -35,9 +75,9 @@ const NO_ENV =
 const sourceThenRun = (script: string) =>
   `set -a; eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$1")"; set +a; ${script}`;
 
-const creCommand = (workflow: "fast" | "slow", envFile: string): ActionCommand => ({
+const creCommand = (workflow: "fast" | "slow", envFile: string, repo: string): ActionCommand => ({
   cmd: ["cre", "-e", envFile, "workflow", "simulate", workflow, "--target", "staging-settings", "--broadcast"],
-  cwd: join(REPO, "cre"),
+  cwd: join(repo, "cre"),
   // The secret *ids* the workflows resolve, at the gains this console already displays. The gains
   // are not the secret — the enclave's copies are — so passing them here reveals nothing the screen
   // does not already footnote.
@@ -48,7 +88,7 @@ const creCommand = (workflow: "fast" | "slow", envFile: string): ActionCommand =
   },
 });
 
-function fillCommand(envFile: string): ActionCommand {
+function fillCommand(envFile: string, repo: string): ActionCommand {
   const leg = LEGS[0]!; // Sepolia: the leg the beat runs on.
   return {
     cmd: [
@@ -60,7 +100,7 @@ function fillCommand(envFile: string): ActionCommand {
       "sh",
       envFile,
     ],
-    cwd: join(REPO, "contracts"),
+    cwd: join(repo, "contracts"),
     env: {
       ZENTIS_RPC: leg.rpcUrl,
       ZENTIS_ROUTER: leg.app,
@@ -75,28 +115,34 @@ function fillCommand(envFile: string): ActionCommand {
   };
 }
 
-export function buildActions(envFile: string | null): Action[] {
-  const blocked = envFile === null ? NO_ENV : null;
+export function buildActions(
+  envFile: string | null,
+  repo: string | null = findRepoRoot(),
+): Action[] {
+  // Both reasons are real and either alone is enough, so the missing repository is named first:
+  // it is the one the operator can fix without going to look for a key.
+  const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
+  const runnable = repo !== null && envFile !== null;
   return [
     {
       key: "r",
       label: "republish fast",
       disabledReason: blocked,
-      command: envFile === null ? null : creCommand("fast", envFile),
+      command: runnable ? creCommand("fast", envFile!, repo!) : null,
       describe: "runs the fast workflow against the testnets and broadcasts its report",
     },
     {
       key: "s",
       label: "republish slow",
       disabledReason: blocked,
-      command: envFile === null ? null : creCommand("slow", envFile),
+      command: runnable ? creCommand("slow", envFile!, repo!) : null,
       describe: "runs the slow workflow: spread, markout and the boundary",
     },
     {
       key: "f",
       label: `fill sepolia ${Number(QUOTE_SIZE_A) / 10 ** LEGS[0]!.tokenA.decimals}`,
       disabledReason: blocked,
-      command: envFile === null ? null : fillCommand(envFile),
+      command: runnable ? fillCommand(envFile!, repo!) : null,
       describe: "takes the Sepolia leg's quote, which is the fill the demo's beat starts from",
     },
     {

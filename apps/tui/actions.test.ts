@@ -1,8 +1,8 @@
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { buildActions, describeCommand } from "./src/actions.js";
+import { join, resolve } from "node:path";
+import { buildActions, describeCommand, findRepoRoot } from "./src/actions.js";
 
 // A file shaped like the operator's real one, so that "the console never holds a key" is asserted
 // against something a key could actually leak out of.
@@ -14,6 +14,7 @@ writeFileSync(
   `CRE_ETH_PRIVATE_KEY=${SECRET}\nTAKER_PRIVATE_KEY=${SECRET}\n1INCH_API_KEY=not-a-shell-identifier\n`,
 );
 
+const REPO = resolve(import.meta.dir, "..", "..");
 const all = (envFile: string | null) => buildActions(envFile);
 const find = (envFile: string | null, key: string) => all(envFile).find((a) => a.key === key)!;
 
@@ -103,4 +104,36 @@ test("every action describes itself in the operator's own words", () => {
   }
 });
 
-rmSync(dir, { recursive: true, force: true });
+// Torn down after the suite: a top-level rmSync would run before the tests that use the path.
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+test("the repo root is found by walking up from the working directory", () => {
+  expect(findRepoRoot(import.meta.dir)).toBe(resolve(import.meta.dir, "..", ".."));
+  expect(findRepoRoot(join(import.meta.dir, "src", "components"))).toBe(
+    resolve(import.meta.dir, "..", ".."),
+  );
+});
+
+test("with no root, no command is built against a guess", () => {
+  for (const key of ["r", "s", "f"]) {
+    const action = buildActions(envPath, null).find((a) => a.key === key)!;
+    expect(action.command).toBeNull();
+    expect(action.disabledReason).toContain("ZENTIS_REPO");
+  }
+  // Re-quote reads through the quote path and needs no repository at all.
+  expect(buildActions(envPath, null).find((a) => a.key === "q")!.disabledReason).toBeNull();
+});
+
+test("the missing repository is named before the missing key, being the easier one to fix", () => {
+  expect(buildActions(null, null).find((a) => a.key === "r")!.disabledReason).toContain("ZENTIS_REPO");
+  expect(buildActions(null, REPO).find((a) => a.key === "r")!.disabledReason).toContain("ZENTIS_ENV");
+});
+
+test("ZENTIS_REPO overrides the search, and a wrong one is ignored rather than obeyed", () => {
+  expect(findRepoRoot(dir, REPO)).toBe(REPO);
+  // A path that is not the repository is not accepted: the search runs on instead, which here falls
+  // through to this module's own location. Obeying it would spawn against a directory with no
+  // scripts in it. (Under `bun test` that last resort is a real path; inside the compiled binary it
+  // is under /$bunfs and is skipped — which is what `bundle.test.ts` covers.)
+  expect(findRepoRoot(dir, join(dir, "nowhere"))).toBe(REPO);
+});
