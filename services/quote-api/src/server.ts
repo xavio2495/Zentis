@@ -2,6 +2,7 @@ import { CHAINS, PORT, REFERENCE_WARN_AGE_SECONDS } from "./config.js";
 import { fetchLeg, type LegResult } from "./legs.js";
 import { QuoteRefused, quoteLeg } from "./quote.js";
 import { absenceCaveat, explain } from "./reason.js";
+import { type Refusal, decodeRefusal } from "./refusal.js";
 import { crowdingBps, fetchVenue } from "./crowding.js";
 
 interface LegQuote {
@@ -18,6 +19,8 @@ interface LegQuote {
   refMid: string | null;
   refAgeSeconds: number | null;
   caveats: string[];
+  /** the decoded Zentis error when the router refused, else null; `caveats` carries its sentence too */
+  refusal: Refusal | null;
   _meta: unknown;
 }
 
@@ -70,6 +73,7 @@ async function buildQuote(
     refAgeSeconds:
       position?.refUpdatedAt == null ? null : nowSeconds - Number(position.refUpdatedAt),
     caveats,
+    refusal: null,
     _meta: leg.meta
   };
 
@@ -83,7 +87,10 @@ async function buildQuote(
     return { ...base, amountOut: outcome.amountOut.toString() };
   } catch (cause) {
     if (cause instanceof QuoteRefused) {
-      caveats.push(`the router refused this quote: ${cause.message}`);
+      // The node's message is "execution reverted" for every refusal; the data says which one.
+      const refusal = decodeRefusal(cause.data);
+      caveats.push(`the router refused this quote: ${refusal?.sentence ?? cause.message}`);
+      return { ...base, refusal };
     } else {
       caveats.push(`could not reach a node for this chain: ${String(cause)}`);
     }
