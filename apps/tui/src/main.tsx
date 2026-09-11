@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { render } from "ink";
 import { App } from "./App.js";
-import { buildActions } from "./actions.js";
+import { buildActions, commandActions } from "./actions.js";
 import { run, summarise } from "./runner.js";
 import type { Action } from "./action-types.js";
 
@@ -49,5 +49,7 @@ const envFile = watchOnly ? null : (process.env.ZENTIS_ENV ?? null);
 const runAction = async (action: Action): Promise<string> =>
   summarise(action, await run(action.command!));
 
-const app = render(<App actions={buildActions(envFile)} runAction={runAction} />);
+const app = render(
+  <App actions={buildActions(envFile)} runAction={runAction} commands={commandActions(envFile)} />,
+);
 void app.waitUntilExit().then(leaveAlternate);

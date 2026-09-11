@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { LEGS } from "@zentis/console-data";
 import { buildActions, buildFillAction, describeCommand, findRepoRoot } from "./src/actions.js";
 
 // A file shaped like the operator's real one, so that "the console never holds a key" is asserted

@@ -39,6 +39,7 @@ export const BINDINGS: Binding[] = [
   { scope: "main", keys: ["s"], label: "republish the slow workflow", id: "slow" },
   { scope: "main", keys: ["f"], label: "take the Sepolia leg's quote", id: "fill" },
   { scope: "confirm", keys: ["y"], label: "confirm, and broadcast", id: "confirm" },
+  { scope: "global", keys: [":"], label: "type a command: fill, quote, republish, window, page", id: "command" },
   { scope: "global", keys: ["?"], label: "this page", id: "help" },
   { scope: "global", keys: ["x"], label: "quit", id: "quit" },
 ];

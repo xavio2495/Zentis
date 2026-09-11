@@ -1,7 +1,7 @@
 import { render } from "ink";
 import { PassThrough, Writable } from "node:stream";
 import { App } from "../src/App.js";
-import { buildActions } from "../src/actions.js";
+import { buildActions, commandActions } from "../src/actions.js";
 import type { Action } from "../src/action-types.js";
 import { type Scenario, fakeSnapshot } from "./world.js";
 
@@ -69,7 +69,10 @@ export async function drive(
   const actions: Action[] =
     // Watch-only the way the real binary is when run from the repo: a repository, no signing key.
     options.armed === true ? buildActions("/dev/null") : buildActions(null);
-  const app = render(<App actions={actions} runAction={null} makeStore={makeStore} />, {
+  // The same factory the binary passes, built from the same env file, so a typed command in the
+  // sandbox is refused or allowed for exactly the reason it would be live.
+  const commands = commandActions(options.armed === true ? "/dev/null" : null);
+  const app = render(<App actions={actions} runAction={null} makeStore={makeStore} commands={commands} />, {
     stdout: stdout as never,
     stdin: stdin as never,
     debug: true,

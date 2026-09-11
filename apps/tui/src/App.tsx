@@ -1,12 +1,13 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { type Store, createStore } from "@zentis/console-data";
+import { BOOK, LEGS, type LegConfig, type Store, createStore, fetchQuotes, offMidBps } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
 import { LegCard } from "./components/LegCard.js";
 import { LegDetail } from "./components/LegDetail.js";
+import { CommandLine } from "./components/CommandLine.js";
 import { Panel, panelInner } from "./components/Panel.js";
 import { Pnl } from "./pages/Pnl.js";
 import { Positions } from "./pages/Positions.js";
@@ -14,8 +15,9 @@ import { Simulation } from "./pages/Simulation.js";
 import { WalletPage } from "./pages/WalletPage.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { type Pending, landed } from "./landed.js";
-import { pairPrice } from "./format.js";
+import { pairPrice, tokenAmount } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
+import { type Command, parseCommand } from "./command.js";
 import { resolve } from "./keymap.js";
 import { LEG_ORDER, UI, legColour } from "./theme.js";
 import { WINDOWS, autoWindow } from "./window.js";
@@ -43,8 +45,18 @@ export function App({
   actions,
   runAction,
   makeStore = createStore,
+  commands = null,
 }: {
   actions: Action[];
+  /**
+   * How a typed command becomes an action, so `:fill base 0.3` and the `f` key produce the same
+   * `Action`, ask the same confirmation and are refused in the same words. Null means the console
+   * was given no way to sign, which the row says when a signing command is typed.
+   */
+  commands?: {
+    fill: (fill: { leg: LegConfig; amountRaw: bigint; isAToB: boolean }) => Action;
+    republish: (workflow: "fast" | "slow") => Action;
+  } | null;
   /** resolves to the line the status bar should show once the command has finished */
   runAction: ((action: Action) => Promise<string>) | null;
   /**
@@ -79,6 +91,12 @@ export function App({
   const [transient, setTransient] = useState<{ text: string; quiet: boolean } | null>(null);
   const say = (text: string, quiet = false) => setTransient({ text, quiet });
   const [awaiting, setAwaiting] = useState<Pending | null>(null);
+  // The command line: what is being typed, what the last one answered, and what has been typed
+  // before. `null` is closed — the row only exists while it has the keyboard.
+  const [typing, setTyping] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<{ text: string; bad: boolean } | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
+  const [recalled, setRecalled] = useState(0);
 
   useEffect(() => {
     store.start();
@@ -112,7 +130,118 @@ export function App({
     setAwaiting(null);
   }, [landing]);
 
+  /** What a quote reads as on the command row: what went in, what came back, and how far off the mid. */
+  const quoteLine = (leg: LegConfig, side: "AtoB" | "BtoA", amountRaw: bigint): Promise<string> =>
+    fetchQuotes(BOOK.positionId, amountRaw, side).then((read) => {
+      const quote = read.value?.quotes.find((q) => q.chainId === leg.chainId);
+      if (quote === undefined) return `${leg.name}: ${read.error ?? "the quote service said nothing about this leg"}`;
+      const [from, to] = side === "AtoB" ? [leg.tokenA, leg.tokenB] : [leg.tokenB, leg.tokenA];
+      if (quote.amountOut === null) {
+        const why = quote.refusal?.sentence ?? quote.caveats[0] ?? "the router refused it";
+        return `${leg.name} ${from.symbol} → ${to.symbol}: ${why}`;
+      }
+      const off = offMidBps(quote, side === "AtoB");
+      return (
+        `${leg.name} ${tokenAmount(amountRaw, from.decimals)} ${from.symbol} → ` +
+        `${tokenAmount(quote.amountOut, to.decimals)} ${to.symbol}` +
+        (off === null ? "" : ` · ${off > 0 ? "+" : ""}${off} bps`)
+      );
+    });
+
+  /**
+   * Carry out a typed command.
+   *
+   * Navigation and the window are done here because they are the console's own state. A quote is a
+   * read, so it runs watch-only. Anything that signs is handed to the same confirmation the keys
+   * use — the command line is a way of naming an action, never a second way of performing one.
+   */
+  const runCommand = (command: Command) => {
+    switch (command.kind) {
+      case "page":
+        setPage(command.page);
+        setTyping(null);
+        setAnswer(null);
+        return;
+      case "window":
+        setWindowChoice(command.index);
+        setAnswer({ text: `chart window ${command.index === null ? "automatic" : WINDOWS[command.index]!.label}`, bad: false });
+        return;
+      case "quote": {
+        const sides: ("AtoB" | "BtoA")[] = command.side === "both" ? ["AtoB", "BtoA"] : [command.side];
+        setAnswer({ text: "asking the router…", bad: false });
+        void Promise.all(sides.map((side) => quoteLine(command.leg, side, command.amountRaw)))
+          .then((lines) => setAnswer({ text: lines.join("   ·   "), bad: false }))
+          .catch((cause: unknown) => setAnswer({ text: `the quote service could not be reached: ${String(cause)}`, bad: true }));
+        return;
+      }
+      case "rebalance":
+        setAnswer({ text: `the rebalance panel is not built yet — ${command.leg.name}'s shift and room are on its card`, bad: true });
+        return;
+      case "push":
+        // Honest rather than helpful: there is no push script to run, so nothing here pretends to.
+        setAnswer({ text: "push is not wired: contracts/script has no Push.s.sol yet", bad: true });
+        return;
+      case "fill":
+      case "republish": {
+        if (commands === null) {
+          setAnswer({ text: "this console was given no way to sign, so it cannot run that", bad: true });
+          return;
+        }
+        const action =
+          command.kind === "fill"
+            ? commands.fill({ leg: command.leg, amountRaw: command.amountRaw, isAToB: command.isAToB })
+            : commands.republish(command.workflow);
+        if (action.disabledReason !== null) {
+          setAnswer({ text: action.disabledReason, bad: true });
+          return;
+        }
+        // Off the row and into the same prompt a key would raise: one place decides what broadcasts.
+        setTyping(null);
+        setAnswer(null);
+        setConfirming(action);
+        say(`press y to broadcast — ${action.label}: ${action.describe}`);
+      }
+    }
+  };
+
   useInput((input, key) => {
+    // While the row is open it has the keyboard, so no keystroke meant for a command can also fire
+    // the key it happens to share a letter with. A pending confirmation still outranks it.
+    if (typing !== null && confirming === null) {
+      if (key.escape) {
+        setTyping(null);
+        setAnswer(null);
+        return;
+      }
+      if (key.return) {
+        const line = typing.trim();
+        if (line === "") return;
+        setHistory((past) => [line, ...past.filter((p) => p !== line)]);
+        setRecalled(0);
+        const parsed = parseCommand(line, LEGS);
+        if ("error" in parsed) {
+          setAnswer({ text: parsed.error, bad: true });
+          return;
+        }
+        setTyping("");
+        runCommand(parsed.command);
+        return;
+      }
+      if (key.upArrow || key.downArrow) {
+        // Newest first, so one press of up is the command just typed.
+        const next = Math.max(0, Math.min(history.length, recalled + (key.upArrow ? 1 : -1)));
+        setRecalled(next);
+        setTyping(next === 0 ? "" : (history[next - 1] ?? ""));
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setTyping((current) => (current ?? "").slice(0, -1));
+        return;
+      }
+      if (input !== "" && !key.ctrl && !key.meta) setTyping((current) => (current ?? "") + input);
+      return;
+    }
+
     const binding = resolve({ confirming: confirming !== null, overlay }, input, key);
 
     // A pending confirmation consumes the next keystroke whatever it is, so the key that broadcasts
@@ -164,6 +293,11 @@ export function App({
       }
       case "quote":
         void store.refresh(true);
+        return;
+      case "command":
+        setTyping("");
+        setAnswer(null);
+        setRecalled(0);
         return;
       case "window":
         setWindowChoice((current) => (current === null ? 0 : current + 1 >= WINDOWS.length ? null : current + 1));
@@ -237,6 +371,12 @@ export function App({
   const windowFor = (chainId: number) =>
     windowChoice === null ? autoWindow(lastFillAt(chainId), snapshot.takenAtSeconds) : WINDOWS[windowChoice]!;
   const graphInner = panelInner(regions.rightWidth, regions.graphRows);
+  // The command row is a row of the screen, taken from the region below the charts rather than added
+  // to the frame: a frame that grew by a row when the colon was pressed would reach `stdout.rows`
+  // and make Ink clear the terminal on every repaint.
+  const commandRows = typing === null ? 0 : 1;
+  const feedRows = Math.max(0, regions.feedRows - commandRows);
+  const pageRows = regions.graphRows + feedRows;
 
   return (
     <Box height={regions.draw} overflow="hidden">
@@ -279,13 +419,9 @@ export function App({
               title="help"
               right="esc or ? to close"
               width={regions.rightWidth}
-              height={regions.graphRows + regions.feedRows}
+              height={pageRows}
             >
-              <Help
-                report={snapshot.sim}
-                actions={actions}
-                {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)}
-              />
+              <Help report={snapshot.sim} actions={actions} {...panelInner(regions.rightWidth, pageRows)} />
             </Panel>
           ) : page !== "live" ? (
             // A page takes the chart and the feed together: these are tables, and a table given half
@@ -294,20 +430,16 @@ export function App({
               title={page}
               right="esc to the live view"
               width={regions.rightWidth}
-              height={regions.graphRows + regions.feedRows}
+              height={pageRows}
             >
               {page === "positions" ? (
-                <Positions snapshot={snapshot} {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)} />
+                <Positions snapshot={snapshot} {...panelInner(regions.rightWidth, pageRows)} />
               ) : page === "pnl" ? (
-                <Pnl snapshot={snapshot} {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)} />
+                <Pnl snapshot={snapshot} {...panelInner(regions.rightWidth, pageRows)} />
               ) : page === "wallet" ? (
-                <WalletPage
-                  snapshot={snapshot}
-                  armed={armed}
-                  {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)}
-                />
+                <WalletPage snapshot={snapshot} armed={armed} {...panelInner(regions.rightWidth, pageRows)} />
               ) : (
-                <Simulation report={snapshot.sim} {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)} />
+                <Simulation report={snapshot.sim} {...panelInner(regions.rightWidth, pageRows)} />
               )}
             </Panel>
           ) : overlay === "leg" && selected !== undefined ? (
@@ -347,13 +479,17 @@ export function App({
           ))}
 
         {overlay !== "help" && page === "live" && (
-          <Panel title="feed" width={regions.rightWidth} height={regions.feedRows}>
+          <Panel title="feed" width={regions.rightWidth} height={feedRows}>
             <Feed
               snapshot={snapshot}
-              width={panelInner(regions.rightWidth, regions.feedRows).width}
-              rows={panelInner(regions.rightWidth, regions.feedRows).height}
+              width={panelInner(regions.rightWidth, feedRows).width}
+              rows={panelInner(regions.rightWidth, feedRows).height}
             />
           </Panel>
+        )}
+
+        {typing !== null && (
+          <CommandLine text={typing} answer={answer} running={running !== null} width={regions.rightWidth} />
         )}
       </Box>
     </Box>

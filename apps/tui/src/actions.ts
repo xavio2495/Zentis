@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
-import { ASSUMED_GAINS, BOOK, LEGS, QUOTE_SIZE_A } from "@zentis/console-data";
+import { ASSUMED_GAINS, BOOK, LEGS, type LegConfig, QUOTE_SIZE_A } from "@zentis/console-data";
 import type { Action, ActionCommand } from "./action-types.js";
 
 /**
@@ -88,30 +88,99 @@ const creCommand = (workflow: "fast" | "slow", envFile: string, repo: string): A
   },
 });
 
-function fillCommand(envFile: string, repo: string): ActionCommand {
-  const leg = LEGS[0]!; // Sepolia: the leg the beat runs on.
+/** One leg, one size, one side: what a fill needs to know beyond where the repository is. */
+export interface FillParams {
+  readonly leg: LegConfig;
+  readonly amountRaw: bigint;
+  readonly isAToB: boolean;
+}
+
+function fillCommand(envFile: string, repo: string, fill: FillParams): ActionCommand {
   return {
     cmd: [
       "sh",
       "-c",
       sourceThenRun(
-        `forge script script/Fill.s.sol --rpc-url "$ZENTIS_RPC" --broadcast`,
+        // The size and the side are assigned *after* the file is sourced, so the console's
+        // parameters win. `set -a` exports everything the operator's env file assigns, and a stale
+        // FILL_AMOUNT left in that file would otherwise quietly replace the amount just typed.
+        `FILL_AMOUNT=${fill.amountRaw} FILL_A_TO_B=${fill.isAToB} ` +
+          `forge script script/Fill.s.sol --rpc-url "$ZENTIS_RPC" --broadcast`,
       ),
       "sh",
       envFile,
     ],
     cwd: join(repo, "contracts"),
     env: {
-      ZENTIS_RPC: leg.rpcUrl,
-      ZENTIS_ROUTER: leg.app,
-      REF_REGISTRY: leg.registry,
+      ZENTIS_RPC: fill.leg.rpcUrl,
+      ZENTIS_ROUTER: fill.leg.app,
+      REF_REGISTRY: fill.leg.registry,
       MAKER: BOOK.maker,
-      TOKEN_A: leg.tokenA.address,
-      TOKEN_B: leg.tokenB.address,
+      TOKEN_A: fill.leg.tokenA.address,
+      TOKEN_B: fill.leg.tokenB.address,
       POSITION_ID: BOOK.positionId,
-      POSITION_DEADLINE: String(leg.deadline),
-      FILL_AMOUNT: String(QUOTE_SIZE_A),
+      POSITION_DEADLINE: String(fill.leg.deadline),
+      FILL_AMOUNT: String(fill.amountRaw),
+      FILL_A_TO_B: String(fill.isAToB),
     },
+  };
+}
+
+/** How a fill is named on screen: the leg, the size and the token going in. */
+function fillLabel(fill: FillParams): string {
+  const token = fill.isAToB ? fill.leg.tokenA : fill.leg.tokenB;
+  const size = decimalOf(fill.amountRaw, token.decimals);
+  return `fill ${fill.leg.name.replace(/-sepolia$/, "")} ${size} ${token.symbol}`;
+}
+
+/** Raw units back to the decimal the operator typed, without a float in the middle of it. */
+function decimalOf(raw: bigint, decimals: number): string {
+  const scale = 10n ** BigInt(decimals);
+  const fraction = (raw % scale).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return fraction === "" ? String(raw / scale) : `${raw / scale}.${fraction}`;
+}
+
+/**
+ * A fill the operator asked for by name, rather than the one key `f` is bound to.
+ *
+ * Built here rather than in the command line so that both paths produce the same `Action`, run
+ * through the same confirmation, and are refused for the same reasons in the same words.
+ */
+export function buildFillAction(
+  envFile: string | null,
+  repo: string | null,
+  fill: FillParams,
+): Action {
+  const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
+  const token = fill.isAToB ? fill.leg.tokenA : fill.leg.tokenB;
+  const out = fill.isAToB ? fill.leg.tokenB : fill.leg.tokenA;
+  return {
+    key: "",
+    blocker: repo === null ? "repo" : envFile === null ? "env" : null,
+    label: fillLabel(fill),
+    disabledReason: blocked,
+    command: blocked === null ? fillCommand(envFile!, repo!, fill) : null,
+    describe: `takes ${fill.leg.label}'s quote, handing over ${token.symbol} for ${out.symbol}`,
+  };
+}
+
+/** A republish the operator asked for by name; `r` and `s` are the same two commands. */
+export function buildRepublishAction(
+  envFile: string | null,
+  repo: string | null,
+  workflow: "fast" | "slow",
+): Action {
+  const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
+  return {
+    key: "",
+    blocker: repo === null ? "repo" : envFile === null ? "env" : null,
+    label: `republish ${workflow}`,
+    disabledReason: blocked,
+    command: blocked === null ? creCommand(workflow, envFile!, repo!) : null,
+    describe:
+      workflow === "fast"
+        ? "runs the fast workflow against the testnets and broadcasts its report"
+        : "runs the slow workflow: spread, markout and the boundary",
   };
 }
 
@@ -146,7 +215,10 @@ export function buildActions(
       blocker,
       label: `fill sepolia ${Number(QUOTE_SIZE_A) / 10 ** LEGS[0]!.tokenA.decimals}`,
       disabledReason: blocked,
-      command: runnable ? fillCommand(envFile!, repo!) : null,
+      // The same builder the typed command uses, at the leg and size the demo's beat runs on.
+      command: runnable
+        ? fillCommand(envFile!, repo!, { leg: LEGS[0]!, amountRaw: QUOTE_SIZE_A, isAToB: true })
+        : null,
       describe: "takes the Sepolia leg's quote, which is the fill the demo's beat starts from",
     },
     {
@@ -164,3 +236,16 @@ export function buildActions(
 
 export const describeCommand = (action: Action): string =>
   action.command === null ? action.describe : `${action.describe}: ${action.command.cmd.join(" ")}`;
+
+/**
+ * The factory the command line is given, so a typed command and its key build the same `Action`.
+ *
+ * `push` has no script in `contracts/script` yet, so it returns null and the row says so rather than
+ * spawning something that is not there.
+ */
+export function commandActions(envFile: string | null, repo: string | null = findRepoRoot()) {
+  return {
+    fill: (fill: FillParams): Action => buildFillAction(envFile, repo, fill),
+    republish: (workflow: "fast" | "slow"): Action => buildRepublishAction(envFile, repo, workflow),
+  };
+}
