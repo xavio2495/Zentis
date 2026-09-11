@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OFFLINE_ENV, runBinary } from "./testing/binary.js";
@@ -70,3 +70,46 @@ test("the binary can be run against the recorded fixtures, reaching no endpoint 
     rmSync(dir, { recursive: true, force: true });
   }
 }, 120_000);
+
+test("the binary signs with no Foundry on PATH, and says nothing that carries a key", () => {
+  // Plan 11's first gate, as far as a session that must not broadcast can take it: the binary is
+  // asked to fill with `cast` absent from PATH and an RPC that refuses, and what it prints is
+  // checked. A device without Foundry must fail on the chain, not on a missing tool — and no path
+  // out of the child may carry the key.
+  const dir = mkdtempSync(join(tmpdir(), "zentis-sign-gate-"));
+  const binary = join(dir, "zentis");
+  const envFile = join(dir, "private.env");
+  const SECRET = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+  try {
+    const build = Bun.spawnSync({
+      cmd: ["bun", "build", "--compile", "src/main.tsx", "--outfile", binary],
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(build.exitCode).toBe(0);
+    writeFileSync(envFile, `TAKER_PRIVATE_KEY=${SECRET}\n`, { mode: 0o600 });
+
+    const run = Bun.spawnSync({
+      cmd: [binary, "sign"],
+      // No Foundry, no anything: the binary's own directory and nothing else on PATH.
+      env: { PATH: dir, ZENTIS_ENV: envFile, ZENTIS_RPC_SEPOLIA: "http://127.0.0.1:1", HOME: dir },
+      stdin: new TextEncoder().encode(
+        JSON.stringify({ kind: "fill", chainId: 11155111, amount: "150000", isAToB: true }),
+      ),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const said = `${new TextDecoder().decode(run.stdout)}${new TextDecoder().decode(run.stderr)}`;
+
+    // It got as far as the chain: no "command not found", no missing tool.
+    expect(said).not.toContain("command not found");
+    expect(said).not.toContain("cast");
+    // And nothing it said carries the key, in either form.
+    expect(said).not.toContain(SECRET);
+    expect(said).not.toContain(SECRET.slice(2));
+    expect(run.exitCode).not.toBe(0); // the RPC was a closed port, which is the failure being read
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 180_000);

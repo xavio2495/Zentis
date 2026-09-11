@@ -93,6 +93,8 @@ export interface FillBytes {
   readonly swapSignature: string;
   /** the order as a cast tuple, already formatted: maker, traits, data */
   readonly orderTuple: string;
+  /** the same three fields, for a caller encoding the call itself rather than shelling out */
+  readonly order: { readonly maker: string; readonly traits: string; readonly data: string };
   /** the taker the traits embed; a fill is for that address and no other */
   readonly taker: `0x${string}`;
   readonly takerDataAToB: `0x${string}`;

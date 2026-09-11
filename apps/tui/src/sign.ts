@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from "node:fs";
-import { createPublicClient, createWalletClient, http, type Address, type Hex } from "viem";
+import { createPublicClient, createWalletClient, http, type Address, type Hex, type Transport } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { LEGS, type LegConfig } from "@zentis/console-data";
 import { type Request, approveRequest, pushRequest, quoteRequest, swapRequest, tokenIn, wrapRequest } from "./intents.js";
@@ -20,7 +20,18 @@ import { type Request, approveRequest, pushRequest, quoteRequest, swapRequest, t
 export type Intent =
   | { kind: "approve"; chainId: number; token: Address; spender: Address; amount: string; keyName?: string }
   | { kind: "fill"; chainId: number; amount: string; isAToB: boolean; keyName?: string }
-  | { kind: "push"; chainId: number; amount: string; keyName?: string }
+  | {
+      kind: "push";
+      chainId: number;
+      /** the top-up itself, in the leg's tokenB */
+      amount: string;
+      /** what the allowance must be afterwards: this push and the settlement after it */
+      approval: string;
+      /** native to wrap first, when the wallet does not hold enough tokenB free */
+      wrap: string;
+      needsApproval: boolean;
+      keyName?: string;
+    }
   | { kind: "wallet-new"; path?: string };
 
 const KINDS = ["approve", "fill", "push", "wallet-new"];
@@ -84,19 +95,31 @@ export interface Step {
   readonly note?: string;
 }
 
-export async function runIntent(intent: Intent, envPath: string, log: (line: string) => void): Promise<void> {
+export async function runIntent(
+  intent: Intent,
+  envPath: string,
+  log: (line: string) => void,
+  /** injected by the tests, which pin the sequence rather than the chain */
+  transport?: Transport,
+): Promise<void> {
   if (intent.kind === "wallet-new") throw new Error("wallet-new is not implemented yet");
 
   const leg = legOf(intent.chainId);
   const keyName = intent.keyName ?? (intent.kind === "push" ? "CRE_ETH_PRIVATE_KEY" : "TAKER_PRIVATE_KEY");
   const key = readKey(envPath, keyName);
   const account = privateKeyToAccount(key as Hex);
-  const transport = http(leg.rpcUrl, { timeout: 20_000 });
-  const reader = createPublicClient({ transport });
-  const wallet = createWalletClient({ account, transport });
+  const legTransport = transport ?? http(leg.rpcUrl, { timeout: 20_000 });
+  const reader = createPublicClient({ transport: legTransport });
+  const wallet = createWalletClient({ account, transport: legTransport });
 
+  // Read once and counted from there. Letting each send fetch its own would have three of them race
+  // for the same number the moment two are in flight, which is the ordinary way a sequence like this
+  // fails on a busy chain.
+  let nonce: number | null = null;
   const send = async (what: string, request: Request): Promise<void> => {
-    const hash = await wallet.sendTransaction({ ...request, chain: null, account });
+    nonce ??= await reader.getTransactionCount({ address: account.address, blockTag: "pending" });
+    const hash = await wallet.sendTransaction({ ...request, chain: null, account, nonce });
+    nonce += 1;
     const receipt = await reader.waitForTransactionReceipt({ hash });
     log(`${what} ${hash} ${receipt.status}`);
     if (receipt.status !== "success") throw new Error(`${what} reverted`);
@@ -133,7 +156,29 @@ export async function runIntent(intent: Intent, envPath: string, log: (line: str
     return;
   }
 
-  throw new Error(`${intent.kind} is not implemented yet`);
+  if (intent.kind === "push") {
+    // Wrap, approve, push — in that order, and the approval covers the settlement after the push as
+    // well as the push itself. An approval sized to the top-up alone is consumed by it and leaves
+    // the leg unable to settle its next fill, which is what happened on 2026-09-11.
+    const wrap = BigInt(intent.wrap);
+    if (wrap > 0n) await send("wrapped", wrapRequest(leg.tokenB.address, wrap));
+    if (intent.needsApproval) {
+      await send("approved", approveRequest(leg.tokenB.address, leg.aqua, BigInt(intent.approval)));
+    }
+    await send(
+      "pushed",
+      pushRequest(leg.aqua, {
+        maker: account.address,
+        app: leg.app,
+        strategyHash: leg.strategyHash,
+        token: leg.tokenB.address,
+        amount: BigInt(intent.amount),
+      }),
+    );
+    return;
+  }
+
+  throw new Error("that intent is not implemented yet");
 }
 
 /** The entry point `zentis sign` runs: intent on stdin, one line per step on stdout. */

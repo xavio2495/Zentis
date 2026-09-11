@@ -157,52 +157,26 @@ test("a typed fill with no env file is refused with the same reason the key give
   expect(action.disabledReason).toContain("ZENTIS_ENV");
 });
 
-test("a push is three cast calls the binary makes itself, with no repository in sight", () => {
-  // The compiled console is handed to an operator who has no checkout: an action that shells out to
-  // `python3 scripts/rebalance.py` cannot run there. `cast` is on the PATH beside the binary.
+test("a push is the binary signing for itself, with its amounts on stdin and no Foundry anywhere", () => {
+  // What the three calls are and in what order is pinned in sign.test.ts against a transport that
+  // records the signed transactions. What is pinned here is that the parent asks for them without a
+  // shell, without `cast`, and without putting the amounts where `ps` would show them.
   const leg = LEGS[0]!;
   const action = buildPushAction("/tmp/private.env", {
     leg,
-    plan: { topUpB: 3_000_000_000_000_000n, wantedB: 6_000_000_000_000_000n, approval: 9_000_000_000_000_000n, needsApproval: true, wrap: 1_000_000_000_000_000n },
+    plan: { topUpB: 3n, wantedB: 6n, approval: 9n, needsApproval: true, wrap: 1n },
   });
-  expect(action.disabledReason).toBeNull();
-  expect(action.command!.cwd).not.toContain("contracts");
-  const script = action.command!.cmd.join(" ");
-  expect(script).not.toContain("rebalance.py");
-  expect(script).not.toContain("forge");
-  // Wrap, approve, push — in that order, and the approval covers the settlement after the push.
-  expect(script.indexOf("deposit()")).toBeLessThan(script.indexOf("approve(address,uint256)"));
-  expect(script.indexOf("approve(address,uint256)")).toBeLessThan(script.indexOf("push(address,address,bytes32,address,uint256)"));
-  expect(script).toContain("9000000000000000");
-  expect(script).toContain(leg.aqua);
-  expect(script).toContain(leg.strategyHash);
-});
-
-test("the nonce is counted from one read, not inferred three times", () => {
-  const action = buildPushAction("/tmp/private.env", {
-    leg: LEGS[0]!,
-    plan: { topUpB: 1n, wantedB: 2n, approval: 3n, needsApproval: true, wrap: 1n },
-  });
-  const script = action.command!.cmd.join(" ");
-  expect(script).toContain("cast nonce");
-  expect(script).toMatch(/--nonce \$N\b/);
-  expect(script).toMatch(/--nonce \$\(\(N \+ 1\)\)/);
-  expect(script).toMatch(/--nonce \$\(\(N \+ 2\)\)/);
-});
-
-test("a push never puts the key on a command line, and the console never reads it", () => {
-  const action = buildPushAction("/tmp/private.env", {
-    leg: LEGS[0]!,
-    plan: { topUpB: 1n, wantedB: 2n, approval: 3n, needsApproval: false, wrap: 0n },
-  });
-  const script = action.command!.cmd.join(" ");
-  // Sourced inside the child, like the fill: the key exists only in that process's environment.
-  expect(script).toContain("set -a");
-  expect(script).toContain("$CRE_ETH_PRIVATE_KEY");
-  expect(action.command!.cmd).toContain("/tmp/private.env");
-  // Nothing to wrap and nothing to approve: one transaction, not three.
-  expect(script).not.toContain("deposit()");
-  expect(script).not.toContain("approve(address,uint256)");
+  const command = action.command!;
+  expect(command.cmd.join(" ")).not.toContain("cast");
+  expect(command.cmd).toContain("sign");
+  expect(command.cmd.join(" ")).not.toContain("9");
+  const intent = JSON.parse(command.stdin!) as { kind: string; approval: string; wrap: string; keyName: string };
+  expect(intent.kind).toBe("push");
+  expect(intent.approval).toBe("9");
+  expect(intent.wrap).toBe("1");
+  // The maker's key, named rather than read: the child opens the file, this process never does.
+  expect(intent.keyName).toBe("CRE_ETH_PRIVATE_KEY");
+  expect(command.env!["ZENTIS_ENV"]).toBe("/tmp/private.env");
 });
 
 test("without an env file a push is refused in the same words as every other signing action", () => {
@@ -352,52 +326,26 @@ test("a typed fill with no env file is refused with the same reason the key give
   expect(action.disabledReason).toContain("ZENTIS_ENV");
 });
 
-test("a push is three cast calls the binary makes itself, with no repository in sight", () => {
-  // The compiled console is handed to an operator who has no checkout: an action that shells out to
-  // `python3 scripts/rebalance.py` cannot run there. `cast` is on the PATH beside the binary.
+test("a push is the binary signing for itself, with its amounts on stdin and no Foundry anywhere", () => {
+  // What the three calls are and in what order is pinned in sign.test.ts against a transport that
+  // records the signed transactions. What is pinned here is that the parent asks for them without a
+  // shell, without `cast`, and without putting the amounts where `ps` would show them.
   const leg = LEGS[0]!;
   const action = buildPushAction("/tmp/private.env", {
     leg,
-    plan: { topUpB: 3_000_000_000_000_000n, wantedB: 6_000_000_000_000_000n, approval: 9_000_000_000_000_000n, needsApproval: true, wrap: 1_000_000_000_000_000n },
+    plan: { topUpB: 3n, wantedB: 6n, approval: 9n, needsApproval: true, wrap: 1n },
   });
-  expect(action.disabledReason).toBeNull();
-  expect(action.command!.cwd).not.toContain("contracts");
-  const script = action.command!.cmd.join(" ");
-  expect(script).not.toContain("rebalance.py");
-  expect(script).not.toContain("forge");
-  // Wrap, approve, push — in that order, and the approval covers the settlement after the push.
-  expect(script.indexOf("deposit()")).toBeLessThan(script.indexOf("approve(address,uint256)"));
-  expect(script.indexOf("approve(address,uint256)")).toBeLessThan(script.indexOf("push(address,address,bytes32,address,uint256)"));
-  expect(script).toContain("9000000000000000");
-  expect(script).toContain(leg.aqua);
-  expect(script).toContain(leg.strategyHash);
-});
-
-test("the nonce is counted from one read, not inferred three times", () => {
-  const action = buildPushAction("/tmp/private.env", {
-    leg: LEGS[0]!,
-    plan: { topUpB: 1n, wantedB: 2n, approval: 3n, needsApproval: true, wrap: 1n },
-  });
-  const script = action.command!.cmd.join(" ");
-  expect(script).toContain("cast nonce");
-  expect(script).toMatch(/--nonce \$N\b/);
-  expect(script).toMatch(/--nonce \$\(\(N \+ 1\)\)/);
-  expect(script).toMatch(/--nonce \$\(\(N \+ 2\)\)/);
-});
-
-test("a push never puts the key on a command line, and the console never reads it", () => {
-  const action = buildPushAction("/tmp/private.env", {
-    leg: LEGS[0]!,
-    plan: { topUpB: 1n, wantedB: 2n, approval: 3n, needsApproval: false, wrap: 0n },
-  });
-  const script = action.command!.cmd.join(" ");
-  // Sourced inside the child, like the fill: the key exists only in that process's environment.
-  expect(script).toContain("set -a");
-  expect(script).toContain("$CRE_ETH_PRIVATE_KEY");
-  expect(action.command!.cmd).toContain("/tmp/private.env");
-  // Nothing to wrap and nothing to approve: one transaction, not three.
-  expect(script).not.toContain("deposit()");
-  expect(script).not.toContain("approve(address,uint256)");
+  const command = action.command!;
+  expect(command.cmd.join(" ")).not.toContain("cast");
+  expect(command.cmd).toContain("sign");
+  expect(command.cmd.join(" ")).not.toContain("9");
+  const intent = JSON.parse(command.stdin!) as { kind: string; approval: string; wrap: string; keyName: string };
+  expect(intent.kind).toBe("push");
+  expect(intent.approval).toBe("9");
+  expect(intent.wrap).toBe("1");
+  // The maker's key, named rather than read: the child opens the file, this process never does.
+  expect(intent.keyName).toBe("CRE_ETH_PRIVATE_KEY");
+  expect(command.env!["ZENTIS_ENV"]).toBe("/tmp/private.env");
 });
 
 test("without an env file a push is refused in the same words as every other signing action", () => {

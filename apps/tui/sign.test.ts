@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LEGS } from "@zentis/console-data";
-import { toFunctionSelector } from "viem";
+import { type Transport, parseTransaction, toFunctionSelector } from "viem";
 import { parseIntent, readKey, redact, runIntent } from "./src/sign.js";
 
 /**
@@ -33,7 +33,8 @@ const SELECTORS: Record<string, string> = {
   [toFunctionSelector("push(address,address,bytes32,address,uint256)")]: "push",
 };
 
-const recordingTransport = (sent: string[], nonces: number[]) => () => ({
+const recordingTransport = (sent: string[], nonces: number[]) =>
+  ((() => ({
   async request({ method, params }: { method: string; params?: unknown[] }) {
     if (method === "eth_chainId") return "0x1";
     if (method === "eth_getTransactionCount") return "0x7";
@@ -41,7 +42,15 @@ const recordingTransport = (sent: string[], nonces: number[]) => () => ({
     if (method === "eth_estimateGas") return "0x5208";
     if (method === "eth_blockNumber") return "0x1";
     if (method === "eth_getBlockByNumber") return { baseFeePerGas: "0x1", number: "0x1", timestamp: "0x1" };
-    if (method === "eth_sendRawTransaction") return `0x${"11".repeat(32)}`;
+      if (method === "eth_sendRawTransaction") {
+        // A local account signs in-process, so what reaches the transport is the signed transaction
+        // itself. Parsing it back is also the strongest form of this assertion: it is what would go
+        // on chain, not what was asked for.
+        const parsed = parseTransaction((params?.[0] ?? "0x") as `0x${string}`);
+        sent.push(SELECTORS[(parsed.data ?? "").slice(0, 10)] ?? "unknown");
+        if (parsed.nonce !== undefined) nonces.push(Number(parsed.nonce));
+        return `0x${"11".repeat(32)}`;
+      }
     if (method === "eth_getTransactionReceipt") {
       return { status: "0x1", transactionHash: `0x${"11".repeat(32)}`, blockNumber: "0x1" };
     }
@@ -52,9 +61,9 @@ const recordingTransport = (sent: string[], nonces: number[]) => () => ({
       if (tx.nonce !== undefined) nonces.push(Number(BigInt(tx.nonce)));
       return `0x${"11".repeat(32)}`;
     }
-    return null;
-  },
-});
+      return null;
+    },
+  })) as unknown as Transport);
 
 test("an intent arrives as data, and a malformed one is refused rather than guessed at", () => {
   const parsed = parseIntent(JSON.stringify({ kind: "approve", chainId: 11155111, token: "0x01", spender: "0x02", amount: "5" }));

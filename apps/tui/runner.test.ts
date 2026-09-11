@@ -31,19 +31,22 @@ test("the extra environment reaches the child, and the parent's PATH still does"
   expect(result.tail).toContain("path-ok");
 });
 
-test("the env file is sourced in the child and skips the name a shell cannot take", async () => {
-  // The real fill command's shell, with everything after the sourcing prologue swapped for an echo:
-  // this asserts the sourcing mechanism without sending anything. `1INCH_API_KEY` must be skipped
-  // rather than fatal.
-  const fill = buildActions(envPath).find((a) => a.key === "f")!.command!;
-  // Plain `$VAR`, not a bash substring: `sh` is dash here, and the real command's shell has to be
-  // POSIX for the same reason.
-  const shell = fill.cmd[2]!.replace(/set -e;.*$/, 'echo "sourced=$TAKER_PRIVATE_KEY"');
-  const result = await run({ cmd: ["sh", "-c", shell, "sh", envPath], cwd: dir });
+test("an intent reaches the child on stdin, where ps cannot see it", async () => {
+  // The env file is no longer sourced by a shell: the signing child opens it and reads the one
+  // variable it wants. What the runner has to carry now is the intent, and it goes on stdin —
+  // arguments are visible to every user on the machine, and an intent names amounts and addresses.
+  const intent = JSON.stringify({ kind: "fill", chainId: 11155111, amount: "150000", isAToB: true });
+  const result = await run({ cmd: ["sh", "-c", "cat"], cwd: dir, stdin: intent });
 
   expect(result.exitCode).toBe(0);
-  expect(result.tail).toContain(`sourced=${SECRET}`); // the child got the key
-  expect(result.tail).not.toContain("command not found"); // the digit-led name did not break sourcing
+  expect(result.tail).toContain("150000");
+});
+
+test("a fill's command carries no amount and no key in its arguments", () => {
+  const fill = buildActions(envPath).find((a) => a.key === "f")!.command!;
+  expect(fill.cmd.join(" ")).not.toContain("150000");
+  expect(fill.cmd.join(" ")).not.toContain(SECRET);
+  expect(fill.stdin).toContain("150000");
 });
 
 test("this process never reads the env file, so the key is not in its own environment", () => {

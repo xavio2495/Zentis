@@ -350,18 +350,15 @@ export const describeCommand = (action: Action): string =>
   action.command === null ? action.describe : `${action.describe}: ${action.command.cmd.join(" ")}`;
 
 /**
- * A top-up the console performs itself: wrap if the wallet is short, approve, push.
+ * A top-up, signed by a child of this binary.
  *
- * No repository and no script. The compiled binary is handed to an operator who may have no
- * checkout at all, so an action that shelled out to `python3 scripts/rebalance.py` could not run
- * where the console actually runs — `cast` is on the PATH beside it, and these are three plain calls
- * with plain arguments, which is the whole reason `push` can be made self-contained and `fill`
- * cannot: a fill has to build a SwapVM order and its program bytes, and hand-encoding that here
- * would be a second implementation of the contract's own builder.
+ * It was three `cast` invocations in a shell. Foundry is a developer toolchain and a stranger's
+ * device will not have it, so the calls moved into the signing child with everything else: wrap when
+ * the wallet's free balance is short, approve `topUp + wantedB` — the approval has to cover the
+ * settlement after the push as well as the push itself — then Aqua's own `push`.
  *
- * The key is sourced inside the child, exactly as the fill does it, so it exists only in that
- * process's environment and never on a command line where `ps` would show it. The nonce is read once
- * and counted: three sends racing for the same nonce is the ordinary way this fails.
+ * The amounts are computed once, in `pushPlan`, and carried in the intent rather than recomputed on
+ * the other side of a process boundary where they could differ.
  */
 export function buildPushAction(
   envFile: string | null,
@@ -371,27 +368,6 @@ export function buildPushAction(
   const blocked = envFile === null ? NO_ENV : null;
   const token = leg.tokenB;
   const size = decimalOf(plan.topUpB, token.decimals);
-  const rpc = `--rpc-url ${leg.rpcUrl}`;
-  const key = "--private-key \"$CRE_ETH_PRIVATE_KEY\"";
-  // Counted from one read. `cast nonce` is the pending count, so the first send takes it as-is.
-  const steps: string[] = ["N=$(cast nonce " + BOOK.maker + " " + rpc + ")"];
-  let step = 0;
-  const at = () => (step === 0 ? "$N" : `$((N + ${step}))`);
-  if (plan.wrap > 0n) {
-    steps.push(`cast send ${token.address} "deposit()" --value ${plan.wrap} ${rpc} ${key} --nonce ${at()}`);
-    step += 1;
-  }
-  if (plan.needsApproval) {
-    steps.push(
-      `cast send ${token.address} "approve(address,uint256)" ${leg.aqua} ${plan.approval} ${rpc} ${key} --nonce ${at()}`,
-    );
-    step += 1;
-  }
-  steps.push(
-    `cast send ${leg.aqua} "push(address,address,bytes32,address,uint256)" ` +
-      `${BOOK.maker} ${leg.app} ${leg.strategyHash} ${token.address} ${plan.topUpB} ${rpc} ${key} --nonce ${at()}`,
-  );
-
   return {
     key: "",
     short: "push",
@@ -401,10 +377,18 @@ export function buildPushAction(
     command:
       blocked === null
         ? {
-            // `set -e` so a failed wrap or approval does not leave a push running against a nonce
-            // that has already been spent.
-            cmd: ["sh", "-c", sourceThenRun(`set -e; ${steps.join("; ")}`), "sh", envFile!],
+            cmd: selfCommand("sign"),
             cwd: process.cwd(),
+            env: { ZENTIS_ENV: envFile! },
+            stdin: JSON.stringify({
+              kind: "push",
+              chainId: leg.chainId,
+              amount: String(plan.topUpB),
+              approval: String(plan.approval),
+              wrap: String(plan.wrap),
+              needsApproval: plan.needsApproval,
+              keyName: "CRE_ETH_PRIVATE_KEY",
+            }),
           }
         : null,
     describe:
