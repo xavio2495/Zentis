@@ -153,84 +153,55 @@ export interface FillParams {
 }
 
 /**
- * A fill, as the console's own two transactions.
+ * How this program re-invokes itself.
  *
- * The order and its taker traits are not built here. They are recorded in the deployment record by
- * `EncodeFill.s.sol` — the contract's own builders — and written only once the router's hash of the
- * rebuilt order matched the shipped strategy on chain, so passing them through is passing the live
- * position. Re-encoding a SwapVM order in a shell command would be a second implementation of the
- * encoder, which is the guess the project's first rule exists to prevent.
+ * Compiled, the binary is its own interpreter, so the signing child is `<binary> sign`. Run from
+ * source it is `bun src/main.tsx sign`. Either way the child is *this* program: there is no second
+ * tool to install, and nothing on a stranger's device to be missing.
+ */
+export function selfCommand(subcommand: string): string[] {
+  const script = process.argv[1];
+  const compiled = script === undefined || script.startsWith("/$bunfs") || script === process.execPath;
+  return compiled ? [process.execPath, subcommand] : [process.execPath, script, subcommand];
+}
+
+/**
+ * A fill, signed by a child of this binary.
  *
- * It quotes first with `cast call` — a static call, which is what `asView()` is in Solidity — and
- * refuses to send if the swap would not match it. That is the parity check `Fill.s.sol` asserted,
- * and it is what catches a reference moving between the quote on screen and the fill.
+ * The order and its taker traits are not built here or there: they come from the `fill` block
+ * recorded beside each deployment, produced by the contract's own builders and written only after
+ * the router's hash of the rebuilt order matched the shipped strategy on chain.
+ *
+ * The intent goes on the child's stdin. Arguments are visible in `ps` to every user on the machine,
+ * and an intent names the amount, the side and which key to use.
  */
 function fillCommand(envFile: string, fill: FillParams): ActionCommand {
-  const { leg } = fill;
-  const bytes = leg.fill!;
-  const [tokenIn] = fill.isAToB ? [leg.tokenA, leg.tokenB] : [leg.tokenB, leg.tokenA];
-  const takerData = fill.isAToB ? bytes.takerDataAToB : bytes.takerDataBToA;
-  const rpc = `--rpc-url ${leg.rpcUrl}`;
-  const key = '--private-key "$TAKER_PRIVATE_KEY"';
-  const quoteSignature = quoteSignatureOf(bytes.swapSignature);
-
-  const script = [
-    // What the router says it would do, read before anything is sent.
-    `QUOTED=$(cast call ${bytes.router} ${JSON.stringify(quoteSignature)} ${JSON.stringify(bytes.orderTuple)} ${fill.amountRaw} ${takerData} ${rpc})`,
-    'echo "quoted: $QUOTED"',
-    `N=$(cast nonce ${bytes.taker} ${rpc})`,
-    `cast send ${tokenIn.address} "approve(address,uint256)" ${bytes.router} ${fill.amountRaw} ${rpc} ${key} --nonce $N`,
-    `cast send ${bytes.router} ${JSON.stringify(bytes.swapSignature)} ${JSON.stringify(bytes.orderTuple)} ${fill.amountRaw} ${takerData} ${rpc} ${key} --nonce $((N + 1))`,
-    // Read back and compared: a swap that did not match the quote is the thing this has to catch.
-    `AFTER=$(cast call ${bytes.router} ${JSON.stringify(quoteSignature)} ${JSON.stringify(bytes.orderTuple)} ${fill.amountRaw} ${takerData} ${rpc})`,
-    'echo "quoted after: $AFTER"',
-  ].join("; ");
-
   return {
-    cmd: ["sh", "-c", sourceThenRun(`set -e; ${script}`), "sh", envFile],
+    cmd: selfCommand("sign"),
     cwd: process.cwd(),
+    env: { ZENTIS_ENV: envFile },
+    stdin: JSON.stringify({
+      kind: "fill",
+      chainId: fill.leg.chainId,
+      amount: String(fill.amountRaw),
+      isAToB: fill.isAToB,
+    }),
   };
 }
 
 /**
- * What the router says it would do, asked directly.
+ * What the router says it would do, read in this process.
  *
- * A static call, which is what `asView()` is in Solidity, so it is the quote path the contracts
- * require rather than a second opinion. It needs no key and no quote service, which is the point:
- * the operator can still ask the router for a price when the service they usually read it from is
- * the thing that is down.
+ * It was `cast call`; it is an `eth_call` through the viem the binary already carries. A static
+ * call is what `asView()` provides in Solidity, so this is the quote path the contracts require
+ * rather than a second opinion — and it needs no key, so it answers watch-only, and no external
+ * tool, so it answers on a device that has only this binary.
  */
-export function buildQuoteAction(fill: FillParams): Action {
-  const { leg } = fill;
-  const bytes = leg.fill;
-  const takerData = bytes === null ? "" : fill.isAToB ? bytes.takerDataAToB : bytes.takerDataBToA;
-  const [from, to] = fill.isAToB ? [leg.tokenA, leg.tokenB] : [leg.tokenB, leg.tokenA];
-  return {
-    key: "",
-    short: "quote",
-    blocker: null,
-    label: `quote ${leg.name.replace(/-sepolia$/, "")} ${decimalOf(fill.amountRaw, from.decimals)} ${from.symbol}`,
-    disabledReason:
-      bytes === null ? `no fill bytes recorded for ${leg.name}, so this console cannot build the order` : null,
-    command:
-      bytes === null
-        ? null
-        : {
-            cmd: [
-              "sh",
-              "-c",
-              `cast call ${bytes.router} ${JSON.stringify(quoteSignatureOf(bytes.swapSignature))} ` +
-                `${JSON.stringify(bytes.orderTuple)} ${fill.amountRaw} ${takerData} --rpc-url ${leg.rpcUrl}`,
-            ],
-            cwd: process.cwd(),
-          },
-    describe: `asks ${leg.label}'s router what it would give for ${from.symbol}, in ${to.symbol}`,
-  };
+export function quoteAvailability(leg: LegConfig): string | null {
+  return leg.fill === null
+    ? `no fill bytes recorded for ${leg.name}, so this console cannot build the order`
+    : null;
 }
-
-/** The router's quote, declared the way its swap is: the same arguments, returning what it would do. */
-const quoteSignatureOf = (swapSignature: string): string =>
-  `${swapSignature.replace(/^swap/, "quote")}(uint256,uint256,bytes32)`;
 
 /** How a fill is named on screen: the leg, the size and the token going in. */
 function fillLabel(fill: FillParams): string {

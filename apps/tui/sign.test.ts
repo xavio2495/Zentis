@@ -2,7 +2,9 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseIntent, readKey, redact } from "./src/sign.js";
+import { LEGS } from "@zentis/console-data";
+import { toFunctionSelector } from "viem";
+import { parseIntent, readKey, redact, runIntent } from "./src/sign.js";
 
 /**
  * The one process that holds a key.
@@ -14,6 +16,45 @@ import { parseIntent, readKey, redact } from "./src/sign.js";
  */
 const dir = mkdtempSync(join(tmpdir(), "zentis-sign-"));
 const SECRET = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+
+const keyFile = join(dir, "key.env");
+writeFileSync(keyFile, `TAKER_PRIVATE_KEY=${SECRET}\n`);
+chmodSync(keyFile, 0o600);
+
+/**
+ * A transport that answers rather than asks, recording what it was told to send.
+ *
+ * The chain is not the subject here: the sequence is. Which calls a push makes, in what order, and
+ * against which nonces is what a mocked transport can pin and a live one cannot pin cheaply.
+ */
+const SELECTORS: Record<string, string> = {
+  [toFunctionSelector("deposit()")]: "deposit",
+  [toFunctionSelector("approve(address,uint256)")]: "approve",
+  [toFunctionSelector("push(address,address,bytes32,address,uint256)")]: "push",
+};
+
+const recordingTransport = (sent: string[], nonces: number[]) => () => ({
+  async request({ method, params }: { method: string; params?: unknown[] }) {
+    if (method === "eth_chainId") return "0x1";
+    if (method === "eth_getTransactionCount") return "0x7";
+    if (method === "eth_gasPrice" || method === "eth_maxPriorityFeePerGas") return "0x1";
+    if (method === "eth_estimateGas") return "0x5208";
+    if (method === "eth_blockNumber") return "0x1";
+    if (method === "eth_getBlockByNumber") return { baseFeePerGas: "0x1", number: "0x1", timestamp: "0x1" };
+    if (method === "eth_sendRawTransaction") return `0x${"11".repeat(32)}`;
+    if (method === "eth_getTransactionReceipt") {
+      return { status: "0x1", transactionHash: `0x${"11".repeat(32)}`, blockNumber: "0x1" };
+    }
+    if (method === "eth_call") return "0x";
+    if (method === "eth_sendTransaction") {
+      const tx = (params?.[0] ?? {}) as { data?: string; nonce?: string };
+      sent.push(SELECTORS[(tx.data ?? "").slice(0, 10)] ?? "unknown");
+      if (tx.nonce !== undefined) nonces.push(Number(BigInt(tx.nonce)));
+      return `0x${"11".repeat(32)}`;
+    }
+    return null;
+  },
+});
 
 test("an intent arrives as data, and a malformed one is refused rather than guessed at", () => {
   const parsed = parseIntent(JSON.stringify({ kind: "approve", chainId: 11155111, token: "0x01", spender: "0x02", amount: "5" }));
@@ -69,3 +110,38 @@ test("redaction holds even when the key is not the one that was passed in", () =
 // After the tests, not while the module is being read: at module scope this ran before the first
 // test did, and every one of them then failed on a directory that was already gone.
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+test("a push is wrap, approve and push, in that order and against one counted nonce", async () => {
+  // The transport records what it is asked to do rather than doing it, which is how the sequence is
+  // pinned without a chain: the order of these three is the whole correctness of a top-up.
+  const sent: string[] = [];
+  const nonces: number[] = [];
+  await runIntent(
+    {
+      kind: "push",
+      chainId: LEGS[0]!.chainId,
+      amount: "1000",
+      approval: "3000",
+      wrap: "500",
+      needsApproval: true,
+      keyName: "TAKER_PRIVATE_KEY",
+    },
+    keyFile,
+    () => undefined,
+    recordingTransport(sent, nonces),
+  );
+  expect(sent).toEqual(["deposit", "approve", "push"]);
+  // One read, then counted: three sends racing for the same nonce is the ordinary way this fails.
+  expect(nonces).toEqual([7, 8, 9]);
+});
+
+test("a push with nothing to wrap and an allowance that covers it is one transaction", async () => {
+  const sent: string[] = [];
+  await runIntent(
+    { kind: "push", chainId: LEGS[0]!.chainId, amount: "1000", approval: "3000", wrap: "0", needsApproval: false, keyName: "TAKER_PRIVATE_KEY" },
+    keyFile,
+    () => undefined,
+    recordingTransport(sent, []),
+  );
+  expect(sent).toEqual(["push"]);
+});

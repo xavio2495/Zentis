@@ -12,7 +12,8 @@ import {
   pushPlan,
 } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
-import { type PublisherMode, buildQuoteAction } from "./actions.js";
+import { type PublisherMode, quoteAvailability } from "./actions.js";
+import { readQuote } from "./quote.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
@@ -203,26 +204,30 @@ export function App({
         setAnswer({ text: `chart window ${command.index === null ? "automatic" : WINDOWS[command.index]!.label}`, bad: false });
         return;
       case "quote": {
-        // Asked of the router directly, as a static call. It needs no key, so it answers watch-only,
-        // and no quote service, so it still answers when that service is what is down. The two-sided
-        // quotes on the cards still come from the service, which decodes a refusal into a sentence.
+        // Read here, in this process, through the same static call the contracts require. No key, so
+        // it answers watch-only; no child process, so it answers on a device that has only this
+        // binary; and no quote service, so it answers when that service is the thing that is down.
+        const unavailable = quoteAvailability(command.leg);
+        if (unavailable !== null) {
+          setAnswer({ text: unavailable, bad: true });
+          return;
+        }
         const sides = command.side === "both" ? [true, false] : [command.side === "AtoB"];
-        const asked = sides.map((isAToB) =>
-          buildQuoteAction({ leg: command.leg, amountRaw: command.amountRaw, isAToB }),
-        );
-        const refused = asked.find((a) => a.disabledReason !== null);
-        if (refused !== undefined) {
-          setAnswer({ text: refused.disabledReason!, bad: true });
-          return;
-        }
-        if (runAction === null) {
-          setAnswer({ text: asked.map((a) => a.label).join("  ·  "), bad: false });
-          return;
-        }
         setAnswer({ text: "asking the router…", bad: false });
-        void Promise.all(asked.map((action) => runAction(action)))
+        void Promise.all(
+          sides.map(async (isAToB) => {
+            const { amountIn, amountOut } = await readQuote(command.leg, { amountRaw: command.amountRaw, isAToB });
+            const [from, to] = isAToB
+              ? [command.leg.tokenA, command.leg.tokenB]
+              : [command.leg.tokenB, command.leg.tokenA];
+            return (
+              `${tokenAmount(amountIn, from.decimals)} ${from.symbol} → ` +
+              `${tokenAmount(amountOut, to.decimals)} ${to.symbol}`
+            );
+          }),
+        )
           .then((lines) => setAnswer({ text: lines.join("   ·   "), bad: false }))
-          .catch((cause: unknown) => setAnswer({ text: `the router could not be asked: ${String(cause)}`, bad: true }));
+          .catch((cause: unknown) => setAnswer({ text: `the router did not answer: ${String(cause)}`, bad: true }));
         return;
       }
       case "rebalance":
