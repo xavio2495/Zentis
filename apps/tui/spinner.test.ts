@@ -60,3 +60,10 @@ test("an empty feed waits on its source rather than quoting the endpoint at it",
     expect(text).toMatch(/waiting on fills/);
   }
 }, 60_000);
+
+test("an unread card does not name a source the book no longer prices from", async () => {
+  // "pool price from RPC" under the spinner: the venue is where a leg's trades settle, and two of
+  // them are retired. It says nothing a reader of an unread card needs.
+  const text = (await drive(120, 40, { scenario: "outage" })).lines.join("\n");
+  expect(text).not.toContain("pool price from RPC");
+}, 60_000);

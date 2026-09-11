@@ -102,3 +102,14 @@ test("the state row leaves the book's facts to the book row rather than repeatin
   expect(state).not.toMatch(/% USDC/);
   expect(state).not.toContain("armed");
 }, 60_000);
+
+test("with nothing valued the profit is unknown, never a zero the book did not earn", async () => {
+  // The outage frame said "book unvalued · split unknown · … · profit 0 USDC". Zero is a claim that
+  // the maker earned nothing, and nothing was read to support it — the same failure `bookTotals`
+  // exists to refuse, arriving through a different door.
+  const snapshot = fakeSnapshot("outage");
+  expect(snapshot.book.inventoryA).toBeNull();
+  const row = rowWith((await drive(190, 50, { scenario: "outage" })).lines, "book")!;
+  expect(row).toContain("profit unknown");
+  expect(row).not.toMatch(/profit [-+]?[\d.]/);
+}, 60_000);

@@ -75,6 +75,42 @@ const NO_REPO = "set ZENTIS_REPO=/path/to/Zentis — the scripts are not below t
 const sourceThenRun = (script: string) =>
   `set -a; eval "$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$1")"; set +a; ${script}`;
 
+/**
+ * Asking the cloud publisher to run now.
+ *
+ * The publisher does not live on the laptop any more: it is a Cloud Run job with its own schedule
+ * and its own secrets, ticking every five minutes. "Republish now" is therefore a request to that
+ * job rather than a workflow run on this machine, which is also why it needs no signing key here —
+ * the job holds its own. It still asks before it does it, because the consequence is the same.
+ *
+ * The execution's own name is kept and the log read is filtered to it: the schedule is running
+ * beside this, so the newest line in that log is not necessarily the run the operator asked for.
+ */
+const cloudCommand = (workflow: "fast" | "slow", project: string): ActionCommand => ({
+  cmd: [
+    "sh",
+    "-c",
+    [
+      `EXEC=$(gcloud run jobs execute ${PUBLISHER_JOB} --region ${PUBLISHER_REGION} ` +
+        `--project "$ZENTIS_GCP_PROJECT" --args ${workflow} --wait --format="value(metadata.name)")`,
+      'echo "execution $EXEC"',
+      // The publisher echoes its own "fast rc=0 …" line to stdout, which is the result worth showing.
+      `gcloud logging read "resource.type=cloud_run_job AND ` +
+        `labels.\"run.googleapis.com/execution_name\"=\"$EXEC\" AND textPayload:rc=" ` +
+        `--project "$ZENTIS_GCP_PROJECT" --limit 10 --freshness=30m --format="value(textPayload)"`,
+    ].join("; "),
+  ],
+  cwd: process.cwd(),
+  // The project id is not a secret, but it is configuration: passed to the child rather than written
+  // into a command line that a screenshot would carry.
+  env: { ZENTIS_GCP_PROJECT: project },
+});
+
+const PUBLISHER_JOB = "zentis-publisher";
+const PUBLISHER_REGION = "us-central1";
+
+const NO_PUBLISHER = "set ZENTIS_GCP_PROJECT to republish through the cloud publisher";
+
 const creCommand = (workflow: "fast" | "slow", envFile: string, repo: string): ActionCommand => ({
   cmd: ["cre", "-e", envFile, "workflow", "simulate", workflow, "--target", "staging-settings", "--broadcast"],
   cwd: join(repo, "cre"),
@@ -244,7 +280,16 @@ export function buildRepublishAction(
 export function buildActions(
   envFile: string | null,
   repo: string | null = findRepoRoot(),
+  /** the Cloud Run project the publisher runs in; when set, a republish asks that job */
+  gcpProject: string | undefined = process.env["ZENTIS_GCP_PROJECT"],
 ): Action[] {
+  // Resolution order for a republish: the cloud job, then a checkout, then neither. The job is
+  // preferred because it is where the publisher actually runs — a local `cre` run is the fallback
+  // for someone working on the workflow itself.
+  const cloud = gcpProject !== undefined && gcpProject !== "";
+  const publishBlocked = cloud ? null : repo === null ? NO_PUBLISHER : envFile === null ? NO_ENV : null;
+  const publishCommand = (workflow: "fast" | "slow"): ActionCommand | null =>
+    cloud ? cloudCommand(workflow, gcpProject!) : publishBlocked === null ? creCommand(workflow, envFile!, repo!) : null;
   // Both reasons are real and either alone is enough, so the missing repository is named first:
   // it is the one the operator can fix without going to look for a key.
   const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
@@ -253,21 +298,25 @@ export function buildActions(
   return [
     {
       key: "r",
-      blocker,
+      blocker: publishBlocked === null ? null : cloud ? null : repo === null ? "repo" : "env",
       label: "republish fast",
       short: "fast",
-      disabledReason: blocked,
-      command: runnable ? creCommand("fast", envFile!, repo!) : null,
-      describe: "runs the fast workflow against the testnets and broadcasts its report",
+      disabledReason: publishBlocked,
+      command: publishCommand("fast"),
+      describe: cloud
+        ? "asks the cloud publisher to run the fast workflow now, ahead of its own schedule"
+        : "runs the fast workflow against the testnets and broadcasts its report",
     },
     {
       key: "s",
-      blocker,
+      blocker: publishBlocked === null ? null : cloud ? null : repo === null ? "repo" : "env",
       label: "republish slow",
       short: "slow",
-      disabledReason: blocked,
-      command: runnable ? creCommand("slow", envFile!, repo!) : null,
-      describe: "runs the slow workflow: spread, markout and the boundary",
+      disabledReason: publishBlocked,
+      command: publishCommand("slow"),
+      describe: cloud
+        ? "asks the cloud publisher to run the slow workflow now: spread, markout and the boundary"
+        : "runs the slow workflow: spread, markout and the boundary",
     },
     {
       key: "f",
@@ -373,7 +422,9 @@ export function buildPushAction(
 export function commandActions(envFile: string | null, repo: string | null = findRepoRoot()) {
   return {
     fill: (fill: FillParams): Action => buildFillAction(envFile, repo, fill),
-    republish: (workflow: "fast" | "slow"): Action => buildRepublishAction(envFile, repo, workflow),
+    republish: (workflow: "fast" | "slow"): Action =>
+      buildActions(envFile, repo).find((a) => a.label === `republish ${workflow}`) ??
+      buildRepublishAction(envFile, repo, workflow),
     // No repository in its arguments: a push is three `cast` calls the binary makes itself.
     push: (push: { leg: LegConfig; plan: PushPlan }): Action => buildPushAction(envFile, push),
   };

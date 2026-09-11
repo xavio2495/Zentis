@@ -23,7 +23,9 @@ writeFileSync(
 );
 
 const REPO = resolve(import.meta.dir, "..", "..");
-const all = (envFile: string | null) => buildActions(envFile);
+// No cloud publisher unless a test asks for one: the default reads this machine's environment, and a
+// suite that passes or fails on what happens to be exported around it is not a suite.
+const all = (envFile: string | null) => buildActions(envFile, findRepoRoot(), "");
 const find = (envFile: string | null, key: string) => all(envFile).find((a) => a.key === key)!;
 
 test("without an env file every signing action is disabled, and says why", () => {
@@ -124,22 +126,25 @@ test("the repo root is found by walking up from the working directory", () => {
   );
 });
 
-test("with no root, no workflow command is built against a guess", () => {
-  // The two workflow actions run `cre` from the repository's own directory and still need it. The
-  // fill does not any more: its order comes from the deployment record, so it runs anywhere.
+test("with no root and no cloud project, no workflow command is built against a guess", () => {
+  // A republish is the cloud job's now, with a local `cre` run as the fallback for someone working
+  // on the workflow itself. With neither, the reason names the one that is usually wanted. The fill
+  // needs neither any more: its order comes from the deployment record, so it runs anywhere.
   for (const key of ["r", "s"]) {
-    const action = buildActions(envPath, null).find((a) => a.key === key)!;
+    // An empty project is "no cloud publisher": the default would read this machine's environment,
+    // and a test that passes or fails on what is exported around it is not a test.
+    const action = buildActions(envPath, null, "").find((a) => a.key === key)!;
     expect(action.command).toBeNull();
-    expect(action.disabledReason).toContain("ZENTIS_REPO");
+    expect(action.disabledReason).toContain("ZENTIS_GCP_PROJECT");
   }
   expect(buildActions(envPath, null).find((a) => a.key === "f")!.command).not.toBeNull();
   // Re-quote reads through the quote path and needs no repository at all.
   expect(buildActions(envPath, null).find((a) => a.key === "q")!.disabledReason).toBeNull();
 });
 
-test("the missing repository is named before the missing key, being the easier one to fix", () => {
-  expect(buildActions(null, null).find((a) => a.key === "r")!.disabledReason).toContain("ZENTIS_REPO");
-  expect(buildActions(null, REPO).find((a) => a.key === "r")!.disabledReason).toContain("ZENTIS_ENV");
+test("the missing publisher is named before the missing key, being the easier one to fix", () => {
+  expect(buildActions(null, null, "").find((a) => a.key === "r")!.disabledReason).toContain("ZENTIS_GCP_PROJECT");
+  expect(buildActions(null, REPO, "").find((a) => a.key === "r")!.disabledReason).toContain("ZENTIS_ENV");
 });
 
 test("ZENTIS_REPO overrides the search, and a wrong one is ignored rather than obeyed", () => {
@@ -327,9 +332,9 @@ test("the project is passed to the child rather than written into the command", 
 
 test("without a project the repository still works, and without either the reason says what to set", () => {
   // Resolution order: the cloud job, then a checkout, then neither.
-  const local = buildActions(envPath, REPO).find((a) => a.key === "r")!;
+  const local = buildActions(envPath, REPO, "").find((a) => a.key === "r")!;
   expect(local.command!.cmd.join(" ")).toContain("cre");
-  const neither = buildActions(envPath, null).find((a) => a.key === "r")!;
+  const neither = buildActions(envPath, null, "").find((a) => a.key === "r")!;
   expect(neither.command).toBeNull();
   expect(neither.disabledReason).toContain("ZENTIS_GCP_PROJECT");
 });

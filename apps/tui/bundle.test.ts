@@ -100,16 +100,18 @@ test("the compiled binary finds the repository from its working directory, not f
     runBinary(binary, { keys: "r", waitSeconds: 3, cwd, env: { ZENTIS_FIXTURES: "1", ...env } }).screen;
 
   // Inside the repository the action is offered, and the confirmation is reached.
-  const inside = drive(repo, { ZENTIS_ENV: envFile });
+  const inside = drive(repo, { ZENTIS_ENV: envFile, ZENTIS_GCP_PROJECT: "" });
   expect(inside).toContain("press y to broadcast");
 
   // Outside it, the keys are disabled with a reason the operator can act on, rather than failing at
   // spawn time after they have already confirmed a broadcast.
-  const outside = drive(dir, { ZENTIS_ENV: envFile });
-  expect(outside).toContain("ZENTIS_REPO");
+  // A republish resolves to the cloud publisher first, so the reason outside a checkout names that;
+  // the fallback is a local `cre` run, which is what ZENTIS_REPO points at.
+  const outside = drive(dir, { ZENTIS_ENV: envFile, ZENTIS_GCP_PROJECT: "" });
+  expect(outside).toMatch(/ZENTIS_GCP_PROJECT|ZENTIS_REPO/);
   expect(outside).not.toContain("press y to broadcast");
 
-  const pointed = drive(dir, { ZENTIS_ENV: envFile, ZENTIS_REPO: repo });
+  const pointed = drive(dir, { ZENTIS_ENV: envFile, ZENTIS_REPO: repo, ZENTIS_GCP_PROJECT: "" });
   expect(pointed).toContain("press y to broadcast");
 }, 180_000);
 
