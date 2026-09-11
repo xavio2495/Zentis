@@ -49,14 +49,28 @@ def call(to, sig, *args, rpc):
     return [int(line.split()[0]) for line in out.stdout.strip().splitlines()]
 
 
-def send(to, sig, *args, rpc, private_key, value=None):
+def send(to, sig, *args, rpc, private_key, value=None, nonce=None):
+    """One transaction, with the nonce stated rather than inferred.
+
+    `cast send` waits for a receipt, but some testnet RPCs answer with the receipt before their own
+    pending-nonce view has caught up, so a second send moments later picks the same nonce and is
+    refused as an underpriced replacement. That is how the Base leg's approve died between its wrap
+    and its push. Counting the nonce here removes the race rather than sleeping through it.
+    """
     cmd = ["cast", "send", to, sig, *map(str, args), "--private-key", private_key, "-r", rpc, "--json"]
     if value is not None:
         cmd += ["--value", str(value)]
+    if nonce is not None:
+        cmd += ["--nonce", str(nonce)]
     out = subprocess.run(cmd, capture_output=True, text=True)
     if out.returncode != 0:
         return None, out.stderr.strip()[-400:]
     return json.loads(out.stdout), None
+
+
+def next_nonce(address, rpc):
+    out = subprocess.run(["cast", "nonce", address, "--block", "pending", "-r", rpc], capture_output=True, text=True)
+    return int(out.stdout.strip()) if out.returncode == 0 else None
 
 
 def plan_leg(name, rpc, fast):
@@ -86,10 +100,15 @@ def plan_leg(name, rpc, fast):
     held = call(leg["tokenB"], "balanceOf(address)(uint256)", maker, rpc=rpc)[0]
     committed = balance_b
     free = max(0, held - committed)
+    # Shipping approves Aqua for the leg's whole tokenB side and ship() moves nothing, so that
+    # allowance is usually still standing and large enough. Approving again costs a transaction and
+    # an extra nonce for no effect.
+    allowance = call(leg["tokenB"], "allowance(address,address)(uint256)", maker, leg["aqua"], rpc=rpc)[0]
     return {
         "name": name, "rpc": rpc, "leg": leg, "maker": maker,
         "mid": mid, "balanceA": balance_a, "balanceB": balance_b,
         "wantedB": wanted_b, "topUp": top_up, "free": free, "wrap": max(0, top_up - free),
+        "allowance": allowance,
     }, None
 
 
@@ -112,25 +131,36 @@ def main():
         if plan["topUp"] <= 0:
             print(f"   holds {-plan['topUp'] / 1e18:.6f} WETH more than the mid wants; a top-up cannot fix that, skipping")
             continue
-        print(f"   top up {plan['topUp'] / 1e18:.6f} WETH (free {plan['free'] / 1e18:.6f}, wrapping {plan['wrap'] / 1e18:.6f})")
+        approving = "approving" if plan["allowance"] < plan["topUp"] else "allowance already covers it"
+        print(f"   top up {plan['topUp'] / 1e18:.6f} WETH (free {plan['free'] / 1e18:.6f}, "
+              f"wrapping {plan['wrap'] / 1e18:.6f}, {approving})")
         if dry_run:
             continue
 
         leg = plan["leg"]
+        nonce = next_nonce(plan["maker"], rpc)
+        if nonce is None:
+            print("   could not read the maker's nonce, so nothing was sent")
+            continue
         if plan["wrap"] > 0:
-            receipt, error = send(leg["tokenB"], "deposit()", rpc=rpc, private_key=private_key, value=plan["wrap"])
+            receipt, error = send(leg["tokenB"], "deposit()", rpc=rpc, private_key=private_key,
+                                  value=plan["wrap"], nonce=nonce)
             if error:
                 print(f"   wrap FAILED: {error}")
                 continue
             print(f"   wrapped: {receipt['transactionHash']}")
-        receipt, error = send(leg["tokenB"], "approve(address,uint256)", leg["aqua"], plan["topUp"],
-                              rpc=rpc, private_key=private_key)
-        if error:
-            print(f"   approve FAILED: {error}")
-            continue
+            nonce += 1
+        if plan["allowance"] < plan["topUp"]:
+            receipt, error = send(leg["tokenB"], "approve(address,uint256)", leg["aqua"], plan["topUp"],
+                                  rpc=rpc, private_key=private_key, nonce=nonce)
+            if error:
+                print(f"   approve FAILED: {error}")
+                continue
+            print(f"   approved: {receipt['transactionHash']}")
+            nonce += 1
         receipt, error = send(leg["aqua"], "push(address,address,bytes32,address,uint256)",
                               plan["maker"], leg["app"], leg["strategyHash"], leg["tokenB"], plan["topUp"],
-                              rpc=rpc, private_key=private_key)
+                              rpc=rpc, private_key=private_key, nonce=nonce)
         if error:
             print(f"   push FAILED: {error}")
             continue
