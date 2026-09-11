@@ -4,6 +4,7 @@ import { duration, signed, tokenAmount } from "../format.js";
 import { type Seg, fitSegments, padRows, segWidth, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { LEG_ORDER, UI, legColour } from "../theme.js";
+import { spinnerAt } from "../spinner.js";
 
 /** A chain as the rest of the screen names it, so no reader has to learn that SEP means Sepolia. */
 const nameOf = (leg: LegSnapshot): string => leg.config.label.split(" ")[0] ?? String(leg.config.chainId);
@@ -285,11 +286,13 @@ export function Feed({
   const { header, body: lines } = table(foldRounds(snapshot.feed), snapshot, width, body);
 
   // A blank region during an outage reads as "nothing has happened", which is a claim. It has not
-  // been established that nothing happened; the source that would say so refused.
+  // been established that nothing happened; the source that would say so has not answered. What that
+  // source replied — the 429 and when it resets — is on its own line in the panel above, once for
+  // the whole book, rather than clipped into the middle of an empty feed.
   const unread = snapshot.legs.map((l) => l.sources.fills).find((e) => e !== null) ?? null;
   const empty =
     unread !== null
-      ? `feed unavailable: ${unread}`
+      ? `${spinnerAt(Date.now())} waiting on fills`
       : "nothing indexed yet for this position";
 
   return (
@@ -298,7 +301,7 @@ export function Feed({
           drag the charts above it up and down between polls. */}
       {lines.length === 0 ? (
         <Box height={1}>
-          <Text color={unread === null ? UI.muted : UI.caveat}>{trunc(empty, width)}</Text>
+          <Text color={UI.muted}>{trunc(empty, width)}</Text>
         </Box>
       ) : (
         <Box height={1}>
