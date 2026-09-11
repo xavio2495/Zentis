@@ -25,9 +25,29 @@ test("one reference across three chains is one row, not three", () => {
 });
 
 test("collapsing does not merge two different references", () => {
-  const rounds = rows(40).filter((r) => r.kind === "round");
+  const rounds = rows(200).filter((r) => r.kind === "round");
   const seqs = rounds.map((r) => r.seq);
   expect(new Set(seqs).size).toBe(seqs.length);
+});
+
+test("one publish stays one row even when a refusal lands between its legs", () => {
+  // Recorded on 2026-09-11: seq 1789077446 wrote three legs, and two refusals landed between
+  // Sepolia's write and the other two. Folding only a consecutive run split that publish into a
+  // row saying one leg and a row saying two, so the screen showed two publishes where the enclave
+  // made one decision — against a console whose whole claim is one mid and one book.
+  const rounds = rows(200).filter((r) => r.kind === "round");
+  const split = rounds.filter((r) => r.seq === 1789077446);
+  expect(split.length).toBe(1);
+  expect(split[0]!.legs.length).toBe(3);
+  expect(new Set(split[0]!.legs.map((l) => l.chainId)).size).toBe(3);
+});
+
+test("a round is dated by its last leg to land, and says how long the writes took", () => {
+  const round = rows(200).filter((r) => r.kind === "round").find((r) => r.seq === 1789077446)!;
+  expect(round.timestamp).toBe(1789078488n);
+  // Sepolia landed twelve seconds after Base; a reader watching for one book should see that the
+  // legs are not written atomically, rather than infer it from rows that disagree.
+  expect(round.spanSeconds).toBe(12);
 });
 
 test("the collapsed feed surfaces the fill and the refusals the raw one buried", () => {
