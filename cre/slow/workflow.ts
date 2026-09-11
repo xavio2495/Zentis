@@ -351,6 +351,14 @@ const readCrowding = (
  *
  * A leg with no matured fills scores zero, which is the right default: absence of evidence about
  * adverse selection is not evidence of it.
+ *
+ * Null is a different answer from zero: it means this leg's indexer could not be read at all, so
+ * nothing was measured and the caller carries the stored number forward. Throwing here used to take
+ * down the whole publish — this read runs over every leg before the volatility and the boundary are
+ * computed, so one exhausted subgraph quota cost the book all three legs' markout, their spread and
+ * their boundary, including the legs whose own indexers were answering. A leg whose indexer is
+ * silent should cost the book that leg's measurement and nothing more, which is how a failed
+ * crowding read already behaves.
  */
 export type LegSignals = {
 	markoutBps: bigint
@@ -358,11 +366,11 @@ export type LegSignals = {
 	mid: bigint
 }
 
-const readMarkout = (
+export const readMarkout = (
 	runtime: TeeRuntime<Config>,
 	leg: z.infer<typeof legSchema>,
 	positionId: Hex,
-): LegSignals => {
+): LegSignals | null => {
 	const config = runtime.config
 	const body = JSON.stringify({
 		query: MARKOUT_QUERY,
@@ -378,14 +386,10 @@ const readMarkout = (
 		})
 		.result()
 
-	if (!ok(response)) {
-		throw new Error(`fills subgraph failed with status ${response.statusCode}`)
-	}
+	if (!ok(response)) return null
 
 	const payload = JSON.parse(text(response)) as MarkoutResponse
-	if (payload.errors && payload.errors.length > 0) {
-		throw new Error(`fills subgraph returned an error: ${payload.errors[0]?.message}`)
-	}
+	if (payload.errors && payload.errors.length > 0) return null
 
 	const position = payload.data?.position
 	if (!position) return { markoutBps: 0n, mid: 0n }
@@ -594,7 +598,8 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const crowding = config.legs.map((leg, i) => {
 		// The venue is on a mainnet; value it at a mainnet mid when the leg names one, and only
 		// fall back to the leg's own mid when it does not.
-		const mid = leg.crowdingChainId === 0 ? (signals[i] as LegSignals).mid : readMainnetMid(runtime, leg, apiKey)
+		// An unread leg has no newest mid either, and a zero mid already reads as no evidence here.
+		const mid = leg.crowdingChainId === 0 ? (signals[i]?.mid ?? 0n) : readMainnetMid(runtime, leg, apiKey)
 		return mid === 0n ? 0n : readCrowding(runtime, leg, mid)
 	})
 
@@ -630,7 +635,10 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 						BigInt(config.maxBandEdgeBps),
 					),
 				),
-				markoutBps: Number((signals[index] as LegSignals).markoutBps),
+				// Measured when the leg's indexer answered, carried forward when it did not: an
+				// unread leg must not have its published markout silently reset to zero, which
+				// would read as "this flow costs nothing" rather than "nobody looked".
+				markoutBps: signals[index] === null ? ref.markoutBps : Number((signals[index] as LegSignals).markoutBps),
 				seq: ref.seq + 1,
 			},
 		])
@@ -641,7 +649,9 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 		return (
 			`${leg.registry}: seq ${ref.seq} -> ${ref.seq + 1}, ` +
 			`spreadBps ${config.baseSpreadBps}+${volatility}, ` +
-			`bandEdgeBps ${edges[index]}, markoutBps ${(signals[index] as LegSignals).markoutBps}, ` +
+			`bandEdgeBps ${edges[index]}, markoutBps ${
+				signals[index] === null ? `${ref.markoutBps} (carried; fills unread)` : (signals[index] as LegSignals).markoutBps
+			}, ` +
 			`crowdingBps ${crowding[index]}`
 		)
 	})
