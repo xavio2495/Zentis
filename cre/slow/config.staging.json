@@ -34,7 +34,7 @@
     {
       "chainSelector": "10344971235874465080",
       "registry": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910",
-      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.2.0",
+      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-base-sepolia/v0.3.0",
       "crowdingSubgraphUrl": "",
       "crowdingTokenA": "",
       "crowdingTokenB": "",
