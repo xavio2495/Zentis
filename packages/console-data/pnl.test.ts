@@ -27,6 +27,34 @@ test("a B-in fill's edge is what the maker received in A terms minus what it gav
   expect(edgeAgainst(fill, mid)).toBe(0n);
 });
 
+test("a top-up is not trading profit, because trading is summed from the fills", () => {
+  // The maker tops a leg up with `push()` to put its curve back on the mid, which raises the
+  // indexed balance without a trade. Trading measured as the balance delta against what was
+  // shipped counts that top-up as profit: on 2026-09-11 the Sepolia leg was pushed 0.005575 WETH,
+  // which at the mark would have read as about 13.77 USDC the maker never earned. Summing the
+  // fills instead is immune to it, and to withdrawals, and to who did them.
+  const mark = (10n ** 30n) / 2_470n;
+  const shipped = { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, mid: mark, markAtShip: mark, seq: 1, block: 1 };
+  const before = legPnl(sepolia, shipped, mark, mark);
+  const toppedUp = {
+    ...sepolia,
+    position: { ...sepolia.position!, balanceB: sepolia.position!.balanceB + 5_575_000_000_000_000n },
+  };
+  expect(legPnl(toppedUp, shipped, mark, mark).tradingA).toBe(before.tradingA);
+});
+
+test("trading is the sum of what each fill moved, valued at the mark", () => {
+  const mark = (10n ** 30n) / 2_470n;
+  const shipped = { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, mid: mark, markAtShip: mark, seq: 1, block: 1 };
+  const pnl = legPnl(sepolia, shipped, mark, mark);
+  const byHand = sepolia.fills.reduce((sum, fill) => {
+    const deltaA = fill.isAToB ? fill.amountIn : -fill.amountOut;
+    const deltaB = fill.isAToB ? -fill.amountOut : fill.amountIn;
+    return sum + deltaA + (deltaB * 10n ** 18n) / mark;
+  }, 0n);
+  expect(pnl.tradingA).toBe(byHand);
+});
+
 test("hold is refused when the opening and closing marks come from different sources", () => {
   // The legs are shipped sized to their own pool's mid, and the book is marked at the mainnet
   // price. On a testnet those differ by an order of magnitude, so valuing the opening basket at the
