@@ -11,7 +11,10 @@
  * invert, black on the brand green, which is where the still image ends. Then it holds and loops,
  * because a console that is waiting should look like it is still alive.
  */
-export const LOGO_GREEN = "#00ED64";
+import { ACCENT } from "./theme.js";
+
+/** The mark's colour, which is the brand's one accent. */
+export const LOGO_GREEN = ACCENT;
 
 /**
  * The moment the mark is complete and still in the brand green, before the colours flip.

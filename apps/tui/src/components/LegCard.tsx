@@ -213,7 +213,9 @@ export function LegCard({
     const cap = position?.maxTiltBps ?? BOOK.maxTiltBps;
     const atCap = Math.abs(leg.ref.tiltBps) >= cap ? " at cap" : "";
     rows.push(
-      <Text color={UI.heading}>
+      // The accent, here and on the row below it: the shift is the product's own signal, and it is
+      // the one thing on this card the brand colour is spent on.
+      <Text color={UI.signal}>
         {chooseFit(
           [`shift ${signed(leg.ref.tiltBps)}${atCap} · published`, `shift ${signed(leg.ref.tiltBps)}${atCap}`],
           inner,
@@ -238,7 +240,7 @@ export function LegCard({
         segs={fitSegments(
           [
             [
-              { text: `${label} `, color: UI.heading },
+              { text: `${label} `, color: UI.signal },
               ...gauge.map((span) => ({
                 text: span.text,
                 color:
@@ -247,7 +249,7 @@ export function LegCard({
               { text: tail, color: UI.muted },
             ],
             [
-              { text: label, color: UI.heading },
+              { text: label, color: UI.signal },
               { text: tail, color: UI.muted },
             ],
             [{ text: label, color: UI.heading }],

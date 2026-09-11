@@ -6,9 +6,24 @@
  * attached to the *meaning*, not to the widget: correction is this cyan in the gauge, in the leg
  * header and in the feed, and nothing else is.
  *
- * Placeholder values, chosen only to be distinguishable at 720p on a dark terminal, pending the
- * project's branding.
+ * The values are the project's branding, decided 2026-09-11 from the two design references: one
+ * accent, an ink ladder of four steps, and severity carried by brightness rather than by hue. The
+ * three exceptions are the provider dots — green, yellow and red were asked for by name — and the
+ * terms below, which are segments of one stacked bar and have to be told apart from each other.
  */
+
+/**
+ * The one brand colour, written down once.
+ *
+ * Reserved for the Zentis signal itself: the shift a leg quotes at, and the mark. It is not a state
+ * and not an emphasis — a screen with the accent in eight places has eight things worth looking at,
+ * and a screen with it everywhere has none.
+ */
+export const ACCENT = "#00ED64";
+
+/** The ink ladder, brightest to dimmest. Severity is a step on this, not a hue. */
+export const INK = ["#f5f5f5", "#c5c5c5", "#8a8a8a", "#4a4a4a"] as const;
+
 export const TERM = {
   /** the anchor: putting this curve back on the mid */
   correction: "#5fd7ff",
@@ -17,7 +32,7 @@ export const TERM = {
   /** the book skew: the same concession charged across the whole book */
   bookConcession: "#8787ff",
   /** the base half-spread the workflow is configured with */
-  base: "#9e9e9e",
+  base: INK[1],
   volatility: "#ffd75f",
   markout: "#ff5f5f",
   staleness: "#ff8700",
@@ -26,17 +41,19 @@ export const TERM = {
 } as const;
 
 export const UI = {
-  frame: "#5f5f5f",
-  heading: "#ffffff",
-  muted: "#8a8a8a",
+  frame: INK[3],
+  heading: INK[0],
+  muted: INK[2],
+  /** the shift, and anything else that is the product's own signal rather than a state */
+  signal: ACCENT,
   /** a fill: the only event on this screen that moved value */
   fill: "#5fd75f",
   reference: "#5fd7ff",
   rejection: "#ff5f5f",
   /** something the operator should read before trusting the number next to it */
   caveat: "#ffd75f",
-  disabled: "#5f5f5f",
-  action: "#ffffff",
+  disabled: INK[3],
+  action: INK[0],
 } as const;
 
 /** Filled and empty cells for the inventory and weight bars. */
@@ -47,7 +64,8 @@ export const BAR = { filled: "█", empty: "░", marker: "│" } as const;
  *
  * Keyed on chain id rather than on position in a list, so a reordered display or a fourth leg
  * cannot silently reassign an identity the reader has already learned. Hues follow the user's
- * wireframe; like the terms above they are placeholders until branding arrives.
+ * wireframe, and are the one place on this screen that is neither ink nor the accent: three legs
+ * have to be told apart at a glance, and four steps of grey cannot do it.
  */
 export const LEG = {
   // Three hues that mean nothing else on this screen. The first set used red for Sepolia — the
