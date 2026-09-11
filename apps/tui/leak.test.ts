@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { privateKeyToAccount } from "viem/accounts";
 import { OFFLINE_ENV, runBinary } from "./testing/binary.js";
 
 /**
@@ -109,6 +110,88 @@ test("the binary signs with no Foundry on PATH, and says nothing that carries a 
     expect(said).not.toContain(SECRET);
     expect(said).not.toContain(SECRET.slice(2));
     expect(run.exitCode).not.toBe(0); // the RPC was a closed port, which is the failure being read
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 180_000);
+
+test("the binary makes a wallet, prints its address, and never prints its key", () => {
+  // Generated in the child that signs, not in the process drawing the screen: the key exists in one
+  // process, for as long as it takes to write it to a file only its owner can read.
+  const dir = mkdtempSync(join(tmpdir(), "zentis-wallet-"));
+  const binary = join(dir, "zentis");
+  try {
+    const build = Bun.spawnSync({
+      cmd: ["bun", "build", "--compile", "src/main.tsx", "--outfile", binary],
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(build.exitCode).toBe(0);
+
+    const run = Bun.spawnSync({
+      cmd: [binary, "sign"],
+      env: { PATH: dir, HOME: dir },
+      stdin: new TextEncoder().encode(JSON.stringify({ kind: "wallet-new" })),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const said = `${new TextDecoder().decode(run.stdout)}${new TextDecoder().decode(run.stderr)}`;
+    expect(run.exitCode).toBe(0);
+
+    const written = readFileSync(join(dir, ".zentis", "wallet.env"), "utf8");
+    const key = written.split("=")[1]!.trim();
+    expect(statSync(join(dir, ".zentis", "wallet.env")).mode & 0o777).toBe(0o600);
+    // The address is public and is said; the key is neither said nor hinted at.
+    expect(said).toContain(privateKeyToAccount(key as `0x${string}`).address);
+    expect(said).not.toContain(key);
+    expect(said).not.toContain(key.slice(2));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 180_000);
+
+test("started without a terminal, the binary says so in one line rather than in a stack", () => {
+  const dir = mkdtempSync(join(tmpdir(), "zentis-tty-"));
+  const binary = join(dir, "zentis");
+  try {
+    Bun.spawnSync({
+      cmd: ["bun", "build", "--compile", "src/main.tsx", "--outfile", binary],
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    // A pipe, not a pty: this is what a service manager or a CI step gives it.
+    const run = Bun.spawnSync({
+      cmd: ["sh", "-c", `${binary} < /dev/null`],
+      env: { PATH: dir, HOME: dir },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const said = `${new TextDecoder().decode(run.stdout)}${new TextDecoder().decode(run.stderr)}`;
+    expect(said).toContain("needs a terminal");
+    expect(said).not.toContain("Raw mode is not supported");
+    expect(said.split("\n").filter((l) => l.trim() !== "").length).toBe(1);
+    expect(run.exitCode).toBe(2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 180_000);
+
+test("the binary states its version and exits, which is what an installer asks it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "zentis-version-"));
+  const binary = join(dir, "zentis");
+  try {
+    Bun.spawnSync({
+      cmd: ["bun", "build", "--compile", "src/main.tsx", "--outfile", binary],
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const run = Bun.spawnSync({ cmd: [binary, "--version"], env: { PATH: dir, HOME: dir }, stdout: "pipe", stderr: "pipe" });
+    expect(run.exitCode).toBe(0);
+    // "dev" until a release compiles the tag in; either way one line and nothing else.
+    expect(new TextDecoder().decode(run.stdout).trim()).toMatch(/^[\w.+()\- ]+$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
