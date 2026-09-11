@@ -236,6 +236,31 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
 });
 
 /**
+ * Where a stranger gets testnet gas, per chain.
+ *
+ * Configuration rather than prose in a component: these move, and when one dies it should be one
+ * line to change rather than a string to hunt for inside a page. Public faucets, listed newest-first
+ * by how reliable they have been; the console shows them and never uses them itself.
+ */
+export const FAUCETS: Record<string, readonly string[]> = {
+  sepolia: [
+    "https://www.alchemy.com/faucets/ethereum-sepolia",
+    "https://faucets.chain.link/sepolia",
+    "https://sepolia-faucet.pk910.de",
+  ],
+  "arbitrum-sepolia": [
+    "https://www.alchemy.com/faucets/arbitrum-sepolia",
+    "https://faucets.chain.link/arbitrum-sepolia",
+    "https://faucet.quicknode.com/arbitrum/sepolia",
+  ],
+  "base-sepolia": [
+    "https://www.alchemy.com/faucets/base-sepolia",
+    "https://portal.cdp.coinbase.com/products/faucet",
+    "https://faucet.quicknode.com/base/sepolia",
+  ],
+};
+
+/**
  * Why a leg has no price chart, in one sentence, so every screen that has to say it says it the same.
  */
 export const POOL_RETIRED =

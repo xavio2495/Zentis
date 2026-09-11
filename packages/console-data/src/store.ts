@@ -1,5 +1,6 @@
 import { FORCED_ON_REFRESH, type Cache, createCache } from "./cache.js";
 import { createPriceReader } from "./prices.js";
+import { BOOK } from "./config.js";
 import { DEFAULT_MARKET_HOURS, type Snapshot, QUOTE_SIZE_A, takeSnapshot } from "./snapshot.js";
 
 /**
@@ -29,6 +30,8 @@ export interface Store {
    * one from hourly closes, so the window has to be asked for rather than cut from a week here.
    */
   setMarketHours(hours: number): void;
+  /** whose wallet the console is reading: its own address once it has a key */
+  setWalletAddress(address: `0x${string}`): void;
   start(): void;
   stop(): void;
 }
@@ -48,6 +51,7 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
   // makes every read after the first a single small `eth_getLogs` rather than a week-long backfill.
   const prices = createPriceReader();
   let marketHours = DEFAULT_MARKET_HOURS;
+  let walletAddress: `0x${string}` = BOOK.maker;
   let state: StoreState = { snapshot: null, loading: false, error: null, lastPollSeconds: null };
   const listeners = new Set<() => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -64,7 +68,7 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
     // held down would fan out into overlapping snapshots that finish out of order.
     if (inFlight !== null) return inFlight;
     set({ loading: true });
-    inFlight = takeSnapshot(quoteSize, cache, prices, marketHours)
+    inFlight = takeSnapshot(quoteSize, cache, prices, marketHours, walletAddress)
       .then((snapshot) => {
         set({ snapshot, error: null, loading: false, lastPollSeconds: Math.floor(Date.now() / 1000) });
       })
@@ -84,6 +88,11 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
       return () => listeners.delete(listener);
     },
     refresh,
+    setWalletAddress(address) {
+      if (address === walletAddress) return;
+      walletAddress = address;
+      void refresh();
+    },
     setMarketHours(hours) {
       if (hours === marketHours) return;
       marketHours = hours;

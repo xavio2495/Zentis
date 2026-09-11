@@ -39,3 +39,29 @@ test("the page shows the wallet this console holds, not the book's maker", async
   const snapshot = fakeSnapshot("fresh");
   expect(snapshot.wallet!.maker).toBe(snapshot.walletAddress);
 }, 60_000);
+
+test("a chain whose approval is short is offered the command that fixes it", async () => {
+  // The allowance column already shows the shortfall; what it lacked was the one thing to do about
+  // it. Aqua pulls at settlement against this approval, so a fill reverts on it rather than on price.
+  const text = said((await drive(190, 50, { keys: ["w"] })).lines);
+  expect(text).toMatch(/approve/i);
+  expect(text).toMatch(/: ?approve sepolia/);
+}, 60_000);
+
+test("a chain that is already approved is not told to approve again", async () => {
+  const text = said((await drive(190, 50, { scenario: "approved", keys: ["w"] })).lines);
+  expect(text).not.toMatch(/: ?approve /);
+}, 60_000);
+
+test("a typed approve is the binary signing for itself, for the router that will pull", async () => {
+  const frame = await drive(150, 44, { keys: [":", ..."approve sepolia", "ENTER"], armed: true });
+  const text = frame.lines.join("\n");
+  expect(text).toContain("press y");
+  expect(text).not.toContain("cast");
+}, 60_000);
+
+test("watch-only is told why it cannot approve, and nothing is asked of it", async () => {
+  const text = (await drive(150, 44, { keys: [":", ..."approve sepolia", "ENTER"] })).lines.join("\n");
+  expect(text).toMatch(/ZENTIS_ENV|watch-only/);
+  expect(text).not.toContain("press y");
+}, 60_000);

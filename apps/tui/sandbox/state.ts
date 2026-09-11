@@ -19,6 +19,8 @@ export const fixedStore = (snapshot: Snapshot) => {
     refresh: async () => undefined,
     // The fixed world has one recorded series, so a window change asks it for nothing.
     setMarketHours: () => undefined,
+    // The fixed world has one recorded wallet, so whose it is does not change.
+    setWalletAddress: () => undefined,
     start: () => undefined,
     stop: () => undefined,
   };
@@ -33,6 +35,8 @@ export const loadingStore = () => {
     subscribe: () => () => undefined,
     refresh: async () => undefined,
     setMarketHours: () => undefined,
+    // The fixed world has one recorded wallet, so whose it is does not change.
+    setWalletAddress: () => undefined,
     start: () => undefined,
     stop: () => undefined,
   };

@@ -1,5 +1,5 @@
 import type { LegHistory, Snapshot } from "@zentis/console-data";
-import { ASSUMED_GAINS, BOOK, LEGS, PAIR, POOL_RETIRED, bookTotals, parseWalletFixture, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
+import { ASSUMED_GAINS, BOOK, LEGS, PAIR, POOL_RETIRED, bookTotals, holdingOf, parseWalletFixture, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
 import recordedWallet from "../../../packages/console-data/fixtures/wallet.json" with { type: "json" };
 import recordedAt from "../../../packages/console-data/fixtures/recorded-at.json" with { type: "json" };
 import historySepolia from "../../../packages/console-data/fixtures/history-sepolia.json" with { type: "json" };
@@ -31,7 +31,8 @@ export type Scenario =
   | "refused"
   | "pinned"
   | "long"
-  | "loading";
+  | "loading"
+  | "empty";
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;
@@ -266,6 +267,29 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
     } as unknown as Snapshot;
   }
 
+  /**
+   * A wallet with nothing in it: what a stranger has the minute after generating one.
+   *
+   * The book is still there and still quoting — it is the maker's, not theirs — but they hold no
+   * gas and no tokens on any chain, which is the state the wallet page has to get them out of.
+   */
+  if (scenario === "empty") {
+    return {
+      ...(fakeSnapshot("fresh", now) as Snapshot),
+      wallet: {
+        maker: "0x000000000000000000000000000000000000bEEF" as `0x${string}`,
+        chains: wallet.chains.map((chain) => ({
+          ...chain,
+          gas: 0n,
+          tokenA: holdingOf(chain.tokenA, 0n, 0n, 0n),
+          tokenB: holdingOf(chain.tokenB, 0n, 0n, 0n),
+        })),
+        caveats: [],
+      },
+      walletAddress: "0x000000000000000000000000000000000000bEEF" as `0x${string}`,
+    } as unknown as Snapshot;
+  }
+
   if (scenario === "refused") {
     // Seen live: the router answers USDC → WETH on Sepolia and reverts WETH → USDC. The quote service
     // reports the revert as a caveat with no amount.
@@ -391,6 +415,7 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
     // a scenario would assert against a total no arrangement of its own legs could produce.
     book: bookTotals(legs as LegSnapshot[]),
     wallet,
+    walletAddress: BOOK.maker,
     market,
     caveats: [],
   } as Snapshot;

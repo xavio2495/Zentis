@@ -64,6 +64,8 @@ export interface Snapshot {
   readonly book: BookTotals;
   /** the maker's own side; null when no chain answered */
   readonly wallet: Wallet | null;
+  /** whose wallet that is: this console's own address, or the book's maker when it holds no key */
+  readonly walletAddress: `0x${string}`;
   /** the one series every leg prices from, and what the market chart is drawn from */
   readonly market: MarkHistory | null;
   readonly caveats: string[];
@@ -92,6 +94,11 @@ export async function takeSnapshot(
   prices: PriceReader = createPriceReader(),
   /** the chart's window, so a short one is drawn from swaps rather than from hourly closes */
   marketHours: number = DEFAULT_MARKET_HOURS,
+  /**
+   * Whose wallet to read. A taker who has just generated a key is looking at their own balances;
+   * the maker's are none of their business and are the wrong ones to fund.
+   */
+  walletAddress: `0x${string}` = BOOK.maker,
 ): Promise<Snapshot> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -126,7 +133,9 @@ export async function takeSnapshot(
   // any way a reader acts on, and both cost a round trip per leg.
   const [marks, wallet, market] = await Promise.all([
     cache.get("mark", CADENCE_MS.fills, () => fetchMarks()),
-    cache.get<Wallet>("wallet", CADENCE_MS.fills, async () => ok(await fetchWallet(LEGS, BOOK.maker))),
+    cache.get<Wallet>(`wallet:${walletAddress}`, CADENCE_MS.fills, async () =>
+      ok(await fetchWallet(LEGS, walletAddress)),
+    ),
     cache.get<MarkHistory>(marketCacheKey(marketHours), CADENCE_MS.market, () => fetchMarkHistory(marketHours)),
   ]);
 
@@ -255,6 +264,7 @@ export async function takeSnapshot(
     sim: loadSimReport(),
     book: bookTotals(legs),
     wallet: wallet.value,
+    walletAddress,
     market: market.value,
     caveats,
   };

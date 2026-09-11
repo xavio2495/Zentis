@@ -1,9 +1,10 @@
 import { Box, Text } from "ink";
-import type { Snapshot, TokenHolding } from "@zentis/console-data";
+import { FAUCETS, type Snapshot, type TokenHolding } from "@zentis/console-data";
 import { tokenAmount } from "../format.js";
-import { type Seg, padRows, trunc, wrapLines } from "../layout.js";
+import { type Seg, fitSegments, padRows, trunc, wrapLines } from "../layout.js";
 import { Segments } from "../components/Segments.js";
 import { UI, legColour } from "../theme.js";
+import { spinnerAt } from "../spinner.js";
 import { type Column, columns } from "./table.js";
 
 /**
@@ -116,6 +117,74 @@ export function WalletPage({
 
     // How Aqua's custody works — why committed is a claim on held rather than a second pot — is in
     // help under this page's heading. The page itself is the balances.
+    // A chain with no gas cannot do anything at all, so the page says where to get some — and stops
+    // saying it the moment the balance arrives, because this page already polls and a funded chain
+    // being offered a faucet reads as a screen that has not noticed.
+    const empty = wallet.chains.filter((chain) => chain.gas === 0n);
+    if (empty.length > 0) {
+      rows.push(<Text key="fundsp"> </Text>);
+      rows.push(
+        <Text key="fundhead" color={UI.heading} bold>
+          {trunc(`${spinnerAt(Date.now())} waiting for gas on ${empty.length} chain${empty.length === 1 ? "" : "s"}`, width)}
+        </Text>,
+      );
+      rows.push(
+        <Segments
+          key="fundaddr"
+          segs={[
+            { text: "send it to  ", color: UI.muted },
+            { text: wallet.maker, color: UI.heading },
+          ]}
+        />,
+      );
+      for (const chain of empty) {
+        const leg = snapshot.legs.find((l) => l.config.chainId === chain.chainId);
+        const name = chain.chain.replace(/-sepolia$/i, "").trim();
+        // Keyed by the leg's own name, not by whatever the wallet recorded as a label: the recorded
+        // wallet carries "Arbitrum Sepolia" where the faucet list is keyed "arbitrum-sepolia".
+        for (const [i, faucet] of (FAUCETS[leg?.config.name ?? ""] ?? []).entries()) {
+          rows.push(
+            <Segments
+              key={`faucet-${chain.chainId}-${i}`}
+              segs={fitSegments(
+                [
+                  [
+                    { text: `${i === 0 ? name.padEnd(10) : "".padEnd(10)}  `, color: legColour(chain.chainId) },
+                    { text: faucet, color: UI.action },
+                  ],
+                  [{ text: faucet, color: UI.action }],
+                ],
+                width,
+              )}
+            />,
+          );
+        }
+        if (leg !== undefined) {
+          // The token addresses, because a faucet gives gas and a wallet has to be told what else to
+          // show. Both are public and both are needed before a fill can be taken.
+          rows.push(
+            <Segments
+              key={`tokens-${chain.chainId}`}
+              segs={fitSegments(
+                [
+                  [
+                    { text: "".padEnd(12), color: UI.muted },
+                    { text: `${leg.config.tokenA.symbol} ${leg.config.tokenA.address}  `, color: UI.muted },
+                    { text: `${leg.config.tokenB.symbol} ${leg.config.tokenB.address}`, color: UI.muted },
+                  ],
+                  [
+                    { text: "".padEnd(12), color: UI.muted },
+                    { text: `${leg.config.tokenA.symbol} ${leg.config.tokenA.address}`, color: UI.muted },
+                  ],
+                ],
+                width,
+              )}
+            />,
+          );
+        }
+      }
+    }
+
     for (const [i, caveat] of wallet.caveats.entries()) {
       for (const [j, text] of wrapLines(caveat, width - 2, 3).entries()) {
         rows.push(
