@@ -69,3 +69,11 @@ test("a refusal the service decoded is named on the card by the contract's reaso
   const card = cardOf((await drive(120, 40, { scenario: "refused" })).lines, "1 Sepolia").join("\n");
   expect(card).toMatch(/WETH → USDC.*outside the band/);
 });
+
+test("a card's own price line is labelled as the leg's venue, not as what it quotes from", async () => {
+  // Sepolia's pool reads 30,187 while the book quotes from a mainnet mark near 2,372. Printing the
+  // first as "1 WETH = 30,187 USDC" on the card said the leg quotes at a price nothing quotes at.
+  const card = cardOf((await drive(120, 40, {})).lines, "1 Sepolia").join("\n");
+  expect(card).toMatch(/venue/);
+  expect(card).not.toMatch(/^1 WETH = [\d,]+ USDC · \d+[dhm] window$/m);
+});
