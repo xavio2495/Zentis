@@ -65,6 +65,9 @@ export const SANDBOX_SEQ = (refSepolia as { seq: number }).seq;
  */
 export const SANDBOX_NOW = (recordedAt as { seconds: number }).seconds;
 
+/** The mainnet mark the fake world values its book at, and the point its market series ends on. */
+const MARK_MID = 405_837_064_044_766_950_299_015_618n;
+
 /**
  * The demo's beat, added to the recorded history: one fill, and one publish refused on every chain.
  *
@@ -194,8 +197,8 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
       // testnet pool's fantasy. The hold effect is deliberately unknown here: the legs this world
       // stands in for were shipped before the mark was recorded, and a sandbox that quietly had a
       // number the live console cannot have would hide the case the screen has to render.
-      mark: { mainnetChainId: 1, mid: 405_837_064_044_766_950_299_015_618n, source: "1inch spot", readAtSeconds: now, error: null },
-      pnl: legPnl(entry.history, entry.leg.shipped, 405_837_064_044_766_950_299_015_618n, null),
+      mark: { mainnetChainId: 1, mid: MARK_MID, source: "1inch spot", readAtSeconds: now, error: null },
+      pnl: legPnl(entry.history, entry.leg.shipped, MARK_MID, null),
       // Every source answered in the fake world, except a venue that no longer exists to answer:
       // the outage scenario is the one that sets the others.
       sources: { fills: null, registry: null, pool: series === null ? POOL_RETIRED : null },
@@ -212,10 +215,12 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
    */
   const market = {
     points: Array.from({ length: 168 }, (_, i) => {
-      const step = BigInt(Math.round(Math.sin(i / 12) * 40) + 1000);
+      // The newest point *is* the mark, so the chart's headline and the price the legs are valued at
+      // are the same number rather than two readings four per cent apart on one screen.
+      const step = i === 167 ? 1000n : BigInt(Math.round(Math.sin(i / 12) * 40) + 1000);
       return {
         timestamp: BigInt(now - (167 - i) * 3600),
-        mid: (405_837_064_044_766_950_299_015_618n * step) / 1000n,
+        mid: (MARK_MID * step) / 1000n,
       };
     }),
     source: "Uniswap v3 mainnet USDC/WETH, via The Graph",

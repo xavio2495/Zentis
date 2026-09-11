@@ -257,30 +257,43 @@ export function LegCard({
     );
   }
 
-  // The leg's own venue, labelled as one: the book quotes from a mainnet mark and this is where the
-  // leg's trades settle, at a testnet price that can sit an order of magnitude away from it. The row
-  // said "1 WETH = 30,187 USDC" beside a book marked at 2,372, which reads as the leg quoting there.
-  // Then the line itself in whatever rows are left — three or four at most.
-  if (leg.series !== null) {
-    const price = pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB);
-    const over = duration(Number(windowSeconds));
-    const lineRows = Math.min(4, innerRows - rows.length - 1);
-    if (lineRows >= 2) {
-      // As quoted, like the chart: the line rises when the price on the row below it rises.
-      const p = plot([{ key: "s", samples: quoted(leg.series.samples) }], inner, lineRows, windowSeconds).byKey.get("s")!;
-      for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
-    }
+  // What this leg has actually done, in the rows the venue price used to take: how many fills it has
+  // taken and what it made trading them. Both come from the data layer's own arithmetic; a null is a
+  // dash with its reason on the pnl page, never a zero the card invented.
+  if (leg.pnl !== null) {
+    const decimals = leg.config.tokenA.decimals;
+    const symbol = leg.config.tokenA.symbol;
+    const { fills, volumeA, tradingA, edgeA } = leg.pnl;
+    const count = `${fills} fill${fills === 1 ? "" : "s"}`;
+    const traded = `${tokenAmount(volumeA, decimals)} ${symbol}`;
+    const earned =
+      tradingA === null
+        ? [{ text: "edge ", color: UI.muted }, { text: `${edgeA > 0n ? "+" : ""}${tokenAmount(edgeA, decimals)}`, color: edgeA < 0n ? UI.rejection : UI.fill }]
+        : [
+            { text: "traded ", color: UI.muted },
+            {
+              text: `${tradingA > 0n ? "+" : ""}${tokenAmount(tradingA, decimals)} ${symbol}`,
+              color: tradingA < 0n ? UI.rejection : UI.fill,
+            },
+          ];
     rows.push(
-      <Text color={UI.muted}>
-        {chooseFit([`venue ${price} · ${over}`, `venue ${price}`, price], inner)}
-      </Text>,
-    );
-  } else if (leg.sources.pool !== null) {
-    const reading = leg.sources.pool === BACKFILLING;
-    rows.push(
-      <Text color={reading ? UI.muted : UI.caveat}>{trunc(`venue: ${leg.sources.pool}`, inner)}</Text>,
+      <Segments
+        segs={fitSegments(
+          [
+            [{ text: `${count} · ${traded}  `, color: UI.muted }, ...earned],
+            [{ text: `${count}  `, color: UI.muted }, ...earned],
+            [{ text: count, color: UI.muted }],
+          ],
+          inner,
+        )}
+      />,
     );
   }
+
+  // No venue price and no venue sparkline here. The book quotes from one mainnet mark, and a card
+  // reading "venue 1 WETH = 28,430 USDC" beside a market of 2,372 reads as a broken screen rather
+  // than as two different prices for two different purposes. The venue's address and the age of its
+  // last swap are in the leg's detail, where there is room to say what they are.
 
   return (
     <Panel

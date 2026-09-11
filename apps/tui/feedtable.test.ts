@@ -102,3 +102,12 @@ test("the refusals of one stale publish share a row, each under the chain that r
   expect(together).toBeDefined();
   for (const start of Object.values(at)) expect(together!.slice(start, start + 9)).toBe("stale seq");
 }, 60_000);
+
+test("a fill says what went in as well as what came out wherever the row has room", async () => {
+  // "fill  -10  → 0.0000607 WETH" at 120 columns: the side the taker paid is what makes the other
+  // side mean anything, and it fits.
+  const [, ...body] = feedOf((await drive(120, 40, {})).lines);
+  const fill = body.find((r) => /\bfill\b/.test(r))!;
+  expect(fill).toBeDefined();
+  expect(fill).toMatch(/0\.15 USDC → /);
+}, 60_000);

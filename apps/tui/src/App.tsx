@@ -37,8 +37,6 @@ import { WINDOWS, autoWindow } from "./window.js";
 /** Fifteen seconds a leg, as asked: long enough to read a line, short enough to see all three. */
 export const ROTATE_MS = 15_000;
 
-/** What the chart asks for before the operator has chosen a window: the longest one. */
-const MARKET_HOURS_DEFAULT = 168;
 
 /** The pages, and the word the status bar names each one by. */
 export type Page = "live" | "positions" | "pnl" | "wallet" | "simulation";
@@ -104,10 +102,12 @@ export function App({
   // The window the chart is drawing, asked of the service rather than cut from a week here: a short
   // window comes back per swap, and an hour of hourly closes is two points and a straight line.
   // Automatic asks for the longest, which is the series every shorter one is a cut of anyway.
-  const marketHours =
-    windowChoice === null
-      ? MARKET_HOURS_DEFAULT
-      : Math.max(1, Math.round((WINDOWS[windowChoice]?.seconds ?? 0) / 3600));
+  // The window the chart draws is the window asked of the service, so a short one comes back per
+  // swap instead of as two hourly closes joined by a straight line.
+  const marketHours = Math.max(
+    1,
+    Math.round((WINDOWS[windowChoice ?? WINDOWS.length - 1] ?? WINDOWS[WINDOWS.length - 1]!).seconds / 3600),
+  );
   useEffect(() => {
     store.setMarketHours(marketHours);
   }, [store, marketHours]);
@@ -400,7 +400,12 @@ export function App({
   const windowFor = (chainId: number) =>
     windowChoice === null ? autoWindow(lastFillAt(chainId), snapshot.takenAtSeconds) : WINDOWS[windowChoice]!;
   const graphInner = panelInner(regions.rightWidth, regions.graphRows);
-  const marketWindowLabel = `${windowFor(LEG_ORDER[0] ?? 0).label} window${windowChoice === null ? " · auto" : ""} · t`;
+  // One window for one chart. The automatic rule was written for per-leg pools, where a testnet
+  // venue might have three swaps in a week and the window had to reach back to the last fill; the
+  // book's market has a point every hour, so automatic is simply the whole week, and `t` cycles the
+  // shorter ones. Taking the label from a leg's automatic window put "1h window" over six days.
+  const marketWindow = WINDOWS[windowChoice ?? WINDOWS.length - 1] ?? WINDOWS[WINDOWS.length - 1]!;
+  const marketWindowLabel = `${marketWindow.label} window${windowChoice === null ? " · auto" : ""} · t`;
   // The command row is a row of the screen, taken from the region below the charts rather than added
   // to the frame: a frame that grew by a row when the colon was pressed would reach `stdout.rows`
   // and make Ink clear the terminal on every repaint.
@@ -513,7 +518,7 @@ export function App({
                 leg={rotating}
                 snapshot={snapshot}
                 {...graphInner}
-                windowSeconds={BigInt(windowFor(rotating.config.chainId).seconds)}
+                windowSeconds={BigInt(marketWindow.seconds)}
               />
             </Panel>
           ))}

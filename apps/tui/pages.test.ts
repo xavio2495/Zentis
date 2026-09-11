@@ -153,3 +153,25 @@ test("a card carries no venue price, since the book does not quote from that poo
   expect(text).not.toMatch(/venue: this leg's reference pool was…/);
   expect(text).not.toMatch(/venue.*…/);
 }, 60_000);
+
+test("the pnl page does not send a reader to a card for a pool mid the cards no longer carry", async () => {
+  const text = (await drive(190, 50, { keys: ["n"] })).lines.join("\n");
+  expect(text).not.toContain("own pool mid is on its card");
+}, 60_000);
+
+test("the positions table drops whole columns at eighty columns rather than clipping its headers", async () => {
+  const lines = (await drive(80, 24, { keys: ["p"] })).lines;
+  const header = lines.find((l) => /\bleg\b|\ble\b/.test(l) && /state|shift/.test(l))!;
+  expect(header).toBeDefined();
+  for (const clipped of ["le ", "at mar", "shif ", "hold "]) {
+    expect(header).not.toContain(clipped);
+  }
+  // What survives at that width is the row's name and what it is doing.
+  expect(header).toContain("leg");
+  expect(header).toMatch(/state/);
+}, 60_000);
+
+test("the help page wraps rather than clipping, because it is the page that explains the rest", async () => {
+  const text = (await drive(120, 40, { keys: ["?"] })).lines.join("\n");
+  expect(text).not.toContain("…");
+}, 60_000);

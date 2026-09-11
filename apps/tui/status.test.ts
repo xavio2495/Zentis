@@ -58,3 +58,12 @@ test("the narrow hint row keeps every key, dropping only the words around them",
     expect(hints).toContain(key);
   }
 }, 60_000);
+
+test("at a hundred and twenty columns the hints carry short labels, not bare letters", async () => {
+  // Bare "r s f q p n w m : ←→ enter t ? x" is a row of letters to guess at; there is room between
+  // that and the full sentence for a word each.
+  const hints = (await drive(120, 40, { armed: true })).lines.find((l) => /\br .*\bq /.test(l))!;
+  expect(hints).toBeDefined();
+  expect(hints).toMatch(/fill|quote/);
+  expect(hints).toMatch(/pnl|wallet/);
+}, 60_000);

@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import { type LegSnapshot, type Snapshot, bInA, humanDuration, rebalanceOf } from "@zentis/console-data";
 import { signed, tokenAmount } from "../format.js";
-import { type Seg, padRows, trunc, wrapLines } from "../layout.js";
+import { type Seg, fitSegments, padRows, segWidth, trunc, wrapLines } from "../layout.js";
 import { Segments } from "../components/Segments.js";
 import { UI, legColour } from "../theme.js";
 import { type Column, columns } from "./table.js";
@@ -162,8 +162,16 @@ export function Positions({
           : rebalanceOf({ balanceA: leg.position.balanceA, balanceB: leg.position.balanceB, mid: leg.ref.mid }),
     }))
     .filter((entry): entry is { leg: LegSnapshot; plan: NonNullable<typeof entry.plan> } => entry.plan !== null)
-    // Nothing to say about a leg that is on the mid: the panel is for the legs that are not.
-    .filter(({ plan }) => plan.canFix || (plan.offMidBps !== null && Math.abs(plan.offMidBps) > 0));
+    // A gap narrower than the leg's own spread is not worth a transaction: the quote already sits
+    // inside it, so moving inventory would change nothing a taker could see. The threshold is the
+    // leg's spread rather than a figure chosen here, so it moves when the policy does.
+    .map((entry) => ({
+      ...entry,
+      settled:
+        entry.plan.offMidBps !== null &&
+        Math.abs(entry.plan.offMidBps) < (entry.leg.spread?.totalBps ?? 0),
+    }))
+    .filter(({ plan, settled }) => settled || plan.canFix || plan.reason !== null);
 
   if (plans.length > 0) {
     rows.push(<Text key="rbsp"> </Text>);
@@ -173,9 +181,17 @@ export function Positions({
       </Text>,
     );
   }
-  for (const { leg, plan } of plans) {
+  for (const { leg, plan, settled } of plans) {
     const name = leg.config.label.split(" ")[0] ?? leg.config.name;
     const { tokenA, tokenB } = leg.config;
+    if (settled) {
+      rows.push(
+        <Text key={`rb-${name}-ok`} color={UI.muted}>
+          {trunc(`${name} is on the mid, within its own spread of ${leg.spread?.totalBps ?? 0} bps`, width)}
+        </Text>,
+      );
+      continue;
+    }
     const held =
       `${name} holds ${tokenAmount(leg.position!.balanceA, tokenA.decimals)} ${tokenA.symbol}` +
       ` and ${tokenAmount(leg.position!.balanceB, tokenB.decimals)} ${tokenB.symbol}` +
@@ -190,20 +206,21 @@ export function Positions({
       );
     }
     if (plan.canFix) {
-      rows.push(
-        <Segments
-          key={`rb-${name}-do`}
-          segs={[
-            { text: "top up ", color: UI.muted },
-            { text: `${tokenAmount(plan.topUpB, tokenB.decimals)} ${tokenB.symbol}`, color: UI.heading, bold: true },
-            { text: "  ·  ", color: UI.frame },
-            // The operator's command, verbatim, so it can be read across and typed: the console runs
-            // it through `:push` behind a confirmation and never from a keystroke alone.
-            { text: `python3 scripts/rebalance.py --only ${leg.config.name}`, color: UI.action },
-            { text: "  (--dry-run reads it first)", color: UI.muted },
-          ]}
-        />,
-      );
+      // Measured, and split across two rows rather than squeezed into one: left to Ink an overlong
+      // row loses characters from inside it, which turned the amount into "top u0.00000958" and the
+      // command into "--onl".
+      const amount: Seg[] = [
+        { text: "top up ", color: UI.muted },
+        { text: `${tokenAmount(plan.topUpB, tokenB.decimals)} ${tokenB.symbol}`, color: UI.heading, bold: true },
+      ];
+      const command: Seg[] = [{ text: `python3 scripts/rebalance.py --only ${leg.config.name}`, color: UI.action }];
+      const note: Seg = { text: "  (--dry-run reads it first)", color: UI.muted };
+      const joined = [...amount, { text: "  ·  ", color: UI.frame }, ...command, note];
+      const oneRow = segWidth(joined) <= width;
+      rows.push(<Segments key={`rb-${name}-a`} segs={oneRow ? joined : amount} />);
+      if (!oneRow) {
+        rows.push(<Segments key={`rb-${name}-c`} segs={fitSegments([[...command, note], command], width)} />);
+      }
     } else if (plan.reason !== null) {
       for (const [i, text] of wrapLines(plan.reason, width - 2, 2).entries()) {
         rows.push(
