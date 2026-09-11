@@ -78,5 +78,53 @@ check "a short secret is left alone"          "$good"  "maxTiltBps 10000"       
 check "a successful run is recorded as such"  "$good"  "rc=0"                     present
 [ "$ok_rc" -eq 0 ] || { fail=$((fail + 1)); echo "  FAIL success exit code: got $ok_rc"; }
 
+
+# ── the signing lock ─────────────────────────────────────────────────────────
+# fast and slow sign with the SAME key. On 2026-09-11 the 07:55 slow run died with
+# `nonce too low: tx: 170 state: 171` because the fast timer fired while slow was signing and took
+# the nonce. A per-publisher lock cannot see that: the two publishers held different locks. They
+# need one lock between them, and they want opposite things when they cannot get it -- fast runs
+# again in five minutes so it should skip, slow runs again in an hour so it should wait.
+cat >"$work/bin/cre" <<'STUB'
+#!/usr/bin/env bash
+echo "✓ Workflow Simulation Result:"
+echo '"published"'
+exit 0
+STUB
+chmod +x "$work/bin/cre"
+run() { PATH="$work/bin:$PATH" ZENTIS_CRE_ENV="$work/cre.env" ZENTIS_LOG_DIR="$work/logs" "$here/publisher.sh" "$@"; }
+hold() { flock "$work/logs/publisher.sign.lock" -c "sleep $1" & echo $!; }
+
+mkdir -p "$work/logs"
+: >"$work/logs/publisher.sign.lock"
+
+holder=$(hold 4); sleep 0.4
+set +e; run fast >/dev/null 2>&1; fast_rc=$?; set -e
+fast_line=$(tail -1 "$work/logs/fast.log" 2>/dev/null || echo "")
+check "fast skips rather than racing the nonce" "$fast_line" "signing" present
+[ "$fast_rc" -eq 0 ] && { pass=$((pass + 1)); echo "  ok   a skip is not a failure for fast"; } \
+	|| { fail=$((fail + 1)); echo "  FAIL fast skip exit: wanted 0, got $fast_rc"; }
+wait "$holder" 2>/dev/null || true
+
+# slow waits for the key rather than giving up its hourly slot
+holder=$(hold 3); sleep 0.4
+began=$(date +%s)
+set +e; ZENTIS_LOCK_WAIT=30 run slow >/dev/null 2>&1; slow_rc=$?; set -e
+waited=$(( $(date +%s) - began ))
+slow_line=$(tail -1 "$work/logs/slow.log")
+check "slow publishes once the key is free" "$slow_line" "published" present
+[ "$slow_rc" -eq 0 ] && [ "$waited" -ge 2 ] && { pass=$((pass + 1)); echo "  ok   slow waited ${waited}s for the key"; } \
+	|| { fail=$((fail + 1)); echo "  FAIL slow wait: rc=$slow_rc after ${waited}s"; }
+wait "$holder" 2>/dev/null || true
+
+# but the wait is bounded, so a hung publisher cannot pin the other one forever
+holder=$(hold 10); sleep 0.4
+set +e; ZENTIS_LOCK_WAIT=1 run slow >/dev/null 2>&1; gave_up=$?; set -e
+give_line=$(tail -1 "$work/logs/slow.log")
+check "a bounded wait gives up with a reason" "$give_line" "signing" present
+[ "$gave_up" -ne 0 ] && { pass=$((pass + 1)); echo "  ok   giving up is reported as a failure"; } \
+	|| { fail=$((fail + 1)); echo "  FAIL giving up should not look like success"; }
+kill "$holder" 2>/dev/null || true; wait "$holder" 2>/dev/null || true
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
