@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { drive } from "./sandbox/drive.js";
+import { fakeSnapshot } from "./sandbox/world.js";
 
 const cardOf = (lines: string[], name: string) => {
   const top = lines.findIndex((l) => l.includes(`┌ ${name}`) || l.includes(`${name} ─`));
@@ -70,10 +71,13 @@ test("a refusal the service decoded is named on the card by the contract's reaso
   expect(card).toMatch(/WETH → USDC.*outside the band/);
 });
 
-test("a card's own price line is labelled as the leg's venue, not as what it quotes from", async () => {
-  // Sepolia's pool reads 30,187 while the book quotes from a mainnet mark near 2,372. Printing the
-  // first as "1 WETH = 30,187 USDC" on the card said the leg quotes at a price nothing quotes at.
+test("a card says what the leg has traded and earned, in the rows the venue line used to take", async () => {
+  // The venue price left six blank rows on every card at 120x40. What belongs there is the leg's own
+  // record: how many fills it has taken and what it made trading, both already in the snapshot.
+  const snapshot = fakeSnapshot("fresh");
+  const leg = snapshot.legs.find((l) => l.config.name === "sepolia")!;
+  expect(leg.pnl).not.toBeNull();
   const card = cardOf((await drive(120, 40, {})).lines, "1 Sepolia").join("\n");
-  expect(card).toMatch(/venue/);
-  expect(card).not.toMatch(/^1 WETH = [\d,]+ USDC · \d+[dhm] window$/m);
+  expect(card).toMatch(new RegExp(`${leg.pnl!.fills} fills?`));
+  expect(card).toMatch(/traded|edge/);
 });
