@@ -4,6 +4,35 @@ on:
   push:
   pull_request:
 
+# A NOTE ON RED BUILDS, because this one is by design and will otherwise be read as a broken job.
+# `REPO_RULES.md` requires the failing test to be committed BEFORE the fix, so a commit whose message
+# begins "Fail until ..." is expected to be red and its successor is expected to be green. At the
+# time this workflow was added, HEAD was `ce9082c` ("Fail until a card calls its pool line the leg's
+# venue rather than its price") and `apps/tui` was 189 passing, 1 failing, exactly as intended.
+# Red on such a commit means the convention is being followed. What matters is that the commit a
+# reviewer or a judge lands on is green, so the final submission commit must be a fix, never a
+# "Fail until ..." one.
+
+# Every endpoint the console could reach, pointed at a closed port. The suites are already isolated
+# — `apps/tui/testing/binary.ts` sets these itself before starting a binary, and `console-data`'s
+# tests read recorded fixtures — so this is belt and braces. It is here because on 2026-09-11 a test
+# that left a console running drained two legs' daily Subgraph Studio allowance to nothing, and CI
+# runs on every push. If one of these ever goes missing the suites still pass; a leaked console would
+# just have somewhere real to poll.
+env:
+  ZENTIS_QUOTE_API: http://127.0.0.1:1
+  ZENTIS_FILLS_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_FILLS_ARBITRUM_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_FILLS_BASE_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_RPC_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_RPC_ARBITRUM_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_RPC_BASE_SEPOLIA: http://127.0.0.1:1
+
+# No secrets are configured for this workflow and none are needed. Every suite that touches a key
+# uses a fake one: the console tests write `CRE_ETH_PRIVATE_KEY=0x00` into a temp file and assert the
+# binary passes the file's PATH and never its contents, and `scripts/publisher.test.sh` stubs the
+# `cre` binary on PATH so it can never reach a chain. Nothing here can broadcast.
+
 jobs:
   contracts:
     runs-on: ubuntu-latest
@@ -15,10 +44,124 @@ jobs:
         with:
           submodules: recursive
 
+      # `contracts/foundry.toml` pins solc (0.8.30) but not forge itself, so the version is pinned
+      # here instead: this is the one the 103 contract tests were last verified against locally.
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
 
       - name: Build
         run: forge build --sizes
 
       - name: Test
         run: forge test -vvv
+
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # ORDER MATTERS. `cre/fast` imports `midFromUsdPrices` from `../slow/policy` rather than
+      # duplicating it, so the fast suite resolves a module inside `cre/slow` and cannot run until
+      # slow's dependencies exist. Installed the other way round, `cre/fast` fails to resolve
+      # `@zentis/strategy-sdk` through that import and the whole suite errors out.
+      - name: Install cre/slow
+        working-directory: cre/slow
+        run: bun install --frozen-lockfile
+      - name: Install cre/fast
+        working-directory: cre/fast
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck the slow workflow
+        working-directory: cre/slow
+        run: bun run typecheck
+      - name: Test the slow workflow
+        working-directory: cre/slow
+        run: bun test
+
+      - name: Typecheck the fast workflow
+        working-directory: cre/fast
+        run: bun run typecheck
+      - name: Test the fast workflow
+        working-directory: cre/fast
+        run: bun test
+
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Test the strategy SDK
+        working-directory: packages/strategy-sdk
+        run: bun install --frozen-lockfile && bun run typecheck && bun test
+
+      - name: Test the console readers
+        working-directory: packages/console-data
+        run: bun install --frozen-lockfile && bun run typecheck && bun test
+
+      - name: Test the simulation report
+        working-directory: packages/sim-report
+        run: bun install --frozen-lockfile && bun test
+
+      - name: Test the quote service
+        working-directory: services/quote-api
+        run: bun install --frozen-lockfile && bun run typecheck && bun test
+
+  console:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # `apps/tui` resolves `@zentis/console-data` through a tsconfig path straight into that
+      # package's SOURCE, so console-data's own dependencies have to be installed for the console to
+      # import it at all. There is no root workspace manifest to do this in one step.
+      - name: Install the console readers
+        working-directory: packages/console-data
+        run: bun install --frozen-lockfile
+      - name: Install the console
+        working-directory: apps/tui
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck the console
+        working-directory: apps/tui
+        run: bun run typecheck
+
+      # Three of these compile the binary with `bun build --compile` and drive it through a pty, so
+      # the job is dominated by them and takes three to four minutes. They need `script` (util-linux)
+      # and `pgrep`/`pkill` (procps), which `ubuntu-latest` has and a slim container would not. They
+      # are not skipped despite the cost: the compiled binary is the delivery format, and
+      # `leak.test.ts` is the test that proves a console started by a test does not outlive it.
+      - name: Test the console
+        working-directory: apps/tui
+        run: bun test
+
+  model-and-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The reference model imports nothing outside the standard library, so pytest is the only
+      # dependency and there is no requirements file to install.
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Test the reference model
+        working-directory: packages/reference-model
+        run: python3 -m pytest tests -q
+
+      # Stubs `cre` on PATH, so it never runs a workflow and never broadcasts.
+      - name: Test the publisher
+        run: ./scripts/publisher.test.sh
