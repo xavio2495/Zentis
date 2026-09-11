@@ -119,3 +119,37 @@ test("a leg long of tokenB is told a top-up cannot fix it, and is offered no com
   expect(text).toMatch(/only adds|cannot/);
   expect(text).not.toContain("scripts/rebalance.py --only arbitrum");
 }, 60_000);
+
+test("the rebalance panel never loses a character to a column, at any width", async () => {
+  // Built without measuring, the row came out as "top u0.00000958" and "--onl" with words from one
+  // leg bleeding into the next: Ink squeezes an overlong row by deleting characters inside it.
+  for (const [cols, rows] of [
+    [190, 50],
+    [120, 40],
+    [80, 24],
+  ] as const) {
+    const text = (await drive(cols, rows, { keys: ["p"], scenario: "pinned" })).lines.join("\n");
+    expect(text).not.toMatch(/top u\d/);
+    expect(text).not.toMatch(/--onl\b/);
+    expect(text).not.toMatch(/WETHia/);
+    // The command, when it is offered at all, is offered whole.
+    if (text.includes("rebalance.py")) expect(text).toMatch(/python3 scripts\/rebalance\.py --only [a-z-]+/);
+  }
+}, 120_000);
+
+test("a leg closer to the mid than its own spread is left alone, with no command to run", async () => {
+  // A top-up of 0.0000096 WETH is noise: it cannot move a quote that already sits inside the
+  // spread the leg charges. Said as being on the mid, rather than offered as a move worth making.
+  const text = (await drive(190, 50, { keys: ["p"] })).lines.join("\n");
+  expect(text).toMatch(/on the mid|within its own spread/);
+  expect(text).not.toMatch(/top up 0\.00000/);
+}, 60_000);
+
+test("a card carries no venue price, since the book does not quote from that pool", async () => {
+  // "venue 1 WETH = 28,430 USDC" on a card beside "market 1 WETH = 2,372" reads as a bug. The venue
+  // is where the leg's trades settle; its address and last swap live in the leg's detail.
+  const text = (await drive(120, 40, {})).lines.join("\n");
+  expect(text).not.toMatch(/venue 1 WETH/);
+  expect(text).not.toMatch(/venue: this leg's reference pool was…/);
+  expect(text).not.toMatch(/venue.*…/);
+}, 60_000);
