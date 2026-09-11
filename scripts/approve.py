@@ -79,8 +79,11 @@ def main():
                 print(f"   {row['symbol']}: {state}; settlement covered")
                 continue
             short_anywhere = True
-            print(f"   {row['symbol']}: {state}; SHORT by {fmt(row['short'])}, a fill taking "
-                  f"{row['symbol']} from the maker reverts at settlement")
+            # Aqua pulls the fill amount, not the commitment, so only a fill larger than what is still
+            # allowed reverts; the invariant kept here is allowance >= committed, because shipping
+            # approves exactly the commitment and nothing else ever tops it up.
+            print(f"   {row['symbol']}: {state}; SHORT by {fmt(row['short'])}, a fill taking more than "
+                  f"{fmt(row['allowance'])} from the maker reverts at settlement")
             if not sending:
                 print(f"      would approve Aqua for {fmt(row['committed'])}")
                 continue
