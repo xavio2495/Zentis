@@ -14,7 +14,32 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 log_dir=${ZENTIS_LOG_DIR:-$HOME/.zentis/logs}; mkdir -p "$log_dir"
 # The gains are secrets to the workflow runtime, which reads them from the process environment.
 set -a; . <(grep -E '^SECRET_' "$env_file"); set +a
-exec 9>"$log_dir/$which.lock"; flock -n 9 || { echo "$(date -u +%FT%TZ) $which: previous run still going" >>"$log_dir/$which.log"; exit 0; }
+note() { echo "$(date -u +%FT%TZ) $which $*" >>"$log_dir/$which.log"; }
+
+# Two locks, because there are two different things to prevent and they want different answers.
+#
+# The publisher's own lock stops a run overlapping the previous run of the SAME publisher; a run
+# that is still going does not want a second copy of itself, so this one never waits.
+exec 8>"$log_dir/$which.lock"; flock -n 8 || { note "previous run still going"; exit 0; }
+
+# The signing lock is shared by fast and slow, because they sign with the SAME key. Without it the
+# two race the account nonce: on 2026-09-11 the 07:55 slow run died with `nonce too low, tx: 170
+# state: 171` when the fast timer fired mid-signature, and the hourly reference was lost for an
+# hour. No cron offset can fix that -- fast is on a five-minute grid, so every minute is within
+# five minutes of a fast run, and the measured fast run time has a tail (p50 29s, p95 57s, but 4%
+# of runs longer). Only a lock between the two signers actually excludes them.
+#
+# They want opposite things when the key is busy: fast runs again in five minutes, so it skips;
+# slow runs again in an hour, so it waits. The wait is bounded, and the default is longer than the
+# fast publisher's own timeout so that a hung fast run is killed by its timeout before slow gives
+# up on it -- but bounded all the same, so a wedged run cannot pin the other publisher forever.
+exec 9>"$log_dir/publisher.sign.lock"
+if [ "$which" = slow ]; then
+	wait_for=${ZENTIS_LOCK_WAIT:-600}
+	flock -w "$wait_for" 9 || { note "gave up after ${wait_for}s waiting for the signing key; another publisher still holds it"; exit 1; }
+else
+	flock -n 9 || { note "skipped: another publisher holds the signing key"; exit 0; }
+fi
 cd "$repo/cre"
 out=$(timeout "${ZENTIS_PUBLISH_TIMEOUT:-540}" cre -e "$env_file" workflow simulate "$which" --target "${ZENTIS_CRE_TARGET:-staging-settings}" --broadcast 2>&1) && rc=0 || rc=$?
 # Redact secret VALUES, never whole lines. An earlier version dropped any line containing the word

@@ -93,12 +93,12 @@ exit 0
 STUB
 chmod +x "$work/bin/cre"
 run() { PATH="$work/bin:$PATH" ZENTIS_CRE_ENV="$work/cre.env" ZENTIS_LOG_DIR="$work/logs" "$here/publisher.sh" "$@"; }
-hold() { flock "$work/logs/publisher.sign.lock" -c "sleep $1" & echo $!; }
+hold() { flock "$work/logs/publisher.sign.lock" -c "sleep $1" & holder=$!; sleep 0.5; }
 
 mkdir -p "$work/logs"
 : >"$work/logs/publisher.sign.lock"
 
-holder=$(hold 4); sleep 0.4
+hold 4
 set +e; run fast >/dev/null 2>&1; fast_rc=$?; set -e
 fast_line=$(tail -1 "$work/logs/fast.log" 2>/dev/null || echo "")
 check "fast skips rather than racing the nonce" "$fast_line" "signing" present
@@ -107,7 +107,7 @@ check "fast skips rather than racing the nonce" "$fast_line" "signing" present
 wait "$holder" 2>/dev/null || true
 
 # slow waits for the key rather than giving up its hourly slot
-holder=$(hold 3); sleep 0.4
+hold 3
 began=$(date +%s)
 set +e; ZENTIS_LOCK_WAIT=30 run slow >/dev/null 2>&1; slow_rc=$?; set -e
 waited=$(( $(date +%s) - began ))
@@ -118,7 +118,7 @@ check "slow publishes once the key is free" "$slow_line" "published" present
 wait "$holder" 2>/dev/null || true
 
 # but the wait is bounded, so a hung publisher cannot pin the other one forever
-holder=$(hold 10); sleep 0.4
+hold 10
 set +e; ZENTIS_LOCK_WAIT=1 run slow >/dev/null 2>&1; gave_up=$?; set -e
 give_line=$(tail -1 "$work/logs/slow.log")
 check "a bounded wait gives up with a reason" "$give_line" "signing" present
