@@ -4,26 +4,26 @@
     {
       "chainId": 11155111,
       "chain": "Sepolia",
-      "gas": "1195847324280470156",
+      "gas": "1173181108225589552",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "38300000",
-        "committed": "15000000",
+        "held": "37750000",
+        "committed": "15450000",
         "allowance": "15000000"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "6071769099591659",
-        "committed": "6071769099591659",
-        "allowance": "6071769099591659"
+        "held": "5899422880110771",
+        "committed": "5899422880110771",
+        "allowance": "5899422880110771"
       }
     },
     {
       "chainId": 421614,
       "chain": "Arbitrum Sepolia",
-      "gas": "966517481189806477",
+      "gas": "963090444677928477",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
@@ -42,7 +42,7 @@
     {
       "chainId": 84532,
       "chain": "Base Sepolia",
-      "gas": "1083210208540182937",
+      "gas": "1083135801219911878",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,

@@ -49,10 +49,18 @@ test("a chain whose approval is short is offered the command that fixes it", asy
   expect(text).toMatch(/: ?approve sepolia/);
 }, 60_000);
 
-test("a chain that is already approved is not told to approve again", async () => {
-  // The recorded wallet's USDC allowance already covers a fill of the book's own size.
+test("a chain is told to approve exactly when its allowance no longer covers what it committed", async () => {
+  // Asserted against the recorded wallet rather than against a remembered state of it. Three fills
+  // on Sepolia spent that leg's allowance down past its committed balance, and the recording after
+  // them says so — a test that had learned "the wallet is approved" would have called the console
+  // wrong for telling the truth.
+  const snapshot = fakeSnapshot("fresh");
   const text = said((await drive(190, 50, { keys: ["w"] })).lines);
-  expect(text).not.toMatch(/: ?approve /);
+  for (const chain of snapshot.wallet!.chains) {
+    const name = (chain.chain.split(" ")[0] ?? "").toLowerCase();
+    const short = chain.tokenA.allowance < chain.tokenA.committed;
+    expect(new RegExp(`: ?approve ${name}\\b`, "i").test(text)).toBe(short);
+  }
 }, 60_000);
 
 test("a typed approve is the binary signing for itself, for the router that will pull", async () => {

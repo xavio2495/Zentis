@@ -138,11 +138,21 @@ test("the rebalance panel never loses a character to a column, at any width", as
 }, 120_000);
 
 test("a leg closer to the mid than its own spread is left alone, with no command to run", async () => {
-  // A top-up of 0.0000096 WETH is noise: it cannot move a quote that already sits inside the
-  // spread the leg charges. Said as being on the mid, rather than offered as a move worth making.
+  // A top-up of 0.0000096 WETH is noise: it cannot move a quote that already sits inside the spread
+  // the leg charges, so it is never offered as a move worth making.
+  //
+  // Asserted as the rule rather than against one leg: this reads the recorded moment, and which leg
+  // is where in it changes every time the fixtures are re-recorded. What may not change is that
+  // every leg the panel names is either given a whole command or told why it has none.
   const text = (await drive(190, 50, { keys: ["p"] })).lines.join("\n");
-  expect(text).toMatch(/on the mid|within its own spread/);
   expect(text).not.toMatch(/top up 0\.00000/);
+  for (const name of ["Sepolia", "Base", "Arbitrum"]) {
+    const said = text.includes(`${name} is on the mid`) || text.includes(`${name} holds`);
+    expect(said).toBe(true);
+  }
+  // A leg that cannot be fixed by a push says so; one that can gets the command in full.
+  if (/top up /.test(text)) expect(text).toMatch(/: push [a-z]+ [a-z]+ [\d.]+/);
+  expect(text).toMatch(/within its own spread|a push only adds|top up /);
 }, 60_000);
 
 test("a card carries no venue price, since the book does not quote from that pool", async () => {
