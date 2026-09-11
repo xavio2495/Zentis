@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { rebalanceOf } from "./src/rebalance.js";
+import { pushPlan, rebalanceOf } from "./src/rebalance.js";
 
 const ONE = 10n ** 18n;
 // A mid of 2,470 USDC per WETH in the book's units: raw tokenB per 1e18 raw tokenA, six-decimal
@@ -50,4 +50,53 @@ test("how far the curve sits from the mid is reported in basis points, signed", 
   expect(short.offMidBps!).toBeGreaterThan(0);
   const long = rebalanceOf({ balanceA, balanceB: wantedB * 2n, mid: MID });
   expect(long.offMidBps!).toBeLessThan(0);
+});
+
+test("a push plans its approval for the settlement after it, not just for itself", () => {
+  // The lesson from 2026-09-11: push() is a transferFrom that consumes the allowance now, and every
+  // later fill taking tokenB from the maker is settled by Aqua pulling against what is left. An
+  // approval sized to the top-up alone left every leg at zero allowance with the commitment intact.
+  const balanceA = 15n * 10n ** 6n;
+  const wantedB = (balanceA * MID) / ONE;
+  const plan = pushPlan({
+    balanceA,
+    balanceB: wantedB / 2n,
+    mid: MID,
+    held: wantedB,
+    allowance: 0n,
+  })!;
+  expect(plan.topUpB).toBe(wantedB - wantedB / 2n);
+  expect(plan.approval).toBe(plan.topUpB + wantedB);
+  expect(plan.needsApproval).toBe(true);
+});
+
+test("what the wallet does not hold free is wrapped first, and nothing more", () => {
+  const balanceA = 15n * 10n ** 6n;
+  const wantedB = (balanceA * MID) / ONE;
+  const committed = wantedB / 2n;
+  // Holding exactly what it committed: every wei of the top-up has to be wrapped.
+  const short = pushPlan({ balanceA, balanceB: committed, mid: MID, held: committed, allowance: 0n })!;
+  expect(short.wrap).toBe(short.topUpB);
+  // Holding plenty: nothing is wrapped.
+  const plenty = pushPlan({ balanceA, balanceB: committed, mid: MID, held: committed * 10n, allowance: 0n })!;
+  expect(plenty.wrap).toBe(0n);
+});
+
+test("an allowance that already covers the settlement is left alone", () => {
+  const balanceA = 15n * 10n ** 6n;
+  const wantedB = (balanceA * MID) / ONE;
+  const plan = pushPlan({
+    balanceA,
+    balanceB: wantedB / 2n,
+    mid: MID,
+    held: wantedB * 4n,
+    allowance: wantedB * 4n,
+  })!;
+  expect(plan.needsApproval).toBe(false);
+});
+
+test("a leg a push cannot help has no plan at all", () => {
+  const balanceA = 15n * 10n ** 6n;
+  const long = pushPlan({ balanceA, balanceB: (balanceA * MID * 2n) / ONE, mid: MID, held: 0n, allowance: 0n });
+  expect(long).toBeNull();
 });
