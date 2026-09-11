@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { markRows } from "../components/Logo.js";
 import { type Snapshot, humanDuration, providersOf } from "@zentis/console-data";
 import type { PublisherMode } from "../actions.js";
 import { type Role, roleReason } from "../role.js";
@@ -169,6 +170,10 @@ export function Status({
       {trunc(`this reading was taken ${humanDuration(Math.max(0, Math.floor(Date.now() / 1000) - polled))} ago`, width)}
     </Text>,
   );
+
+  // Whatever the table did not need goes to the mark. It is the one thing on these pages that can be
+  // given room rather than take it: nothing is drawn unless the rows were already spare.
+  rows.push(...markRows(width, height - rows.length));
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">

@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { markRows } from "../components/Logo.js";
 import { type LegSnapshot, type Snapshot, humanDuration } from "@zentis/console-data";
 import { tokenAmount } from "../format.js";
 import { type Seg, padRows, trunc, wrapLines } from "../layout.js";
@@ -183,6 +184,10 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
     rows.push(<Segments key="pfth" segs={table.header} />);
     for (const [i, segs] of table.rows.entries()) rows.push(<Segments key={`pf${i}`} segs={segs} />);
   }
+
+  // Whatever the table did not need goes to the mark. It is the one thing on these pages that can be
+  // given room rather than take it: nothing is drawn unless the rows were already spare.
+  rows.push(...markRows(width, height - rows.length));
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">

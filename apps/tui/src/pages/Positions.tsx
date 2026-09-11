@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { markRows } from "../components/Logo.js";
 import { type LegSnapshot, type Snapshot, bInA, humanDuration, rebalanceOf } from "@zentis/console-data";
 import { signed, tokenAmount } from "../format.js";
 import { type Seg, fitSegments, padRows, segWidth, trunc, wrapLines } from "../layout.js";
@@ -233,6 +234,10 @@ export function Positions({
       }
     }
   }
+
+  // Whatever the table did not need goes to the mark. It is the one thing on these pages that can be
+  // given room rather than take it: nothing is drawn unless the rows were already spare.
+  rows.push(...markRows(width, height - rows.length));
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
