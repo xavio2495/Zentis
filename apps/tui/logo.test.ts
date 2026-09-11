@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { LOGO_GREEN, LOGO_PERIOD_MS, logoFrame } from "./src/logo.js";
+import { LOGO_GREEN, LOGO_PERIOD_MS, logoFrame, logoSize } from "./src/logo.js";
 
 /**
  * The mark, drawn from the same geometry the SVG is.
@@ -57,4 +57,18 @@ test("it loops, so the screen it lives on is never still", () => {
 test("a grid too small to say anything is empty rather than a smear", () => {
   const tiny = logoFrame(1_500, 0, 0);
   expect(tiny.rows).toEqual([]);
+});
+
+test("the grid is the file's own square, so the mark is neither flattened nor cropped", () => {
+  // A character cell is about twice as tall as it is wide, so the file's square field is twice as
+  // many columns as rows. Any other ratio is the logo squashed, and cropping to the ink — which
+  // bought a few rows — is what pushed the chains into the text above and below it.
+  const size = logoSize(120, 30);
+  expect(size.width).toBe(size.height * 2);
+
+  // The margin the file has above and below its ink is kept, which is what holds the mark clear of
+  // whatever is drawn beside it.
+  const frame = logoFrame(LOGO_PERIOD_MS - 1, size.width, size.height);
+  expect(frame.rows[0]!.cells.some((cell) => cell.on)).toBe(false);
+  expect(frame.rows.at(-1)!.cells.some((cell) => cell.on)).toBe(false);
 });

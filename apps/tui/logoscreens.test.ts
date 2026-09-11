@@ -63,3 +63,26 @@ test("where the screen is short the choices win, because a choice nobody can see
   }
   expect(frame.overflows).toBe(false);
 }, 60_000);
+
+test("the mark stands outside the border, which holds only what there is to choose", () => {
+  return drive(120, 40, { onboarding: true }).then((frame) => {
+    const lastMark = frame.lines.findLastIndex((l) => /█/.test(l));
+    // The frame opens under the mark rather than around it: a border drawn around a logo reads as a
+    // box somebody put a logo in, and this one belongs to the choices.
+    const borderTop = frame.lines.findIndex((l) => /┌/.test(l));
+    expect(borderTop).toBeGreaterThan(lastMark);
+    for (const line of frame.lines.slice(0, lastMark + 1)) expect(line).not.toMatch(/[│┌╰]/);
+  });
+}, 60_000);
+
+test("the second choice asks for the path where it was offered, rather than elsewhere", async () => {
+  const frame = await drive(120, 40, { onboarding: true, keys: ["2", "/", "t", "m", "p", "/", "k"] });
+  const text = frame.lines.join("\n");
+  expect(text).toMatch(/path to an env file/);
+  // What was typed is on the page that asked for it, and it says how to send it and how to go back.
+  expect(text).toContain("/tmp/k");
+  expect(text).toMatch(/enter/);
+  expect(text).toMatch(/esc/);
+  expect(frame.overflows).toBe(false);
+}, 60_000);
+
