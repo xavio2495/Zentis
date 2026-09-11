@@ -33,6 +33,13 @@
       "address": "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73"
     }
   },
+  "referencePool": {
+    "supersededAddress": "0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf",
+    "supersededSubgraph": "https://api.studio.thegraph.com/query/1758742/zentis-reference-pool-arbitrum-sepolia/v0.0.1",
+    "supersededNote": "SUPERSEDED as a price source on 2026-09-11: the legs no longer quote from this pool. Every leg now prices from one mid read from the real WETH/USDC market on Ethereum mainnet, because three unarbitraged testnet pools quoted the same pair at three unrelated prices and a book weight measured against one of them is not comparable with a weight measured against another. Kept as the record of what this leg used to price from, and of the liquidity criterion the chain was chosen on.",
+    "keyNote": "Recorded as supersededAddress rather than address on purpose: the console reads referencePool.address as a live endpoint, and a retired pool must not become one again by being written down. Sepolia's record still carries address because its chart has not been repointed yet.",
+    "note": "Used the global volatility multiplier; no per-leg override was ever needed here."
+  },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
     "strategyHash": "0xd37a493e8ba6bd3890c52520c0cfabb2e7a3026ee0eb57ecdc693e4830825190",
