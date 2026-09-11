@@ -5,6 +5,7 @@ import type { Action } from "../action-types.js";
 import { type Seg, fitSegments, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { bookSegments } from "./BookRow.js";
+import { Providers } from "./Providers.js";
 import { TERM, UI } from "../theme.js";
 
 /**
@@ -111,7 +112,7 @@ export function bookState(snapshot: Snapshot, armed: boolean): BookState {
  * when a watch-only viewer pressed `r` — so a viewer could not tell which keys existed. The reason a
  * key is off lives in the `?` overlay, where someone who wants to arm the console will look.
  */
-function hints(actions: Action[], width: number): Seg[] {
+export function hints(actions: Action[], width: number): Seg[] {
   const tone = (a: Action) => (a.disabledReason === null ? UI.action : UI.disabled);
   // Three lengths, not two: the full label, the action's own one-word name, and the bare key. A row
   // of bare letters at a hundred and twenty columns is a row to guess at when there was room for a
@@ -201,18 +202,24 @@ export function StatusBar({
   // shed in that order as the height goes, except that a live note takes the state's row, because a
   // confirmation prompt has to be seen.
   const book = bookSegments(snapshot, armed, polledAgo, loading, width);
+  // The book, then its state, then every source the console reads, then whatever the last action
+  // said. The keys are not here any more: they have a section of their own below the feed, because
+  // a row of keys is not critical information and it was sitting above the one thing that is.
+  const stateRows = rows >= 4 ? 1 : 0;
+  const noteRows = note === null ? 0 : 1;
+  const providerRows = Math.max(0, rows - 1 - stateRows - noteRows);
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
       <Box height={1}>
         <Segments segs={book} />
       </Box>
-      {rows > 1 && <Box height={1}>{rows < 4 && note !== null ? note : <Segments segs={line} />}</Box>}
-      {rows > 2 && (
+      {stateRows === 1 && (
         <Box height={1}>
-          <Segments segs={hints(actions, width)} />
+          <Segments segs={line} />
         </Box>
       )}
-      {rows > 3 && <Box height={1}>{note ?? <Text> </Text>}</Box>}
+      {providerRows > 0 && <Providers snapshot={snapshot} width={width} rows={providerRows} />}
+      {noteRows === 1 && <Box height={1}>{note}</Box>}
     </Box>
   );
 }

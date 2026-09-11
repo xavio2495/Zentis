@@ -129,16 +129,8 @@ export function Positions({
     <Text key="sp"> </Text>,
   ];
 
-  // What the table cannot hold: the mark each row is valued at, and anything the snapshot flagged.
-  const mark = snapshot.legs.find((l) => l.mark !== null)?.mark ?? null;
-  if (mark !== null) {
-    const age = mark.readAtSeconds === null ? null : Math.max(0, snapshot.takenAtSeconds - mark.readAtSeconds);
-    rows.push(
-      <Text key="mark" color={UI.muted}>
-        {trunc(`marked at ${mark.source}${age === null ? "" : `, read ${humanDuration(age)} ago`}`, width)}
-      </Text>,
-    );
-  }
+  // What the rows are marked at is in help under this page's heading; a leg that could not be read
+  // still says so here, because that changes what its row means.
   for (const [i, leg] of legs.entries()) {
     if (leg.sources.fills === null) continue;
     rows.push(

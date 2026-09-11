@@ -13,7 +13,8 @@ import { Pnl } from "./pages/Pnl.js";
 import { Positions } from "./pages/Positions.js";
 import { Simulation } from "./pages/Simulation.js";
 import { WalletPage } from "./pages/WalletPage.js";
-import { StatusBar } from "./components/StatusBar.js";
+import { StatusBar, hints } from "./components/StatusBar.js";
+import { Segments } from "./components/Segments.js";
 import { type Pending, landed } from "./landed.js";
 import { chooseFit, pairPrice, tokenAmount } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
@@ -77,6 +78,9 @@ export function App({
   // Which page the right-hand column is on. The cards and the overall view are on every one of them,
   // so a reader who walks away from the live view still sees the book move.
   const [page, setPage] = useState<Page>("live");
+  // How far the help page has been scrolled. Reset whenever it is opened, so `?` always starts at
+  // the top rather than wherever it was left.
+  const [helpAt, setHelpAt] = useState(0);
   const [legIndex, setLegIndex] = useState(0);
   // Which leg the chart region is showing while it rotates. Separate from `legIndex`, which is the
   // leg whose detail is pinned, so returning from a detail does not jerk the rotation somewhere else.
@@ -293,8 +297,16 @@ export function App({
         exit();
         return;
       case "help":
+        setHelpAt(0);
         setOverlay((current) => (current === "help" ? "none" : "help"));
         return;
+      case "scroll": {
+        // Half a page a press, the convention every pager uses: enough to move, little enough to
+        // keep a line of context from what was just read.
+        const step = Math.max(3, Math.floor(fit(size.cols, size.rows).graphRows / 2));
+        setHelpAt((current) => Math.max(0, current + (key.upArrow ? -step : step)));
+        return;
+      }
       case "back":
         setOverlay("none");
         return;
@@ -458,7 +470,7 @@ export function App({
               width={regions.rightWidth}
               height={pageRows}
             >
-              <Help report={snapshot.sim} actions={actions} {...panelInner(regions.rightWidth, pageRows)} />
+              <Help actions={actions} offset={helpAt} {...panelInner(regions.rightWidth, pageRows)} />
             </Panel>
           ) : page !== "live" ? (
             // A page takes the chart and the feed together: these are tables, and a table given half
@@ -530,6 +542,14 @@ export function App({
               width={panelInner(regions.rightWidth, feedRows).width}
               rows={panelInner(regions.rightWidth, feedRows).height}
             />
+          </Panel>
+        )}
+
+        {regions.keyRows > 0 && (
+          <Panel title="keys" width={regions.rightWidth} height={regions.keyRows + 2}>
+            <Box width={panelInner(regions.rightWidth, regions.keyRows + 2).width} height={regions.keyRows} overflow="hidden">
+              <Segments segs={hints(actions, panelInner(regions.rightWidth, regions.keyRows + 2).width)} />
+            </Box>
           </Panel>
         )}
 

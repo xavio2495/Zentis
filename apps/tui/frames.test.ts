@@ -86,11 +86,15 @@ test("watch-only says so, and the help overlay is reachable from it", async () =
 
   const help = await drive(120, 40, { keys: ["?"] });
   const text = help.lines.join("\n");
-  // Every disclosure lives here and nowhere else, so this is what must not be missing.
+  // Every disclosure lives here and nowhere else, so this is what must not be missing. The page
+  // scrolls, so what is below the first screen is reached rather than absent.
   expect(text).toContain("gains");
-  expect(text).toContain("bps of the");
-  expect(text).toContain("uncalibrated");
   expect(help.overflows).toBe(false);
+  const further = await drive(120, 40, { keys: ["?", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN"] });
+  const scrolled = further.lines.join("\n");
+  expect(scrolled).toContain("basis points of the");
+  expect(scrolled).toContain("uncalibrated");
+  expect(further.overflows).toBe(false);
 }, 60_000);
 
 test("a leg's detail opens over the charts and names what the card only shows", async () => {

@@ -11,11 +11,13 @@ import { fakeSnapshot } from "./sandbox/world.js";
 const panelOf = (lines: string[], title: string): string[] => {
   const top = lines.findIndex((l) => l.includes(`┌ ${title}`));
   if (top === -1) return [];
-  const column = lines[top]!.indexOf(`┌ ${title}`);
+  const edge = lines[top]!.indexOf(`┌ ${title}`);
+  const column = edge + 1;
   const rows: string[] = [];
   for (const line of lines.slice(top + 1)) {
-    const cell = line.slice(column + 1);
-    if (cell.startsWith("╰")) break;
+    // A panel's rows are the ones whose left edge is still its border.
+    if (line[edge] !== "│") break;
+    const cell = line.slice(column);
     rows.push(cell.replace(/│\s*$/, "").trimEnd());
   }
   return rows;
@@ -45,8 +47,9 @@ test("the keys live below the feed now, not above the book", async () => {
   const top = panelOf(lines, "zentis").join("\n");
   expect(top).not.toMatch(/\bx quit\b/);
   const feedAt = lines.findIndex((l) => l.includes("┌ feed"));
-  const keysAt = lines.findIndex((l) => /x quit|x$/.test(l) && l.includes("│"));
+  const keysAt = lines.findIndex((l) => l.includes("┌ keys"));
   expect(keysAt).toBeGreaterThan(feedAt);
+  expect(panelOf(lines, "keys").join("\n")).toMatch(/republish|r s f q/);
 }, 60_000);
 
 test("the whole console still fits at eighty by twenty-four with the new section", async () => {

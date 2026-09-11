@@ -62,30 +62,16 @@ export function Simulation({
   for (const [i, segs] of table.rows.entries()) rows.push(<Segments key={`r${i}`} segs={segs} />);
   rows.push(<Text key="sp2"> </Text>);
 
-  for (const [i, text] of wrapLines(
-    `Mean and worst are basis points of the ${report.bookInA / 1e6} tokenA opening book, on ${report.signal}. ` +
-      `Gains: own ${report.kappaBps}, book ${report.kappaBookBps}. Model ${report.modelCommit.slice(0, 10)}.`,
-    width,
-    4,
-  ).entries()) {
-    rows.push(
-      <Text key={`u${i}`} color={UI.muted}>
-        {text}
-      </Text>,
-    );
-  }
-  for (const [i, text] of wrapLines(
-    "The simulation ranks this policy against a static one over shared seeds. It is uncalibrated, " +
-      "so it says which is ahead and not what either is worth.",
-    width,
-    4,
-  ).entries()) {
-    rows.push(
-      <Text key={`d${i}`} color={UI.muted}>
-        {text}
-      </Text>,
-    );
-  }
+  // What the run claims, and what "uncalibrated" costs it, are in help under this page's heading.
+  // The gains and the model it was run at stay, because they are part of the reading.
+  rows.push(
+    <Text key="params" color={UI.muted}>
+      {trunc(
+        `own ${report.kappaBps} / book ${report.kappaBookBps} · ${report.signal} · model ${report.modelCommit.slice(0, 10)}`,
+        width,
+      )}
+    </Text>,
+  );
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">

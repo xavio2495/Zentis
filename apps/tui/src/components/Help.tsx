@@ -1,6 +1,4 @@
 import { Box, Text } from "ink";
-import { type SimReport, headline } from "@zentis/console-data";
-import { BINDINGS } from "../keymap.js";
 import type { Action } from "../action-types.js";
 import { padRows, trunc, wrapLines } from "../layout.js";
 import { TERM, UI } from "../theme.js";
@@ -36,39 +34,47 @@ const TERMS: [string, string, string][] = [
 ];
 
 /**
- * The simulation's three lines, wrapped rather than clipped.
- *
- * This is the page that explains every other one, so an ellipsis here takes away the explanation
- * and leaves the thing being explained. The whole page now has room for the sentence instead: the
- * run itself is a page of its own on `m`.
+ * What each page would otherwise have to say on itself, every frame, in rows it needs for numbers.
  */
-function simLines(report: SimReport, width: number): string[] {
-  const regimes = report.regimes
-    .map((r) => `${r.regime} ${r.seedsAhead}/${r.seeds} +${r.meanBpsOfBook.toFixed(1)}`)
-    .join("  ");
-  return [
-    headline(report),
-    // Basis points of the book, never the raw tokenA figure, which reads as dollars and is not.
-    ...wrapLines(regimes, width, 3),
-    ...wrapLines(
-      `mean and worst as bps of the ${report.bookInA / 1e6} tokenA opening book · ${report.signal}` +
-        ` · own ${report.kappaBps} / book ${report.kappaBookBps} · model ${report.modelCommit.slice(0, 10)}`,
-      width,
-      3,
-    ),
-  ];
-}
+const PAGES: [string, string][] = [
+  [
+    "positions",
+    "What each leg was shipped as, what it holds, and what that is worth at the mainnet mark rather " +
+      "than at its own venue. The panel below sizes a top-up from the leg's own reserves.",
+  ],
+  [
+    "pnl",
+    "Marked at the mainnet spot price. Trading is the fills' arithmetic; hold needs a mark from the " +
+      "same source at both ends, and generations shipped before that mark have none.",
+  ],
+  [
+    "wallet",
+    "Aqua holds no tokens: it records the committed balance and pulls from this wallet at settlement. " +
+      "Committed is a claim on held; an approval below it reverts the next fill.",
+  ],
+  [
+    "simulation",
+    "Ranks this policy against a static one over shared seeds; it is uncalibrated, so it says which " +
+      "is ahead and not what either is worth. Mean and worst are basis points of the opening book.",
+  ],
+  [
+    "leg detail",
+    "The shift is one signed number on-chain, rebuilt as its correction and its concessions. A venue " +
+      "is where a leg's trades settle, not what it quotes from.",
+  ],
+];
 
 export function Help({
-  report,
   actions,
   width,
   height,
+  offset = 0,
 }: {
-  report: SimReport;
   actions: Action[];
   width: number;
   height: number;
+  /** how far the page has been scrolled, in rows; `↑`/`↓` move it */
+  offset?: number;
 }) {
   const rows: React.ReactNode[] = [];
   const push = (node: React.ReactNode) => rows.push(node);
@@ -82,7 +88,7 @@ export function Help({
   // place prose lives, and a paragraph clipped mid-clause at 80 columns is the thing being fixed.
   for (const [i, text] of wrapLines(
     "One market-making position on three chains, quoting from one reference published at the same " +
-      "instant on all of them, managing its inventory as a single book without bridging.",
+      "instant on all of them, managed as a single book without bridging.",
     width,
     6,
   ).entries()) {
@@ -100,9 +106,8 @@ export function Help({
     </Text>,
   );
   for (const [i, text] of wrapLines(
-    "The shift's split is recomputed here at the harness's published gains — own 10,000, book " +
-      "5,000 — because the real ones never leave the enclave. A maker running other gains sees the " +
-      "published shift diverge from this one, which is correct and is flagged on the leg.",
+    "The shift's split is recomputed here at the published gains — own 10,000, book 5,000 — because " +
+      "the real ones never leave the enclave, so a maker running others sees it diverge.",
     width,
     6,
   ).entries()) {
@@ -112,25 +117,8 @@ export function Help({
       </Text>,
     );
   }
-  for (const [i, text] of simLines(report, width).entries()) {
-    push(
-      <Text key={`s${i}`} color={i === 0 ? UI.heading : UI.muted}>
-        {text}
-      </Text>,
-    );
-  }
-  for (const [i, text] of wrapLines(
-    "The simulation ranks this policy against a static one over shared seeds. It is uncalibrated, " +
-      "so it says which is ahead and not what either is worth.",
-    width,
-    4,
-  ).entries()) {
-    push(
-      <Text key={`u${i}`} color={UI.muted}>
-        {text}
-      </Text>,
-    );
-  }
+  // The run itself is a page of its own on `m`, and what it claims is under "simulation" below; it
+  // used to be repeated here, which cost this page five rows and clipped the sections beneath it.
 
   // How to arm the console, here rather than in the status bar: it is not a warning to someone who
   // only wants to watch, and someone who wants to act will look here.
@@ -144,7 +132,7 @@ export function Help({
     );
     for (const [i, text] of wrapLines(
       `${off.map((a) => a.key).join(", ")} are off: ${off[0]!.disabledReason}. ` +
-        "The console never reads the file; it hands the path to the commands it runs.",
+        "The console never reads that file; it hands its path to the commands it runs.",
       width,
       4,
     ).entries()) {
@@ -152,6 +140,25 @@ export function Help({
         <Text key={`a${i}`} color={UI.muted}>
           {text}
         </Text>,
+      );
+    }
+  }
+
+  // One heading per page, carrying what that page used to say in prose. The pages show data; this is
+  // where a reader who wants the sentence behind a column finds it, once, instead of on every frame.
+  push(<Text key="sppg"> </Text>);
+  push(
+    <Text key="tpg" color={UI.heading} bold>
+      the pages
+    </Text>,
+  );
+  for (const [page, prose] of PAGES) {
+    for (const [i, text] of wrapLines(prose, width - 12, 6).entries()) {
+      push(
+        <Box key={`pg${page}${i}`}>
+          <Text color={UI.action}>{(i === 0 ? page : "").padEnd(12)}</Text>
+          <Text color={UI.muted}>{text}</Text>
+        </Box>,
       );
     }
   }
@@ -174,31 +181,31 @@ export function Help({
     }
   }
 
-  push(<Text key="sp2"> </Text>);
-  push(
-    <Text key="t3" color={UI.heading} bold>
-      keys
-    </Text>,
-  );
-  for (const binding of BINDINGS) {
-    for (const [i, text] of wrapLines(binding.label, width - 12, 2).entries()) {
-      push(
-        <Box key={`${binding.keys.join("")}${i}`}>
-          <Text color={UI.action}>{(i === 0 ? binding.keys.join(" / ") : "").padEnd(12)}</Text>
-          <Text color={UI.muted}>{text}</Text>
-        </Box>,
-      );
-    }
-  }
+  // No key table here any more: the keys have their own section on screen at all times now, and a
+  // second copy of them was the longest thing on the page a reader already had in front of them.
+
+  // Scrolled rather than trimmed. This page explains five others, and at a hundred and twenty
+  // columns that is more rows than the region has; cutting the explanation until it fitted would be
+  // cutting the thing a reader opened it for. The last row says where they are in it.
+  const body = Math.max(1, height - 1);
+  const top = Math.max(0, Math.min(offset, Math.max(0, rows.length - body)));
+  const shown = rows.slice(top, top + body);
+  const more = rows.length - (top + body);
+  const footer =
+    more > 0
+      ? `esc or ?  back    ↓ ${more} more`
+      : top > 0
+        ? "esc or ?  back    ↑ back up"
+        : "esc or ?  back";
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
-      {padRows(rows, height - 1, null).map((row, i) => (
+      {padRows(shown, body, null).map((row, i) => (
         <Box key={i} height={1}>
           {row ?? <Text> </Text>}
         </Box>
       ))}
-      <Text color={UI.muted}>{trunc("esc or ?  back", width)}</Text>
+      <Text color={UI.muted}>{trunc(footer, width)}</Text>
     </Box>
   );
 }

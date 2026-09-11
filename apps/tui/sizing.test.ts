@@ -11,8 +11,9 @@ test("the regions always leave a row of headroom, at every size", () => {
   for (const [cols, rows] of SIZES) {
     const r = fit(cols, rows);
     expect(r.draw).toBe(rows - 1);
-    // Every region is a bordered panel; the status bar's border is the two rows outside its content.
-    expect(r.statusRows + 2 + r.graphRows + r.feedRows).toBe(r.draw);
+    // Every region is a bordered panel, and the keys have one of their own below the feed now; each
+    // border is the two rows outside its content.
+    expect(r.statusRows + 2 + r.graphRows + r.feedRows + r.keyRows + 2).toBe(r.draw);
     expect(r.cardHeights[0] + r.cardHeights[1] + r.cardHeights[2]).toBe(r.draw);
     expect(r.draw).toBeLessThan(rows);
   }

@@ -64,6 +64,8 @@ export interface Regions {
   readonly statusRows: number;
   readonly graphRows: number;
   readonly feedRows: number;
+  /** the keys' own section, below the feed */
+  readonly keyRows: number;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -91,12 +93,16 @@ export function fit(cols: number, rows: number): Regions {
   // is one or two lines inside that.
   // Three when there is room — the state, the keys, and what the last action said — so a note never
   // has to displace the keys. Two on a short terminal, one on the smallest.
-  // One more than before, for the overall view: the book row is never shed, so every height keeps it
-  // and the rows below it give way in order — the action note, then the key hints, then the state.
-  const statusRows = draw >= 30 ? 4 : draw >= 22 ? 3 : 2;
+  // The top panel is the critical information: the book's own row, then one line per source the
+  // console reads. Eleven sources need eleven rows, which only a tall terminal has; below that they
+  // collapse to a row of marks, so the panel always says whether anything is down.
+  const statusRows = draw >= 44 ? 14 : draw >= 30 ? 5 : draw >= 22 ? 4 : 3;
 
   const BORDER = 2;
-  const rightBody = Math.max(0, draw - statusRows - BORDER);
+  // The keys have a section of their own below the feed now: one row inside its own border. They are
+  // not critical information, and they were sitting above the one thing that is.
+  const keyRows = 1;
+  const rightBody = Math.max(0, draw - statusRows - BORDER - (keyRows + BORDER));
   // Roughly half to the charts, per the wireframe, but never so little that a chart is a single row
   // of noise, and never so much that the feed cannot show a publish and the fill that preceded it.
   const graphRows = rightBody < 10 ? 0 : clamp(Math.floor(rightBody * 0.5), 7, 22);
@@ -107,7 +113,7 @@ export function fit(cols: number, rows: number): Regions {
   const each = Math.floor(draw / 3);
   const cardHeights: [number, number, number] = [each, each, draw - each * 2];
 
-  return { draw, legsWidth, cardHeights, rightWidth, statusRows, graphRows, feedRows };
+  return { draw, legsWidth, cardHeights, rightWidth, statusRows, graphRows, feedRows, keyRows };
 }
 
 /** Truncate to width, with an ellipsis when it bites. */

@@ -25,7 +25,8 @@ test("the simulation page shows the run, and what it claims is in help", async (
   const sim = await pageText("m");
   expect(sim).not.toContain("uncalibrated");
   expect(sim).toMatch(/regime|seeds/);
-  const help = await pageText("?");
+  // In help under its own heading, which is below the first screen at this width: the page scrolls.
+  const help = (await drive(190, 50, { keys: ["?", "DOWN", "DOWN", "DOWN"] })).lines.join("\n");
   expect(help).toContain("uncalibrated");
 }, 60_000);
 

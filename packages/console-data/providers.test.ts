@@ -26,10 +26,13 @@ test("every chain contributes its own two endpoints, named by the chain", () => 
   const providers = providersOf(
     snapshotWith([leg(1, "sepolia", null, null), leg(2, "base-sepolia", null, null)]),
   );
-  for (const name of ["sepolia", "base-sepolia"]) {
-    expect(providers.filter((p) => p.name.includes(name) && p.kind === "rpc")).toHaveLength(1);
-    expect(providers.filter((p) => p.name.includes(name) && p.kind === "fills")).toHaveLength(1);
+  // Named by the chain, not by the deployment: every leg is on a sepolia, so "base-sepolia" in a
+  // column of eleven rows is three repetitions of a word that distinguishes nothing.
+  for (const chain of ["sepolia", "base"]) {
+    expect(providers.filter((p) => p.kind === "rpc" && p.name.endsWith(chain))).toHaveLength(1);
+    expect(providers.filter((p) => p.kind === "fills" && p.name.endsWith(chain))).toHaveLength(1);
   }
+  expect(providers.filter((p) => p.kind === "rpc")).toHaveLength(2);
 });
 
 test("a source that refused is down, with the short reason rather than the paragraph", () => {

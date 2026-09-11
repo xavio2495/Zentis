@@ -199,20 +199,14 @@ export function LegDetail({
     );
   }
 
-  // Labelled in the same column as `pool` and `reference`, with its continuation lines indented to
-  // match. Run straight into its sentence, "why this leg has no…" read as a question.
+  // The generated sentence that read the numbers back — "this leg's reserves put its own curve 0.15%
+  // off the mid" — is in help under this page's heading. The numbers above say it, and the sentence
+  // was taking the rows a refusal needs.
   const LABEL = 11;
-  for (const [i, text] of wrapLines(why(leg), width - 1 - LABEL, 3).entries()) {
-    line(
-      `why${i}`,
-      <>
-        <Text color={UI.muted}>{(i === 0 ? "why" : "").padEnd(LABEL)}</Text>
-        <Text color={UI.muted}>{text}</Text>
-      </>,
-    );
-  }
+
   // A side the router refused, in the service's own sentence with this leg's token names. The card
-  // only has room to name the reason; this is where it is told.
+  // only has room to name the reason; this is where it is told. It was lost when the "why" rows it
+  // sat under were taken out.
   const { tokenA, tokenB } = leg.config;
   for (const [direction, quote, from, to] of [
     ["AtoB", leg.quoteAToB, tokenA, tokenB],
@@ -230,6 +224,7 @@ export function LegDetail({
       );
     }
   }
+
   for (const [i, caveat] of leg.caveats.entries()) {
     line(`caveat${i}`, <Text color={UI.caveat}>{trunc(`! ${caveat}`, width - 1)}</Text>);
   }

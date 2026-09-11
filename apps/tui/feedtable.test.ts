@@ -5,11 +5,14 @@ import { drive } from "./sandbox/drive.js";
 const feedOf = (lines: string[]): string[] => {
   const header = lines.findIndex((l) => l.includes("┌ feed"));
   if (header === -1) return [];
-  const column = [...lines[header]!].indexOf("┌") + 1;
+  // From the panel's own left edge, so the closing border is recognisable: sliced one column in, the
+  // bottom edge reads as "───" and the loop ran on into whatever panel came next.
+  const edge = [...lines[header]!].indexOf("┌");
+  const column = edge + 1;
   const rows: string[] = [];
   for (const line of lines.slice(header + 1)) {
+    if ([...line][edge] !== "│") break;
     const cell = [...line].slice(column).join("");
-    if (cell.startsWith("╰")) break;
     rows.push(cell.replace(/│\s*$/, "").trimEnd());
   }
   return rows.filter((r) => r.trim() !== "");

@@ -28,11 +28,24 @@ test("with legs unread the book split is said to be unknown, never a confident z
   expect(status).toContain("split unknown");
 });
 
+/** The keys have a section of their own below the feed; this reads that panel rather than the top. */
+const keysOf = (lines: string[]) => {
+  const top = lines.findIndex((l) => l.includes("\u250c keys"));
+  if (top === -1) return "";
+  const column = lines[top]!.indexOf("\u250c keys");
+  return lines
+    .slice(top + 1)
+    .map((l) => l.slice(column + 1).replace(/\u2502\s*$/, "").trimEnd())
+    .filter((l) => !l.startsWith("\u2570"))
+    .join("\n");
+};
+
 test("the key hints are always there, and pressing a disabled key does not replace them", async () => {
-  const watching = statusOf((await drive(120, 40, { keys: ["r"] })).lines);
+  const watching = keysOf((await drive(120, 40, { keys: ["r"] })).lines);
   expect(watching).toMatch(/r .*s .*f .*q/);
   // The signing-key sentence is not a warning for someone who only wants to watch.
   expect(watching).not.toContain("set ZENTIS_ENV");
+  expect(statusOf((await drive(120, 40, { keys: ["r"] })).lines)).not.toContain("set ZENTIS_ENV");
 });
 
 test("how to arm the console is in the help overlay", async () => {

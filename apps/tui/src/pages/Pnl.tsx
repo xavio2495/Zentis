@@ -108,41 +108,14 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
   );
   rows.push(<Text key="sp"> </Text>);
 
-  const mark = legs.find((l) => l.mark !== null)?.mark ?? null;
-  if (mark !== null) {
-    const age = mark.readAtSeconds === null ? null : Math.max(0, snapshot.takenAtSeconds - mark.readAtSeconds);
+  // What the book is marked at, and why hold is unknown, are in help under this page's heading. What
+  // stays is the one line that changes what "total" means: a total without hold is not a total.
+  if (legs.some((l) => l.pnl?.holdA == null)) {
     rows.push(
-      <Text key="mark" color={UI.muted}>
-        {trunc(
-          // The legs' own pool mids used to be the alternative mark; two of those pools were retired
-          // with the move to one mid, so there is no second reading to point at any more.
-          `marked at ${mark.source}${age === null ? "" : `, read ${humanDuration(age)} ago`}`,
-          width,
-        )}
+      <Text key="hold" color={UI.caveat}>
+        {trunc("! hold unknown: no opening mark from this source, so total is trading only", width)}
       </Text>,
     );
-  }
-
-  // One reason per distinct caveat: three legs shipped the same day give the same sentence three
-  // times, and a page that repeats itself reads as three separate problems.
-  const reasons = [...new Set(legs.map((l) => l.pnl?.caveat).filter((c): c is string => c != null))];
-  for (const [i, reason] of reasons.entries()) {
-    for (const [j, text] of wrapLines(reason, width - 2, 3).entries()) {
-      rows.push(
-        <Text key={`r${i}-${j}`} color={UI.caveat}>
-          {j === 0 ? `! ${text}` : `  ${text}`}
-        </Text>,
-      );
-    }
-  }
-  if (book.caveat !== null) {
-    for (const [j, text] of wrapLines(book.caveat, width - 2, 2).entries()) {
-      rows.push(
-        <Text key={`bc${j}`} color={UI.caveat}>
-          {j === 0 ? `! ${text}` : `  ${text}`}
-        </Text>,
-      );
-    }
   }
 
   // What the totals are made of, in whatever room is left. A page whose lower half is blank has

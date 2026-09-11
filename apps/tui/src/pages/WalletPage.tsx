@@ -114,22 +114,8 @@ export function WalletPage({
     for (const [i, segs] of table.rows.entries()) rows.push(<Segments key={`row${i}`} segs={segs} />);
     rows.push(<Text key="sp2"> </Text>);
 
-    // Not a footnote anyone can skip: it is the reason held and committed are not two pots.
-    for (const [i, text] of wrapLines(
-      "Aqua holds no tokens: it records the committed balance against the shipped strategy and pulls " +
-        "from this wallet when a fill settles, so committed is a claim on held rather than a separate " +
-        "balance, and free is what a new ship could use.",
-      width,
-      4,
-    ).entries()) {
-      rows.push(
-        <Text key={`note${i}`} color={UI.muted}>
-          {text}
-        </Text>,
-      );
-    }
-    // Wrapped, never cut: "the next fill would revert on the a…" is the half of the sentence that
-    // says there is a problem without saying what to do about it.
+    // How Aqua's custody works — why committed is a claim on held rather than a second pot — is in
+    // help under this page's heading. The page itself is the balances.
     for (const [i, caveat] of wallet.caveats.entries()) {
       for (const [j, text] of wrapLines(caveat, width - 2, 3).entries()) {
         rows.push(
