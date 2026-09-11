@@ -43,7 +43,7 @@
     {
       "chainSelector": "3478487238524512106",
       "registry": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
-      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.2.0",
+      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.3.0",
       "crowdingSubgraphUrl": "https://api.studio.thegraph.com/query/1758742/aqua-standard/v0.2.0",
       "crowdingTokenA": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
       "crowdingTokenB": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",

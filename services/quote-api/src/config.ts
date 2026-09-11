@@ -26,7 +26,7 @@ export const CHAINS: readonly ChainConfig[] = [
     name: "arbitrum-sepolia",
     subgraphUrl: env(
       "ZENTIS_SUBGRAPH_ARBITRUM_SEPOLIA",
-      "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.2.0"
+      "https://api.studio.thegraph.com/query/1760015/zentis-fills-arbitrum-sepolia/v0.3.0"
     ),
     rpcUrl: env("ZENTIS_RPC_ARBITRUM_SEPOLIA", "https://sepolia-rollup.arbitrum.io/rpc")
   },
