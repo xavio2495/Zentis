@@ -41,7 +41,12 @@ test("numbers survive every width whole, which is what Ink's squeezing destroys"
     for (const pattern of [/seq\d/, /reference\d/, /fill\d/, /shift[-+]/, /spread\d/]) {
       expect(text).not.toMatch(pattern);
     }
-    const seqs = [...text.matchAll(/seq (\d+)/g)].map((m) => m[1]!);
+    // The narrowest feed writes a publish's seq bare, without the word, so long digit runs count too;
+    // a decimal's digits (0.00000388) are not a seq and are left out.
+    const seqs = [
+      ...[...text.matchAll(/seq (\d+)/g)].map((m) => m[1]!),
+      ...[...text.matchAll(/(?<![.\d])(\d{7,})(?![.\d])/g)].map((m) => m[1]!),
+    ];
     expect(seqs.length).toBeGreaterThan(0);
     for (const seq of seqs) {
       expect(seq.length === 10 || Number(seq) < 100).toBe(true);

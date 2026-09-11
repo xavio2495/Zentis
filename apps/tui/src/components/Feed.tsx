@@ -1,131 +1,270 @@
 import { Box, Text } from "ink";
-import { BOOK, type FoldedRow, type Snapshot, foldRounds } from "@zentis/console-data";
+import { BOOK, type FoldedRow, type LegSnapshot, type Snapshot, foldRounds } from "@zentis/console-data";
 import { duration, signed, tokenAmount } from "../format.js";
-import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
+import { type Seg, fitSegments, padRows, segWidth, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
-import { UI, legColour } from "../theme.js";
+import { LEG_ORDER, UI, legColour } from "../theme.js";
 
 /** A chain as the rest of the screen names it, so no reader has to learn that SEP means Sepolia. */
-const nameOf = (snapshot: Snapshot, chainId: number): string =>
-  snapshot.legs.find((l) => l.config.chainId === chainId)?.config.label.split(" ")[0] ?? String(chainId);
+const nameOf = (leg: LegSnapshot): string => leg.config.label.split(" ")[0] ?? String(leg.config.chainId);
+
+/**
+ * One cell, as its renderings longest first. A layout picks a level, never a per-row choice, so a
+ * column is as wide in every row as the widest thing it holds; a cell with fewer renderings than
+ * the level uses its shortest.
+ */
+type Cell = Seg[][];
+const cell = (text: string, color?: string, bold?: boolean): Cell => [[{ text, color, bold }]];
+const BLANK: Cell = [[]];
+
+interface TableRow {
+  readonly when: Cell;
+  /** what happened; a publish's event is its seq, the cross-chain claim the row records */
+  readonly event: Cell;
+  /** one cell per leg, in the cards' order */
+  readonly legs: Cell[];
+  /** what does not belong to a column, longest first; the last rendering is dropped whole if even it does not fit */
+  readonly note: Seg[][];
+}
 
 /** A shift, and whether it is sitting on the leg's signed cap — where −500 is a limit, not a size. */
-function shiftSegs(snapshot: Snapshot, chainId: number, tiltBps: number): Seg[] {
-  const leg = snapshot.legs.find((l) => l.config.chainId === chainId);
-  const cap = leg?.position?.maxTiltBps ?? BOOK.maxTiltBps;
+function shiftCell(leg: LegSnapshot, tiltBps: number): Cell {
+  const cap = leg.position?.maxTiltBps ?? BOOK.maxTiltBps;
+  const number: Seg = { text: signed(tiltBps), color: UI.heading };
+  if (Math.abs(tiltBps) < cap) return [[number]];
   return [
-    { text: " " },
-    { text: nameOf(snapshot, chainId), color: legColour(chainId) },
-    { text: ` ${signed(tiltBps)}`, color: UI.heading },
-    ...(Math.abs(tiltBps) >= cap ? [{ text: " at cap", color: UI.muted }] : []),
+    [number, { text: " at cap", color: UI.muted }],
+    [number, { text: " at cap", color: UI.muted }],
+    [number, { text: " cap", color: UI.muted }],
   ];
 }
 
 /**
- * Why a publish row lists fewer legs than the book has.
- *
- * The workflow writes every leg in one publish. A row listing one leg usually means the console could
- * not read the other two, and saying "on 1 leg" read as the workflow having written only one.
+ * A leg a publish does not list. The workflow writes every leg in one publish, so a leg missing from
+ * a row is usually one the console could not read, and saying so in its own column is what stops
+ * the row reading as the workflow having written one leg.
  */
-function missingSegs(snapshot: Snapshot, present: number[]): Seg[] {
-  const absent = snapshot.legs.filter((l) => !present.includes(l.config.chainId));
-  if (absent.length === 0) return [];
-  const unread = absent.filter((l) => l.sources.fills !== null).length;
-  const n = (k: number) => `${k} leg${k === 1 ? "" : "s"}`;
-  return [
-    {
-      text: unread > 0 ? ` · ${n(unread)} unread` : ` · ${n(absent.length)} not in this publish`,
-      color: UI.caveat,
-    },
-  ];
+function absentCell(leg: LegSnapshot): Cell {
+  return leg.sources.fills !== null ? cell("unread", UI.caveat) : cell("–", UI.muted);
 }
 
-/**
- * Fills, refusals and publishes on one clock, in the order they happened, each chain in its colour.
- *
- * The refusals are here deliberately and their reason strings are printed as the registry wrote
- * them: `stale seq` is what finality looks like from outside, and the pause in the demo is
- * unintelligible without it. Publishes that changed nothing fold into one row, so the rows that
- * record something happening are not pushed off the bottom by thirteen that did not.
- *
- * Every row is measured before it is drawn. Left to Ink, an overlong row loses characters from
- * inside its numbers: a seq came out as `seq1789029` and a shift of `-349` as `-1`.
- */
-function rowSegments(row: FoldedRow, snapshot: Snapshot, width: number): Seg[] {
+function tableRow(row: FoldedRow, snapshot: Snapshot, ordered: LegSnapshot[]): TableRow {
   const ago = (t: bigint) => duration(snapshot.takenAtSeconds - Number(t));
 
   if (row.kind === "round" || row.kind === "fold") {
-    const time: Seg = {
-      text: `${(row.kind === "fold" ? `${ago(row.to)}–${ago(row.from)}` : ago(row.timestamp)).padStart(6)} `,
-      color: UI.muted,
-    };
-    const what: Seg[] =
-      row.kind === "fold"
-        ? [
-            { text: `${row.count} publishes`, color: UI.reference },
-            { text: ", unchanged", color: UI.muted },
-          ]
-        : [
-            { text: "publish ", color: UI.reference },
-            { text: `seq ${row.seq}`, color: UI.heading },
-          ];
-    const shifts = row.legs.flatMap((leg) => shiftSegs(snapshot, leg.chainId, leg.tiltBps));
-    const bare = row.legs.flatMap((leg): Seg[] => [
-      { text: " " },
-      { text: signed(leg.tiltBps), color: legColour(leg.chainId) },
-    ]);
-    const missing = missingSegs(snapshot, row.legs.map((leg) => leg.chainId));
-    // "unchanged" is given up before the chain names: which chain a shift belongs to is the
-    // information, and "N publishes" with one set of shifts already says they did not change.
-    const brief: Seg[] = row.kind === "fold" ? [what[0]!] : what;
-    return fitSegments(
-      [
-        [time, ...what, { text: " ·", color: UI.muted }, ...shifts, ...missing],
-        [time, ...what, { text: " ·", color: UI.muted }, ...shifts],
-        [time, ...brief, { text: " ·", color: UI.muted }, ...shifts],
-        [time, ...what, ...bare, ...missing],
-        [time, ...what, ...bare],
-        [time, ...what],
+    const legs = ordered.map((leg) => {
+      const entry = row.legs.find((l) => l.chainId === leg.config.chainId);
+      return entry === undefined ? absentCell(leg) : shiftCell(leg, entry.tiltBps);
+    });
+    if (row.kind === "round") {
+      return {
+        when: cell(ago(row.timestamp), UI.muted),
+        // "seq" stays through the middle level: a bare ten-digit number reads as a timestamp.
+        event: [
+          [{ text: "publish seq ", color: UI.reference }, { text: String(row.seq), color: UI.heading }],
+          [{ text: "seq ", color: UI.reference }, { text: String(row.seq), color: UI.heading }],
+          [{ text: String(row.seq), color: UI.heading }],
+        ],
+        legs,
+        note: [],
+      };
+    }
+    return {
+      // The newest end orders the row, like every other age in the column; how far back the run goes
+      // is said in its note, because a range in a column of ages is the one cell that does not line up.
+      when: cell(ago(row.to), UI.muted),
+      event: cell(`${row.count} publishes`, UI.reference),
+      legs,
+      note: [
+        [{ text: `unchanged back to ${ago(row.from)}`, color: UI.muted }],
+        [{ text: "unchanged", color: UI.muted }],
       ],
-      width,
-    );
+    };
   }
 
-  const time: Seg = { text: `${ago(row.timestamp).padStart(6)} `, color: UI.muted };
-  const chain: Seg = { text: nameOf(snapshot, row.chainId).padEnd(9), color: legColour(row.chainId), bold: true };
+  const own = (value: Cell) =>
+    ordered.map((leg) => (leg.config.chainId === row.chainId ? value : BLANK));
 
   if (row.kind === "rejection") {
-    return fitSegments(
-      [
-        [time, chain, { text: `rejected: ${row.reason}`, color: UI.rejection }],
-        [time, chain, { text: row.reason, color: UI.rejection }],
-      ],
-      width,
-    );
+    // Printed as the registry wrote it: `stale seq` is what finality looks like from outside, and the
+    // pause in the demo is unintelligible without it.
+    return {
+      when: cell(ago(row.timestamp), UI.muted),
+      event: cell("rejected", UI.rejection),
+      legs: own(cell(row.reason, UI.rejection)),
+      note: [],
+    };
   }
 
-  const leg = snapshot.legs.find((l) => l.config.chainId === row.chainId);
-  const inDecimals = (row.isAToB ? leg?.config.tokenA.decimals : leg?.config.tokenB.decimals) ?? 18;
-  const outDecimals = (row.isAToB ? leg?.config.tokenB.decimals : leg?.config.tokenA.decimals) ?? 18;
-  const inSymbol = (row.isAToB ? leg?.config.tokenA.symbol : leg?.config.tokenB.symbol) ?? "";
-  const outSymbol = (row.isAToB ? leg?.config.tokenB.symbol : leg?.config.tokenA.symbol) ?? "";
-  const amounts =
-    `${tokenAmount(row.amountIn, inDecimals)} ${inSymbol}` +
-    ` → ${tokenAmount(row.amountOut, outDecimals)} ${outSymbol}`;
+  const leg = ordered.find((l) => l.config.chainId === row.chainId);
+  const [from, to] = row.isAToB
+    ? [leg?.config.tokenA, leg?.config.tokenB]
+    : [leg?.config.tokenB, leg?.config.tokenA];
+  const inText = `${tokenAmount(row.amountIn, from?.decimals ?? 18)} ${from?.symbol ?? ""}`;
+  const outText = `${tokenAmount(row.amountOut, to?.decimals ?? 18)} ${to?.symbol ?? ""}`;
   const context =
     row.refTiltBps === null
       ? "  no reference had been published"
-      : `  at shift ${signed(row.refTiltBps)}, reference ${duration(Number(row.refAgeSeconds ?? 0n))} old`;
-  const head: Seg[] = [time, chain, { text: "fill ", color: UI.fill }];
-
-  return fitSegments(
-    [
-      [...head, { text: amounts, color: UI.heading }, { text: context, color: UI.muted }],
-      [...head, { text: amounts, color: UI.heading }],
-      [time, chain, { text: "fill", color: UI.fill }],
+      : `  reference ${duration(Number(row.refAgeSeconds ?? 0n))} old`;
+  return {
+    when: cell(ago(row.timestamp), UI.muted),
+    event: cell("fill", UI.fill),
+    // The leg's column carries the shift the fill was priced at, the same quantity a publish row
+    // puts there, so a fill reads against the publishes above and below it.
+    legs: own(row.refTiltBps === null ? cell("–", UI.muted) : shiftCell(leg!, row.refTiltBps)),
+    note: [
+      [{ text: `${inText} → ${outText}`, color: UI.heading }, { text: context, color: UI.muted }],
+      [{ text: `${inText} → ${outText}`, color: UI.heading }],
+      [{ text: `→ ${outText}`, color: UI.heading }],
     ],
-    width,
+  };
+}
+
+/**
+ * The table's shape at one width: which rendering level its cells use, how far apart the columns
+ * sit, and whether notes may be left out. Tried in order, first fit wins.
+ *
+ * Spacing outranks notes, and the seq outranks both: it is the cross-chain claim, so it is never
+ * dropped, only said more briefly. A fill's amounts are shown whenever the columns leave room.
+ */
+interface Layout {
+  readonly level: number;
+  readonly gap: number;
+  readonly notesMayDrop: boolean;
+}
+const LAYOUTS: Layout[] = [
+  { level: 0, gap: 2, notesMayDrop: false },
+  { level: 1, gap: 2, notesMayDrop: false },
+  { level: 1, gap: 2, notesMayDrop: true },
+  { level: 2, gap: 2, notesMayDrop: true },
+  // One cell between columns is the last resort: "stale seq stale seq" run together is the table
+  // failing at the one thing it is for.
+  { level: 2, gap: 1, notesMayDrop: true },
+];
+
+const pick = (c: Cell, level: number): Seg[] => c[Math.min(level, c.length - 1)]!;
+const padTo = (segs: Seg[], width: number): Seg[] => {
+  const used = segWidth(segs);
+  return used >= width ? segs : [...segs, { text: " ".repeat(width - used) }];
+};
+
+/**
+ * Fills, refusals and publishes on one clock, in the order they happened, as a table with a column
+ * per chain.
+ *
+ * The columns are the point. The same leg's shift sits at the same place on every row, so a reader
+ * follows Base down the page instead of finding "Base" again in each sentence, and a refusal lands
+ * under the chain that refused it. Column widths are measured from what the rows actually hold, and
+ * every row is built to width before it is drawn: left to Ink, an overlong row loses characters from
+ * inside its numbers.
+ */
+/**
+ * Refusals from different chains within this many seconds of each other share a row. The workflow
+ * relays one seq to every chain at once, so a stale one is refused everywhere within a block or two;
+ * as separate rows, one event took three rows of mostly blank cells.
+ */
+const SAME_REFUSAL_SECONDS = 120n;
+
+function mergeRefusals(rows: FoldedRow[]): FoldedRow[][] {
+  const groups: FoldedRow[][] = [];
+  for (const row of rows) {
+    const group = groups[groups.length - 1];
+    const first = group?.[0];
+    if (
+      row.kind === "rejection" &&
+      first?.kind === "rejection" &&
+      group!.every((r) => r.kind === "rejection" && r.chainId !== row.chainId) &&
+      first.timestamp - row.timestamp <= SAME_REFUSAL_SECONDS
+    ) {
+      group!.push(row);
+    } else {
+      groups.push([row]);
+    }
+  }
+  return groups;
+}
+
+/** A merged refusal row: the newest one's age, and each refusal's reason in its own chain's column. */
+function refusalRow(group: FoldedRow[], snapshot: Snapshot, ordered: LegSnapshot[]): TableRow {
+  const [first] = group.map((row) => tableRow(row, snapshot, ordered));
+  return {
+    ...first!,
+    legs: ordered.map((leg) => {
+      const own = group.find((r) => r.kind === "rejection" && r.chainId === leg.config.chainId);
+      return own?.kind === "rejection" ? cell(own.reason, UI.rejection) : BLANK;
+    }),
+  };
+}
+
+function table(
+  rows: FoldedRow[],
+  snapshot: Snapshot,
+  width: number,
+  limit: number,
+): { header: Seg[]; body: { key: string; segs: Seg[] }[] } {
+  // The cards' order, not the data layer's, so a column sits in the same order as the cards beside it.
+  const ordered = [
+    ...LEG_ORDER.flatMap((id) => snapshot.legs.filter((l) => l.config.chainId === id)),
+    ...snapshot.legs.filter((l) => !(LEG_ORDER as readonly number[]).includes(l.config.chainId)),
+  ];
+  const groups = mergeRefusals(rows).slice(0, limit);
+  const built = groups.map((group) =>
+    group.length > 1 ? refusalRow(group, snapshot, ordered) : tableRow(group[0]!, snapshot, ordered),
   );
+  const headers: TableRow = {
+    when: cell("when", UI.muted),
+    event: cell("event", UI.muted),
+    legs: ordered.map((leg) => cell(nameOf(leg), legColour(leg.config.chainId), true)),
+    note: [],
+  };
+  const all = [headers, ...built];
+  const hasNotes = built.some((r) => r.note.length > 0);
+  // The least a note needs to say anything whole: its shortest rendering, across every row.
+  const noteNeed = Math.max(0, ...built.map((r) => (r.note.length === 0 ? 0 : segWidth(r.note[r.note.length - 1]!))));
+
+  const shape = (layout: Layout) => {
+    const w = (get: (r: TableRow) => Cell) => Math.max(...all.map((r) => segWidth(pick(get(r), layout.level))));
+    const widths = {
+      when: w((r) => r.when),
+      event: w((r) => r.event),
+      legs: ordered.map((_, i) => w((r) => r.legs[i]!)),
+    };
+    const columns = [widths.when, widths.event, ...widths.legs];
+    const used = columns.reduce((a, b) => a + b, 0) + layout.gap * (columns.length - 1);
+    return { widths, used };
+  };
+
+  const layout =
+    LAYOUTS.find((l) => {
+      const { used } = shape(l);
+      return used <= width && (l.notesMayDrop || !hasNotes || width - used - l.gap >= noteNeed);
+    }) ?? LAYOUTS[LAYOUTS.length - 1]!;
+  const { widths, used } = shape(layout);
+  const gap: Seg = { text: " ".repeat(layout.gap) };
+  const noteRoom = width - used - layout.gap;
+
+  const line = (r: TableRow, note: Seg[][]): Seg[] => {
+    const cells: Seg[][] = [
+      // Ages are right-aligned, so the units line up and the eye reads the numbers.
+      (() => {
+        const segs = pick(r.when, layout.level);
+        const pad = widths.when - segWidth(segs);
+        return pad > 0 ? [{ text: " ".repeat(pad) }, ...segs] : segs;
+      })(),
+      padTo(pick(r.event, layout.level), widths.event),
+      ...r.legs.map((c, i) => padTo(pick(c, layout.level), widths.legs[i]!)),
+    ];
+    const chosen = note.find((n) => segWidth(n) <= noteRoom);
+    const segs = cells.flatMap((c, i) => (i === 0 ? c : [gap, ...c]));
+    const out = chosen === undefined ? segs : [...segs, gap, ...chosen];
+    // Trailing padding is not content; trimming it keeps the row's measured width honest.
+    return fitSegments([out], width);
+  };
+
+  return {
+    header: line(headers, []),
+    body: built.map((r, i) => ({ key: `${groups[i]![0]!.kind}-${i}`, segs: line(r, r.note) })),
+  };
 }
 
 export function Feed({
@@ -137,8 +276,9 @@ export function Feed({
   width: number;
   rows: number;
 }) {
-  const body = Math.max(0, rows);
-  const shown = foldRounds(snapshot.feed).slice(0, body);
+  // One row goes to the header, which names the columns every other row lines up under.
+  const body = Math.max(0, rows - 1);
+  const { header, body: lines } = table(foldRounds(snapshot.feed), snapshot, width, body);
 
   // A blank region during an outage reads as "nothing has happened", which is a claim. It has not
   // been established that nothing happened; the source that would say so refused.
@@ -152,16 +292,18 @@ export function Feed({
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
       {/* Padded to the region's height so the feed does not resize as events arrive, which would
           drag the charts above it up and down between polls. */}
-      {shown.length === 0 && (
+      {lines.length === 0 ? (
         <Box height={1}>
           <Text color={unread === null ? UI.muted : UI.caveat}>{trunc(empty, width)}</Text>
         </Box>
+      ) : (
+        <Box height={1}>
+          <Segments segs={header} />
+        </Box>
       )}
       {padRows(
-        shown.map((row, i) => (
-          <Segments key={`${row.kind}-${i}`} segs={rowSegments(row, snapshot, width)} />
-        )),
-        shown.length === 0 ? Math.max(0, body - 1) : body,
+        lines.map(({ key, segs }) => <Segments key={key} segs={segs} />),
+        body,
         null,
       ).map((row, i) => (
         <Box key={i} height={1}>

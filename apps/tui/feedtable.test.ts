@@ -45,7 +45,8 @@ test("every publish puts each leg's shift under that leg's name, so the shifts l
   for (const [cols, rows] of SIZES) {
     const [header, ...body] = feedOf((await drive(cols, rows, { armed: true })).lines);
     const at = columnsOf(header!);
-    const publishes = body.filter((r) => /publish/.test(r));
+    // A publish's event is its seq, with or without the words before it, depending on the width.
+    const publishes = body.filter((r) => /publish|\b\d{10}\b/.test(r));
     expect(publishes.length).toBeGreaterThan(0);
     for (const row of publishes) {
       for (const start of Object.values(at)) {
