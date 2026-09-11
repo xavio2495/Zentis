@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildActions, describeCommand, findRepoRoot } from "./src/actions.js";
+import { buildActions, buildFillAction, describeCommand, findRepoRoot } from "./src/actions.js";
 
 // A file shaped like the operator's real one, so that "the console never holds a key" is asserted
 // against something a key could actually leak out of.
@@ -136,4 +136,27 @@ test("ZENTIS_REPO overrides the search, and a wrong one is ignored rather than o
   // scripts in it. (Under `bun test` that last resort is a real path; inside the compiled binary it
   // is under /$bunfs and is skipped — which is what `bundle.test.ts` covers.)
   expect(findRepoRoot(dir, join(dir, "nowhere"))).toBe(REPO);
+});
+
+test("a typed fill names its own leg, side and size, and those win over the env file's", () => {
+  // The parameters are assigned on the command line *after* the file is sourced. `set -a` inside the
+  // child exports everything the file assigns, so a stale FILL_AMOUNT in the operator's env file
+  // would otherwise quietly replace the size they just typed.
+  const leg = LEGS.find((l) => l.name === "base-sepolia")!;
+  const action = buildFillAction("/tmp/private.env", "/repo", { leg, amountRaw: 250_000n, isAToB: false });
+  expect(action.disabledReason).toBeNull();
+  const script = action.command!.cmd.join(" ");
+  expect(script).toContain("FILL_AMOUNT=250000");
+  expect(script).toContain("FILL_A_TO_B=false");
+  expect(script.indexOf("FILL_AMOUNT=")).toBeGreaterThan(script.indexOf("set +a"));
+  expect(action.command!.env!["ZENTIS_RPC"]).toBe(leg.rpcUrl);
+  expect(action.command!.env!["ZENTIS_ROUTER"]).toBe(leg.app);
+  expect(action.label).toContain("base");
+});
+
+test("a typed fill with no env file is refused with the same reason the key gives", () => {
+  const leg = LEGS[0]!;
+  const action = buildFillAction(null, "/repo", { leg, amountRaw: 1n, isAToB: true });
+  expect(action.command).toBeNull();
+  expect(action.disabledReason).toContain("ZENTIS_ENV");
 });
