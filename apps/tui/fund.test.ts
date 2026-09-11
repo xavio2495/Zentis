@@ -42,7 +42,8 @@ test("the page shows the wallet this console holds, not the book's maker", async
 
 test("a chain whose approval is short is offered the command that fixes it", async () => {
   // The allowance column already shows the shortfall; what it lacked was the one thing to do about
-  // it. Aqua pulls at settlement against this approval, so a fill reverts on it rather than on price.
+  // it. Aqua pulls the fill's own amount at settlement against this approval, so a fill larger than
+  // the allowance reverts on it rather than on price.
   // A wallet fresh from onboarding has approved nothing, which is where this matters.
   const text = said((await drive(190, 50, { scenario: "empty", keys: ["w"] })).lines);
   expect(text).toMatch(/approve/i);

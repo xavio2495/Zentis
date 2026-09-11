@@ -13,8 +13,9 @@ import { type Read, failed, ok } from "./graphql.js";
  * Held is the truth; committed is a claim on it; free is the remainder.
  *
  * Two failures are worth naming rather than arithmetic: a wallet that has fallen below what the
- * position committed (the next fill cannot settle) and an approval below the committed balance
- * (the same, for a different reason).
+ * position committed, and an approval below it. They are not the same failure. The first means a
+ * fill cannot settle at all; the second means only a fill larger than what is left of the allowance
+ * cannot, because the pull is of the fill's own amount and not of the commitment.
  */
 
 const ERC20 = [
@@ -108,7 +109,14 @@ export function walletCaveats(holdings: readonly (TokenHolding & { chain: string
       caveats.push(`${h.chain} has committed more ${h.symbol} than the wallet now holds, so a fill that settles against it would fail`);
     }
     if (h.allowanceShort) {
-      caveats.push(`${h.chain}'s Aqua allowance for ${h.symbol} is below the committed balance, so the next fill would revert on the approval`);
+      // Not "the next fill would revert". Aqua pulls the fill's own amount at settlement, so an
+      // allowance under the commitment still settles anything smaller than what is left of it. What
+      // the leg has lost is the ability to settle the commitment it was shipped with — the ship
+      // approves exactly that and nothing else tops it up — and an operator told the wrong thing
+      // broadcasts an approval they did not need this minute.
+      caveats.push(
+        `${h.chain}'s Aqua allowance for ${h.symbol} is below what the position committed, so the leg cannot settle its whole commitment: a fill larger than the allowance reverts on it`,
+      );
     }
   }
   return caveats;
