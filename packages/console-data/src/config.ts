@@ -123,12 +123,35 @@ const RPC_ENV: Record<string, [string, string]> = {
 
 const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-function rpcUrl(name: string): string {
+/**
+ * Every endpoint the console reads is overridable by the environment, per leg.
+ *
+ * Not a convenience: a test that starts the real binary must be able to point it away from the live
+ * indexers. A compiled console polls the fills subgraphs once a minute, and a handful left running
+ * by a leaky test drained two legs' daily allowance to nothing. An empty variable is not an
+ * override, because that is what a shell leaves behind when one is unset.
+ */
+const overridden = (variable: string, fallback: string, env: Record<string, string | undefined>): string => {
+  const override = env[variable];
+  return override === undefined || override === "" ? fallback : override;
+};
+
+const envVariable = (prefix: string, name: string) => `${prefix}_${name.toUpperCase().replace(/-/g, "_")}`;
+
+export function rpcOverride(name: string, env: Record<string, string | undefined> = process.env): string {
   const entry = RPC_ENV[name];
   if (entry === undefined) throw new Error(`no rpc endpoint is configured for ${name}`);
   const [variable, fallback] = entry;
-  const override = process.env[variable];
-  return override === undefined || override === "" ? fallback : override;
+  return overridden(variable, fallback, env);
+}
+
+/** The leg's fills subgraph, or whatever `ZENTIS_FILLS_<LEG>` points at instead. */
+export function fillsSubgraphUrl(
+  name: string,
+  configured: string,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return overridden(envVariable("ZENTIS_FILLS", name), configured, env);
 }
 
 export const BOOK: BookConfig = {
@@ -168,9 +191,9 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     // chain rather than a workflow parameter, and the workflow stopped carrying it when the book
     // moved to one mainnet mid.
     referencePool: (pool?.address as `0x${string}` | undefined) ?? null,
-    fillsSubgraphUrl: slow.fillsSubgraphUrl,
+    fillsSubgraphUrl: fillsSubgraphUrl(deployment.name, slow.fillsSubgraphUrl),
     referencePoolSubgraphUrl: subgraphs?.referencePool ?? null,
-    rpcUrl: rpcUrl(deployment.name),
+    rpcUrl: rpcOverride(deployment.name),
     // Read through a widened type: `markAtShip` is written by `scripts/reship.py` from 2026-09-11
     // and is simply absent on every generation shipped before it, which is what leaves the hold
     // effect unknown on those. The rest is present on every record.

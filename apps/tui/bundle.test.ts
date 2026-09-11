@@ -94,11 +94,10 @@ test("the compiled binary finds the repository from its working directory, not f
   writeFileSync(envFile, "CRE_ETH_PRIVATE_KEY=0x00\n");
   const repo = resolve(import.meta.dir, "..", "..");
 
-  // Sixteen seconds before the key, because the actions are only offered once the first poll has
-  // come back; the window and the cleanup are the driver's, and every endpoint it hands the console
-  // points at a closed port.
+  // Against the recorded fixtures, so the screen is up immediately and no indexer is read: what this
+  // test is about is where the console looks for the scripts, not what the chains say.
   const drive = (cwd: string, env: Record<string, string>) =>
-    runBinary(binary, { keys: "r", waitSeconds: 16, cwd, env }).screen;
+    runBinary(binary, { keys: "r", waitSeconds: 3, cwd, env: { ZENTIS_FIXTURES: "1", ...env } }).screen;
 
   // Inside the repository the action is offered, and the confirmation is reached.
   const inside = drive(repo, { ZENTIS_ENV: envFile });

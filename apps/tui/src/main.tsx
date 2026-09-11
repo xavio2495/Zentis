@@ -2,6 +2,8 @@
 import { render } from "ink";
 import { App } from "./App.js";
 import { buildActions, commandActions } from "./actions.js";
+import { fixedStore } from "../sandbox/state.js";
+import { fakeSnapshot } from "../sandbox/world.js";
 import { run, summarise } from "./runner.js";
 import type { Action } from "./action-types.js";
 
@@ -49,8 +51,28 @@ const envFile = watchOnly ? null : (process.env.ZENTIS_ENV ?? null);
 const runAction = async (action: Action): Promise<string> =>
   summarise(action, await run(action.command!));
 
+/**
+ * `ZENTIS_FIXTURES=1` runs the console against the recorded moment instead of the network.
+ *
+ * It is what a test drives — a console started by a test must not be able to spend the maker's
+ * indexer allowance — and it is what the demo falls back on if an endpoint is down at the wrong
+ * minute. The screen is the real one; only the world behind it is the recording, and the status bar
+ * says so rather than letting a recorded moment pass for a live one.
+ */
+const fixtures = (process.env.ZENTIS_FIXTURES ?? "") !== "";
+const makeStore = fixtures
+  ? fixedStore({ ...fakeSnapshot("fresh"), caveats: ["recorded fixtures, not live: no source was read"] })
+  : undefined;
+
 const app = render(
-  <App actions={buildActions(envFile)} runAction={runAction} commands={commandActions(envFile)} />,
+  <App
+    // Only the world behind the screen is recorded. What the console may do is still decided by
+    // whether the operator gave it a key, because that is a choice they made and not a test mode.
+    actions={buildActions(envFile)}
+    runAction={runAction}
+    commands={commandActions(envFile)}
+    makeStore={makeStore}
+  />,
 );
 void app.waitUntilExit().then(() => {
   leaveAlternate();
