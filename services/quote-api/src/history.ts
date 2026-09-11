@@ -15,8 +15,23 @@
  */
 import slowConfig from "../../../cre/slow/config.staging.json" with { type: "json" };
 
-/** A week, which is the window the volatility term is measured over. */
+/** A week, which is the window the volatility term is measured over, and the longest on offer. */
 export const HISTORY_HOURS = 168;
+
+/**
+ * Below this the hourly series is the wrong instrument: an hour of it is one point, and a chart
+ * asked to draw the last hour would show a single step. Short windows read the swaps instead, which
+ * on this pool arrive often enough that an hour is a few hundred of them.
+ */
+const SWAPS_BELOW_HOURS = 12;
+
+export const sourceFor = (hours: number): "swaps" | "hours" => (hours < SWAPS_BELOW_HOURS ? "swaps" : "hours");
+
+/** A window the series can actually answer: at least an hour, at most the week it holds. */
+export function clampHours(hours: number): number {
+  if (!Number.isFinite(hours)) return HISTORY_HOURS;
+  return Math.max(1, Math.min(HISTORY_HOURS, Math.floor(hours)));
+}
 
 const CACHE_SECONDS = Number(process.env["ZENTIS_HISTORY_CACHE_SECONDS"] ?? "600");
 
@@ -46,6 +61,26 @@ export function parseHourly(raw: readonly RawHour[]): MarkPoint[] {
     .sort((a, b) => a.t - b.t);
 }
 
+export interface RawSwap {
+  timestamp: string;
+  sqrtPriceX96: string;
+}
+
+/** Swaps into points, oldest first, with any unpriced one left out rather than drawn at zero. */
+export function parseSwaps(raw: readonly RawSwap[]): MarkPoint[] {
+  return raw
+    .map((swap) => ({ t: Number(swap.timestamp), mid: midFromSqrtPrice(swap.sqrtPriceX96) }))
+    .filter((point) => point.mid > 0n)
+    .sort((a, b) => a.t - b.t);
+}
+
+const SWAPS_QUERY = `query Recent($pool: String!, $since: BigInt!) {
+  swaps(where: { pool: $pool, timestamp_gte: $since }, orderBy: timestamp, orderDirection: desc, first: 1000) {
+    timestamp
+    sqrtPriceX96
+  }
+}`;
+
 const QUERY = `query History($pool: String!, $first: Int!) {
   poolHourDatas(where: { pool: $pool }, orderBy: periodStartUnix, orderDirection: desc, first: $first) {
     periodStartUnix
@@ -57,12 +92,16 @@ interface Cached {
   at: number;
   points: MarkPoint[];
 }
-let cached: Cached | null = null;
+// One entry per window shape: the hourly week and the short swap window age differently and a
+// single slot would have them evicting each other on every alternate request.
+const cache = new Map<"swaps" | "hours", Cached>();
 
 export interface MarkHistory {
   readonly points: { t: number; mid: string }[];
   readonly source: string;
   readonly hours: number;
+  /** whether the points are hourly closes or individual swaps, which decides how to draw them */
+  readonly granularity: "swaps" | "hours";
   readonly error: string | null;
 }
 
@@ -77,40 +116,54 @@ export async function fetchMarkHistory(
   subgraphUrl: string | undefined,
   pool: string | undefined,
   apiKey: string | undefined,
+  requestedHours: number = HISTORY_HOURS,
 ): Promise<MarkHistory> {
   const now = Math.floor(Date.now() / 1000);
-  const empty = { points: [], source: SOURCE, hours: HISTORY_HOURS };
+  const hours = clampHours(requestedHours);
+  const granularity = sourceFor(hours);
+  const shape = { source: SOURCE, hours, granularity };
+  const render = (points: MarkPoint[], error: string | null): MarkHistory => ({
+    ...shape,
+    // Both series are cached whole and cut to the window here, so switching from a week to an hour
+    // costs nothing and cannot ask the gateway again for something it has already answered.
+    points: points.filter((point) => point.t >= now - hours * 3600).map((p) => ({ t: p.t, mid: p.mid.toString() })),
+    error,
+  });
+
   if (subgraphUrl === undefined || pool === undefined || apiKey === undefined || apiKey === "") {
-    return { ...empty, error: "no gateway key or pool is configured, so there is no market history" };
+    return { ...shape, points: [], error: "no gateway key or pool is configured, so there is no market history" };
   }
-  if (cached !== null && now - cached.at < CACHE_SECONDS) {
-    return { points: cached.points.map((p) => ({ t: p.t, mid: p.mid.toString() })), source: SOURCE, hours: HISTORY_HOURS, error: null };
-  }
+  const hit = cache.get(granularity);
+  if (hit !== undefined && now - hit.at < CACHE_SECONDS) return render(hit.points, null);
+
+  const query = granularity === "swaps" ? SWAPS_QUERY : QUERY;
+  const variables =
+    granularity === "swaps"
+      ? { pool: pool.toLowerCase(), since: String(now - SWAPS_BELOW_HOURS * 3600) }
+      : { pool: pool.toLowerCase(), first: HISTORY_HOURS };
+
   try {
     const response = await fetch(subgraphUrl, {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ query: QUERY, variables: { pool: pool.toLowerCase(), first: HISTORY_HOURS } }),
+      body: JSON.stringify({ query, variables }),
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) throw new Error(`the gateway answered ${response.status}`);
-    const body = (await response.json()) as { data?: { poolHourDatas: RawHour[] }; errors?: { message: string }[] };
-    if (body.errors !== undefined && body.errors.length > 0) throw new Error(body.errors[0]!.message);
-    const points = parseHourly(body.data?.poolHourDatas ?? []);
-    if (points.length === 0) throw new Error("the gateway returned no priced hours");
-    cached = { at: now, points };
-    return { points: points.map((p) => ({ t: p.t, mid: p.mid.toString() })), source: SOURCE, hours: HISTORY_HOURS, error: null };
+    const parsed = (await response.json()) as {
+      data?: { poolHourDatas?: RawHour[]; swaps?: RawSwap[] };
+      errors?: { message: string }[];
+    };
+    if (parsed.errors !== undefined && parsed.errors.length > 0) throw new Error(parsed.errors[0]!.message);
+    const points =
+      granularity === "swaps" ? parseSwaps(parsed.data?.swaps ?? []) : parseHourly(parsed.data?.poolHourDatas ?? []);
+    if (points.length === 0) throw new Error(`the gateway returned no priced ${granularity}`);
+    cache.set(granularity, { at: now, points });
+    return render(points, null);
   } catch (cause) {
     // A stale series beats a blank chart, and says how old it is.
-    if (cached !== null) {
-      return {
-        points: cached.points.map((p) => ({ t: p.t, mid: p.mid.toString() })),
-        source: SOURCE,
-        hours: HISTORY_HOURS,
-        error: `${String(cause)}; showing the series read ${now - cached.at}s ago`,
-      };
-    }
-    return { ...empty, error: String(cause) };
+    if (hit !== undefined) return render(hit.points, `${String(cause)}; showing the series read ${now - hit.at}s ago`);
+    return { ...shape, points: [], error: String(cause) };
   }
 }
 

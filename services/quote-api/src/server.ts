@@ -167,9 +167,10 @@ async function handleMark(): Promise<Response> {
  * The one market series the book is priced and measured against, for the console's chart. Hourly
  * over a week, in the registry's units, from the same subgraph and pool the volatility term uses.
  */
-async function handleMarkHistory(): Promise<Response> {
+async function handleMarkHistory(url: URL): Promise<Response> {
   const { subgraphUrl, pool, apiKey } = historyConfig();
-  return json(await fetchMarkHistory(subgraphUrl, pool, apiKey));
+  const hours = Number(url.searchParams.get("hours") ?? "168");
+  return json(await fetchMarkHistory(subgraphUrl, pool, apiKey, hours));
 }
 
 async function handleCrowding(url: URL): Promise<Response> {
@@ -246,7 +247,7 @@ const server = Bun.serve({
     if (url.pathname === "/quote") return handleQuote(url);
     if (url.pathname === "/crowding") return handleCrowding(url);
     if (url.pathname === "/mark") return handleMark();
-    if (url.pathname === "/mark/history") return handleMarkHistory();
+    if (url.pathname === "/mark/history") return handleMarkHistory(url);
     if (url.pathname === "/health") return json({ ok: true, chains: CHAINS.map((c) => c.name) });
     return json({ error: "not found" }, 404);
   }
