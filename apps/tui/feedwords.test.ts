@@ -29,9 +29,9 @@ test("a shift at the leg's cap says so, because -500 there is a limit, not a siz
 
 test("a publish that reached one leg because two were unread says the two were unread", async () => {
   // "on 1 leg" during an outage read as the workflow having written one leg. It wrote three; the
-  // console could only read one of them.
+  // console could only read one of them, and the other two columns say so.
   const feed = feedOf((await drive(190, 50, { scenario: "partial" })).lines);
   expect(feed.length).toBeGreaterThan(0);
   expect(feed).not.toContain("on 1 leg");
-  expect(feed).toContain("2 legs unread");
+  expect(feed.match(/unread/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
 });

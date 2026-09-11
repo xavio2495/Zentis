@@ -19,7 +19,8 @@ const feedOf = (lines: string[]) => {
     const text = cell.replace(/│\s*$/, "").trimEnd();
     if (text.trim() !== "") rows.push(text);
   }
-  return rows;
+  // The first row is the table's header, which names the columns rather than recording an event.
+  return rows.slice(1);
 };
 
 test("no feed row ends mid-clause", async () => {
