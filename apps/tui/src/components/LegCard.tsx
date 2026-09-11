@@ -257,8 +257,10 @@ export function LegCard({
     );
   }
 
-  // The price, labelled with the window it is drawn over, and then the line itself in whatever rows
-  // are left — three or four at most. Everything the card has to say comes first.
+  // The leg's own venue, labelled as one: the book quotes from a mainnet mark and this is where the
+  // leg's trades settle, at a testnet price that can sit an order of magnitude away from it. The row
+  // said "1 WETH = 30,187 USDC" beside a book marked at 2,372, which reads as the leg quoting there.
+  // Then the line itself in whatever rows are left — three or four at most.
   if (leg.series !== null) {
     const price = pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB);
     const over = duration(Number(windowSeconds));
@@ -268,11 +270,15 @@ export function LegCard({
       const p = plot([{ key: "s", samples: quoted(leg.series.samples) }], inner, lineRows, windowSeconds).byKey.get("s")!;
       for (const row of p.rows) rows.push(<Text color={colour}>{row}</Text>);
     }
-    rows.push(<Text color={UI.muted}>{chooseFit([`${price} · ${over} window`, price], inner)}</Text>);
+    rows.push(
+      <Text color={UI.muted}>
+        {chooseFit([`venue ${price} · ${over}`, `venue ${price}`, price], inner)}
+      </Text>,
+    );
   } else if (leg.sources.pool !== null) {
     const reading = leg.sources.pool === BACKFILLING;
     rows.push(
-      <Text color={reading ? UI.muted : UI.caveat}>{trunc(`pool price: ${leg.sources.pool}`, inner)}</Text>,
+      <Text color={reading ? UI.muted : UI.caveat}>{trunc(`venue: ${leg.sources.pool}`, inner)}</Text>,
     );
   }
 
