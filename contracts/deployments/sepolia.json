@@ -7,7 +7,9 @@
       "address": "0xA5dCB9B329b17253FF35202dEb7a2093d06fd7b0",
       "deployBlock": 11669777,
       "deployTx": "0x858ee89656665a2a132068a7195a4742871ef166cbf42b09072bf24de5f3426c",
-      "note": "Oracle band disabled (FEED = address(0)), as on the other two legs -- but for a different reason. Sepolia's Chainlink ETH/USD feed at 0x694AA1769357215DE4FAC081bf1f309aDC325306 IS contract-readable, unlike Base Sepolia's, and returned $2489.30 live. It is disabled because the reference pool's implied price is about 14x the feed's, so an enabled band would reject every publish -- which is the band working as designed, not a fault."
+      "note": "Oracle band disabled (FEED = address(0)), as on the other two legs. The feed itself is live and contract-readable: latestRoundData returned $2465.98 at 2026-09-11T06:41Z, three minutes old, and within 20 bps of the mainnet market mid the position now quotes from. It stays disabled because FEED is immutable, so enabling it means new registries, new strategy hashes, a re-ship and new subgraph manifests -- deferred deliberately, not blocked. The earlier reason recorded here, that the reference pool sat about 14x off the feed, no longer applies: the legs no longer price off that pool.",
+      "ethUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "ethUsdFeedVerified": "2026-09-11, latestRoundData read over the public RPC"
     },
     "AquaRouter": {
       "address": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
@@ -39,7 +41,8 @@
     "feeTier": 10000,
     "liquidity": "157295183475483626",
     "swapsInSixDays": 492,
-    "note": "All four fee tiers agree on price within 0.4%, so the tiers are arbitraged against each other even though the pool as a whole is far from the off-chain market."
+    "note": "All four fee tiers agree on price within 0.4%, so the tiers are arbitraged against each other even though the pool as a whole is far from the off-chain market. (Recorded before the pool was retired as a price source.)",
+    "supersededNote": "SUPERSEDED as a price source on 2026-09-11: the legs no longer quote from this pool. Every leg now prices from one mid read from the real WETH/USDC market on Ethereum mainnet, because three unarbitraged testnet pools quoted the same pair at three unrelated prices and a book weight measured against one of them is not comparable with a weight measured against another. Kept as the record of what this leg used to price from, and of the liquidity criterion the chain was chosen on."
   },
   "subgraphs": {
     "referencePool": "https://api.studio.thegraph.com/query/1760020/zentis-reference-pool-sepolia/v0.0.1",

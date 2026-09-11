@@ -4,8 +4,10 @@
   "contracts": {
     "ZentisRefRegistry": {
       "address": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32",
-      "note": "oracle band disabled (FEED = address(0)): Arbitrum Sepolia has no standard ETH/USD Data Feed, only Data Streams. Redeployed so the on-chain bytecode matches the repository: the superseded instance predates the fix that makes onReport reject rather than revert.",
-      "supersedes": "0xF86CdAeE90DB9901a5F104172294161085070C5A"
+      "note": "Oracle band disabled (FEED = address(0)). CORRECTION: the note previously here said Arbitrum Sepolia has no standard ETH/USD Data Feed, only Data Streams. It has one. latestRoundData at 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165 returned $2466.12 at 2026-09-11T06:53Z over the public RPC, within 20 bps of the mainnet market mid. The band stays disabled because FEED is immutable and enabling it means new registries, new strategy hashes, a re-ship and new subgraph manifests. Redeployed so the on-chain bytecode matches the repository: the superseded instance predates the fix that makes onReport reject rather than revert.",
+      "supersedes": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
+      "ethUsdFeed": "0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165",
+      "ethUsdFeedVerified": "2026-09-11, latestRoundData read over the public RPC"
     },
     "AquaRouter": {
       "address": "0x8f4f807c72a2bfab4024e783f68fc714d0ce2bbe",
