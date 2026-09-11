@@ -9,8 +9,20 @@ import { fakeSnapshot } from "./sandbox/world.js";
  * is making money. Everything asserted here is read out of the same snapshot the frame was drawn
  * from, so an ordinary re-record of the fixtures cannot turn a rendering test red.
  */
-const rowWith = (lines: string[], needle: string): string | undefined =>
-  lines.map((l) => l.replace(/[│┌┐╰╯─]/g, " ")).find((l) => l.includes(needle));
+/**
+ * A row of the status panel, cut out of the frame at that panel's own left edge. Every physical
+ * line also carries the leg-card column, so a helper that searched the whole line would read the
+ * cards' numbers as the status bar's.
+ */
+const rowWith = (lines: string[], needle: string): string | undefined => {
+  const top = lines.findIndex((l) => l.includes("┌ zentis"));
+  if (top === -1) return undefined;
+  const column = lines[top]!.indexOf("┌ zentis");
+  return lines
+    .slice(top + 1)
+    .map((l) => l.slice(column + 1).replace(/│\s*$/, "").trimEnd())
+    .find((l) => l.includes(needle));
+};
 
 test("the overall view says the inventory, the split, the legs and the mode on one row at 80 columns", async () => {
   const snapshot = fakeSnapshot("fresh");
@@ -75,7 +87,7 @@ test("with legs unread the overall view says the split is unknown and how much o
   const snapshot = fakeSnapshot("partial");
   const unread = snapshot.legs.filter((l) => l.sources.fills !== null).length;
   expect(unread).toBeGreaterThan(0);
-  const row = rowWith((await drive(190, 50, {})).lines, "book")!;
+  const row = rowWith((await drive(190, 50, { scenario: "partial" })).lines, "book")!;
   expect(row).toContain("split unknown");
   expect(row).not.toMatch(/\d+% USDC/);
   expect(row).toContain(`${snapshot.book.legs - unread} of ${snapshot.book.legs} legs`);

@@ -167,6 +167,21 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     // other two were unread rather than that the workflow only wrote one.
     const refusal = "subgraph HTTP 429, resets 21:52Z";
     const sepoliaOnly = active.filter((e) => e.leg.name === "sepolia").map((e) => e.history);
+    const unreadLegs = legs.map((leg) =>
+      leg.config.name === "sepolia"
+        ? leg
+        : {
+            ...leg,
+            position: null,
+            shift: null,
+            spread: null,
+            quoteAToB: null,
+            quoteBToA: null,
+            mark: null,
+            pnl: null,
+            sources: { fills: refusal, registry: null, pool: null },
+          },
+    );
     return {
       pair: PAIR,
       positionId: BOOK.positionId,
@@ -174,23 +189,13 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
       seq,
       bookWeightA: book.weightA,
       gains: ASSUMED_GAINS,
-      legs: legs.map((leg) =>
-        leg.config.name === "sepolia"
-          ? leg
-          : {
-              ...leg,
-              position: null,
-              shift: null,
-              spread: null,
-              quoteAToB: null,
-              quoteBToA: null,
-              mark: null,
-        pnl: null,
-        sources: { fills: refusal, registry: null, pool: null },
-            },
-      ),
+      legs: unreadLegs,
       feed: collapseFeed(mergeFeed(sepoliaOnly, 200), 40),
       sim: loadSimReport(),
+      // Derived from the legs above, like the other scenarios: a book handed a total its own legs do
+      // not add up to would let the overall view pass a test the real one fails.
+      book: bookTotals(unreadLegs as LegSnapshot[]),
+      wallet: null,
       caveats: [],
     } as unknown as Snapshot;
   }

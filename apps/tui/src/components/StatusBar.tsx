@@ -4,6 +4,7 @@ import { duration } from "../format.js";
 import type { Action } from "../action-types.js";
 import { type Seg, fitSegments, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
+import { bookSegments } from "./BookRow.js";
 import { TERM, UI } from "../theme.js";
 
 /**
@@ -153,42 +154,12 @@ export function StatusBar({
   loading: boolean;
 }) {
   const state = bookState(snapshot, armed);
-  const symbol = snapshot.legs[0]?.config.tokenA.symbol ?? "";
-  // The book split is omitted rather than shown as zero when no leg could be read: a book that
-  // reads 0% USDC is a claim about the position, and nothing was read to support it.
-  const unread = snapshot.legs.filter((l) => l.sources.fills !== null).length;
-  // Ordered by what may be dropped first. The mode is last because it is the only one that is a
-  // safety fact: a console that stops saying whether it can sign is one someone may assume can.
-  // The seq survives a subgraph outage — the registries are read over RPC — so during an outage it
-  // is present and long, and it was pushing the mode off the line.
-  // A split computed from the legs that answered is not the book's split; with any leg unread the
-  // honest statement is that it is unknown, and why.
-  const split =
-    unread === 0
-      ? `${weightPercent(snapshot.bookWeightA)}% ${symbol}`
-      : unread === snapshot.legs.length
-        ? null
-        : `book split unknown · ${unread} leg${unread === 1 ? "" : "s"} unread`;
-  // Proof the screen is live. The first thing dropped when the line is short: it is reassurance, not
-  // information about the book.
-  const pulse = loading ? "polling…" : polledAgo === null ? null : `polled ${duration(polledAgo)} ago`;
-  const optional = [pulse, snapshot.seq === null ? null : `seq ${snapshot.seq}`, split].filter(
-    (f): f is string => f !== null,
-  );
-  const mode = armed ? "armed" : "watch-only";
-  const factRuns = [...optional.map((_, i) => [...optional.slice(i), mode]), [mode]].map((parts) =>
-    parts.join(" · "),
-  );
 
-  // The state sentence takes what it needs and the facts take what is left. Both are chosen from
-  // whole variants, because a clipped seq is a different seq and a clipped remedy is not a remedy.
+  // Only the state sentence. The split, the seq, the mode and the pulse belong to the overall view
+  // above, and carrying them here too put two splits on screen — one at the pools' mids and one at
+  // the mainnet mark — under the same word.
   const line = fitSegments(
-    state.variants.flatMap((variant): Seg[][] =>
-      factRuns.map((facts) => [
-        { text: variant, color: state.tone, bold: true },
-        { text: `   ${facts}`, color: UI.muted },
-      ]),
-    ),
+    state.variants.map((variant): Seg[] => [{ text: variant, color: state.tone, bold: true }]),
     width,
   );
 
@@ -196,18 +167,23 @@ export function StatusBar({
     <Text color={transient.quiet ? UI.muted : UI.caveat}>{trunc(transient.text, width)}</Text>
   );
 
-  // Three rows when there is room: the state, the keys, and what the last action said. With two the
-  // keys stay and an action's note takes the state's row while it is live — a confirmation prompt
-  // has to be seen. With one, the note wins for the same reason.
+  // The overall view leads, on every page and at every size: what the maker owns, whether it is one
+  // book, and whether it is making money. Then the state, the keys, and what the last action said —
+  // shed in that order as the height goes, except that a live note takes the state's row, because a
+  // confirmation prompt has to be seen.
+  const book = bookSegments(snapshot, armed, polledAgo, loading, width);
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
-      <Box height={1}>{rows < 3 && note !== null ? note : <Segments segs={line} />}</Box>
-      {rows > 1 && (
+      <Box height={1}>
+        <Segments segs={book} />
+      </Box>
+      {rows > 1 && <Box height={1}>{rows < 4 && note !== null ? note : <Segments segs={line} />}</Box>}
+      {rows > 2 && (
         <Box height={1}>
           <Segments segs={hints(actions, width)} />
         </Box>
       )}
-      {rows > 2 && <Box height={1}>{note ?? <Text> </Text>}</Box>}
+      {rows > 3 && <Box height={1}>{note ?? <Text> </Text>}</Box>}
     </Box>
   );
 }

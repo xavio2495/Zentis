@@ -91,7 +91,9 @@ export function fit(cols: number, rows: number): Regions {
   // is one or two lines inside that.
   // Three when there is room — the state, the keys, and what the last action said — so a note never
   // has to displace the keys. Two on a short terminal, one on the smallest.
-  const statusRows = draw >= 30 ? 3 : draw >= 22 ? 2 : 1;
+  // One more than before, for the overall view: the book row is never shed, so every height keeps it
+  // and the rows below it give way in order — the action note, then the key hints, then the state.
+  const statusRows = draw >= 30 ? 4 : draw >= 22 ? 3 : 2;
 
   const BORDER = 2;
   const rightBody = Math.max(0, draw - statusRows - BORDER);

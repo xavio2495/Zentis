@@ -24,7 +24,8 @@ test("a fresh reference's age is given against its limit, so fresh and 21m do no
 test("with legs unread the book split is said to be unknown, never a confident zero", async () => {
   const status = statusOf((await drive(190, 50, { scenario: "partial" })).lines);
   expect(status).not.toMatch(/\b0% USDC/);
-  expect(status).toContain("book split unknown");
+  // The split lives in the overall view above now, which is the book’s own row.
+  expect(status).toContain("split unknown");
 });
 
 test("the key hints are always there, and pressing a disabled key does not replace them", async () => {
