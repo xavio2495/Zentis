@@ -217,9 +217,12 @@ test("a fresh home reaches the live view as a taker, and the file it wrote is it
 
     // "1" makes the wallet; the window is long enough for the signing child to finish and the page
     // to redraw, because what this asserts is what the reader is shown afterwards.
-    const { screen } = runBinary(binary, { keys: "1", waitSeconds: 3, seconds: 20, env: { HOME: dir, ZENTIS_FIXTURES: "1" } });
-    expect(screen).toContain("no wallet yet");
-    expect(screen).toMatch(/address 0x[0-9a-fA-F]{40}/);
+    const { screen, plain } = runBinary(binary, { keys: "1", waitSeconds: 3, seconds: 20, env: { HOME: dir, ZENTIS_FIXTURES: "1" } });
+    expect(plain).toContain("no wallet yet");
+    // Matched without the colour codes, which sit between the label and the value.
+    expect(plain).toMatch(/address\s+0x[0-9a-fA-F]{40}/);
+    // And a way forward from here, which is what the live run found missing.
+    expect(plain).toMatch(/enter to continue/);
 
     const walletFile = join(dir, ".zentis", "wallet.env");
     expect(statSync(walletFile).mode & 0o777).toBe(0o600);

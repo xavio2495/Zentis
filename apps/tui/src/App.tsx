@@ -58,6 +58,14 @@ export const ROTATE_MS = 15_000;
 
 /** The pages, and the word the status bar names each one by. */
 export type Page = "live" | "positions" | "pnl" | "wallet" | "simulation" | "status";
+
+/** Everything a key decides, rebuilt in one place when one arrives mid-run. */
+export interface Armed {
+  readonly actions: Action[];
+  readonly commands: Commands | null;
+  readonly publisher: PublisherMode;
+  readonly address: string | null;
+}
 const PAGE_OF: Record<string, Page> = {
   positions: "positions",
   pnl: "pnl",
@@ -66,15 +74,23 @@ const PAGE_OF: Record<string, Page> = {
   status: "status",
 };
 
+export interface Commands {
+  fill: (fill: { leg: LegConfig; amountRaw: bigint; isAToB: boolean }) => Action;
+  republish: (workflow: "fast" | "slow") => Action | null;
+  push: (push: { leg: LegConfig; plan: PushPlan }) => Action;
+  approve: (approve: { leg: LegConfig; amountRaw: bigint }) => Action;
+}
+
 export function App({
-  actions,
+  actions: actionsGiven,
   runAction,
   makeStore = createStore,
-  commands = null,
-  publisher = "none",
-  address = null,
+  commands: commandsGiven = null,
+  publisher: publisherGiven = "none",
+  address: addressGiven = null,
   onboarding = false,
   onChoose,
+  onArm,
 }: {
   actions: Action[];
   /**
@@ -82,12 +98,7 @@ export function App({
    * `Action`, ask the same confirmation and are refused in the same words. Null means the console
    * was given no way to sign, which the row says when a signing command is typed.
    */
-  commands?: {
-    fill: (fill: { leg: LegConfig; amountRaw: bigint; isAToB: boolean }) => Action;
-    republish: (workflow: "fast" | "slow") => Action | null;
-    push: (push: { leg: LegConfig; plan: PushPlan }) => Action;
-    approve: (approve: { leg: LegConfig; amountRaw: bigint }) => Action;
-  } | null;
+  commands?: Commands | null;
   /**
    * Which publisher this console can reach. It decides whether `r` and `s` exist at all — with none
    * they are not offered, not disabled — and the status page says which one is in use.
@@ -103,6 +114,14 @@ export function App({
   onboarding?: boolean;
   /** what to do with a choice: make a wallet, take a path, or watch. Null in the sandbox. */
   onChoose?: ((choice: "generate" | "existing" | "watch") => Promise<string | null>) | null;
+  /**
+   * Pick up the wallet that has just been written, without restarting.
+   *
+   * The console is armed from a file that did not exist when it started, so everything derived from
+   * that file — the actions, the command factory, the publisher and the address — is rebuilt where
+   * it was built in the first place rather than half-rebuilt here.
+   */
+  onArm?: (() => Armed | null) | null;
   /** resolves to the line the status bar should show once the command has finished */
   runAction: ((action: Action) => Promise<string>) | null;
   /**
@@ -129,6 +148,14 @@ export function App({
   const [choosing, setChoosing] = useState(false);
   const [chose, setChose] = useState<string | null>(null);
   const [onboarded, setOnboarded] = useState(false);
+  // What the console became once a wallet was made mid-run; null until then, and what it was started
+  // with is used. Named over the props so that every line below reads the same either way — a
+  // console armed at startup and one armed a keystroke ago are the same console.
+  const [armedWith, setArmedWith] = useState<Armed | null>(null);
+  const actions = armedWith?.actions ?? actionsGiven;
+  const commands = armedWith?.commands ?? commandsGiven;
+  const publisher = armedWith?.publisher ?? publisherGiven;
+  const address = armedWith?.address ?? addressGiven;
   const [legIndex, setLegIndex] = useState(0);
   // Which leg the chart region is showing while it rotates. Separate from `legIndex`, which is the
   // leg whose detail is pinned, so returning from a detail does not jerk the rotation somewhere else.
@@ -348,8 +375,18 @@ export function App({
     // First run takes the keyboard until it is answered: two of the three choices change what the
     // live view would even show, so there is nothing useful to press behind this.
     if (onboarding && !onboarded) {
-      if (input === "3") {
+      // Once a wallet exists, both ways forward use it: "enter" because it was just made, and "3"
+      // because watching a console that holds a key is not what anyone means by choosing it now.
+      const goOn = () => {
+        if (chose !== null && onArm != null) setArmedWith(onArm());
         setOnboarded(true);
+      };
+      if (key.return && chose !== null) {
+        goOn();
+        return;
+      }
+      if (input === "3") {
+        goOn();
         return;
       }
       if (input === "1" && !choosing && onChoose != null) {

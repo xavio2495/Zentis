@@ -77,10 +77,40 @@ export function Onboarding({
       </Text>,
     );
   }
-  for (const [i, line] of (said ?? "").split("\n").filter((l) => l.trim() !== "").entries()) {
+
+  if (said !== null && said.trim() !== "") {
+    // The address first and whole. It is the one thing on this page a reader has to copy — into a
+    // faucet, into a wallet — and an address with an ellipsis in it is not an address. Everything
+    // else the child said follows it, wrapped.
+    const address = /0x[0-9a-fA-F]{40}/.exec(said)?.[0] ?? null;
+    // The label goes with the value it labelled: the child says "address 0x…", and leaving the word
+    // behind put "address · written …" on the line under the address it had just been taken out of.
+    const rest = (address === null ? said : said.split(address).join(""))
+      .replace(/\baddress\b/g, "")
+      .replace(/\s+·\s+/g, " · ")
+      .trim();
+    if (address !== null) {
+      rows.push(
+        <Segments
+          key="address"
+          segs={[
+            { text: "address  ", color: UI.muted },
+            { text: address, color: UI.fill, bold: true },
+          ] satisfies Seg[]}
+        />,
+      );
+    }
+    for (const [i, line] of wrapLines(rest.replace(/^[·\s]+/, ""), width, 3).entries()) {
+      rows.push(
+        <Text key={`said${i}`} color={UI.muted}>
+          {line}
+        </Text>,
+      );
+    }
+    rows.push(<Text key="sp-forward"> </Text>);
     rows.push(
-      <Text key={`said${i}`} color={i === 0 ? UI.fill : UI.muted}>
-        {trunc(line, width)}
+      <Text key="forward" color={UI.action}>
+        {trunc("enter to continue with this wallet", width)}
       </Text>,
     );
   }

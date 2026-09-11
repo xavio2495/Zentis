@@ -158,6 +158,23 @@ const makeStore = fixtures
   ? fixedStore({ ...fakeSnapshot("fresh"), caveats: ["recorded fixtures, not live: no source was read"] })
   : undefined;
 
+/**
+ * What the console becomes once a wallet exists that did not when it started.
+ *
+ * Rebuilt here, where it was built the first time: the env path is re-resolved exactly as it is at
+ * startup, so a console armed a keystroke ago is the same console as one armed before it drew.
+ */
+const arm = () => {
+  const path = resolveEnvPath();
+  if (path === null) return null;
+  return {
+    actions: buildActions(path),
+    commands: commandActions(path),
+    publisher: publisherMode(path, findRepoRoot()),
+    address: addressOf(path),
+  };
+};
+
 const app = render(
   <App
     // Only the world behind the screen is recorded. What the console may do is still decided by
@@ -169,6 +186,7 @@ const app = render(
     address={addressOf(envFile)}
     onboarding={onboarding}
     onChoose={choose}
+    onArm={arm}
     makeStore={makeStore}
   />,
 );

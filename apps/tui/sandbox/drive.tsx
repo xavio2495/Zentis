@@ -96,7 +96,11 @@ export async function drive(
       commands={commands}
       publisher={publisherMode(envFile, findRepoRoot(), project)}
       onboarding={options.onboarding === true}
-      onChoose={async () => "address 0x0000000000000000000000000000000000000001\nwritten ~/.zentis/wallet.env mode 600"}
+      onChoose={async () =>
+        "address 0x0000000000000000000000000000000000000001 · written ~/.zentis/wallet.env mode 600 · the key is in that file and will not be shown again"
+      }
+      // The fake world has no file to arm on, so continuing leaves the console as it started.
+      onArm={() => null}
     />,
     {
     stdout: stdout as never,

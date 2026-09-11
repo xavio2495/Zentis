@@ -74,6 +74,9 @@ test("the address is the first thing under the choices, and is never cut", async
   expect(addressAt).toBeGreaterThan(-1);
   // The address is what a reader has to copy into a faucet, so it is whole and it is first.
   expect(shown[addressAt]).not.toContain("…");
-  const pathAt = shown.findIndex((l) => l.includes("wallet.env"));
-  expect(addressAt).toBeLessThan(pathAt === -1 ? Number.MAX_SAFE_INTEGER : pathAt);
+  // Before everything the child said about it, and before the way forward: the choices above
+  // mention the path too, so this is anchored on what follows the address rather than precedes it.
+  const forwardAt = shown.findIndex((l) => /enter to continue/i.test(l));
+  expect(addressAt).toBeLessThan(forwardAt);
+  expect(shown[addressAt + 1]).toMatch(/written|mode 600/);
 }, 60_000);
