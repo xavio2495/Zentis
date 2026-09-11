@@ -47,3 +47,16 @@ test("the state line says a source is down without repeating what it said", asyn
   // Once, on the source's own line.
   expect((text.match(/429/g) ?? []).length).toBeLessThanOrEqual(4);
 }, 60_000);
+
+test("an empty feed waits on its source rather than quoting the endpoint at it", async () => {
+  // The last place an endpoint's message was still printed inside a panel: "feed unavailable:
+  // subgraph HTTP 429, resets 21:5…", clipped, in a panel with nothing else in it.
+  for (const [cols, rows] of [
+    [190, 50],
+    [80, 24],
+  ] as const) {
+    const text = (await drive(cols, rows, { scenario: "outage" })).lines.join("\n");
+    expect(text).not.toContain("feed unavailable");
+    expect(text).toMatch(/waiting on fills/);
+  }
+}, 60_000);
