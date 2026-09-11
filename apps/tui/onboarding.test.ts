@@ -1,0 +1,49 @@
+import { expect, test } from "bun:test";
+import { BOOK } from "@zentis/console-data";
+import { drive } from "./sandbox/drive.js";
+import { roleOf } from "./src/role.js";
+
+/**
+ * What a stranger meets on first run.
+ *
+ * Three choices and nothing else: make a wallet, point at one, or watch. Everything the console can
+ * do afterwards follows from which address it ends up holding — nobody is asked to choose a role,
+ * because the chain already decided it.
+ */
+test("with no wallet and no env file, the console opens on the choice rather than the live view", async () => {
+  const frame = await drive(120, 40, { onboarding: true });
+  const text = frame.lines.join("\n");
+  expect(text).toMatch(/generate|make a wallet/i);
+  expect(text).toMatch(/env file|existing/i);
+  expect(text).toMatch(/watch/i);
+  // Not the live view: no cards, no feed, until one of the three is chosen.
+  expect(text).not.toContain("┌ feed");
+  expect(frame.overflows).toBe(false);
+}, 60_000);
+
+test("choosing to watch goes straight to the live view, with nothing that signs", async () => {
+  const text = (await drive(120, 40, { onboarding: true, keys: ["3"] })).lines.join("\n");
+  expect(text).toContain("┌ feed");
+  expect(text).toContain("watch-only");
+}, 60_000);
+
+test("the page says what generating one will do before it does it", async () => {
+  const text = (await drive(120, 40, { onboarding: true })).lines.join("\n");
+  expect(text).toMatch(/\.zentis\/wallet\.env/);
+  // The two facts that matter about a key file, said before it exists rather than after.
+  expect(text).toMatch(/600/);
+  expect(text).toMatch(/not be shown again|never shown/i);
+}, 60_000);
+
+test("a role is read off the address, never chosen", () => {
+  expect(roleOf(BOOK.maker)).toBe("maker");
+  expect(roleOf("0x000000000000000000000000000000000000dEaD")).toBe("taker");
+  expect(roleOf(null)).toBe("watcher");
+  // Case is not identity: an address is the same address however it is written.
+  expect(roleOf(BOOK.maker.toLowerCase() as `0x${string}`)).toBe("maker");
+});
+
+test("the status page says which role the console is in, and why", async () => {
+  const text = (await drive(190, 50, { keys: ["d"] })).lines.join("\n");
+  expect(text).toMatch(/role\s+(watcher|taker|maker)/);
+}, 60_000);
