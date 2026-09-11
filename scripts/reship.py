@@ -17,7 +17,7 @@ ShipPosition refuses a reference older than an hour, and updatedAt is a finalize
 this within ~40 minutes of a fast publish. Until the ship block is finalized (~20 min) the fast
 workflow reverts on the new strategy's balance read; that is expected.
 """
-import json, os, subprocess, sys, time
+import json, os, subprocess, sys, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +28,25 @@ RPCS = {
 }
 CONFIGS = [ROOT / p for p in ("cre/fast/config.staging.json", "cre/fast/config.production.json",
                               "cre/slow/config.staging.json", "cre/slow/config.production.json")]
+QUOTE_API = os.environ.get("ZENTIS_QUOTE_API", "http://localhost:8787")
+
+
+def mark_at_ship(chain_id):
+    """The mainnet mark for this leg right now, to be recorded with the ship.
+
+    Hold profit is a price change over time and needs one price source at both ends. The ship is
+    sized to the leg's own pool mid, which on a testnet is nowhere near the market, so without the
+    market's price *at this moment* the hold effect can never be separated from the trading later.
+    None if the quote service is not up: a missing mark is recorded as missing, never guessed.
+    """
+    try:
+        with urllib.request.urlopen(f"{QUOTE_API}/mark", timeout=10) as response:
+            for mark in json.load(response)["marks"]:
+                if mark["chainId"] == chain_id and mark["mid"] is not None:
+                    return mark["mid"]
+    except Exception as cause:
+        print(f"  no mark recorded ({cause}); hold profit will be unknown for this generation")
+    return None
 
 
 def key() -> str:
@@ -108,11 +127,13 @@ def reship(chain_id, name, rpc, dry_run, private_key):
     superseded = {**old, "dockTx": dock["transactionHash"],
                   "supersededReason": "re-shipped sized to the reference mid with the testnet shift cap raised to 5000 bps"}
     record.setdefault("supersededPositions", []).append(superseded)
+    mark = mark_at_ship(chain_id)
     record["position"] = {
         "positionId": old["positionId"], "strategyHash": new_hash, "maker": old["maker"], "deadline": old["deadline"],
         "shipTx": ship_tx, "shipBlock": block, "shippedBalanceA": logs.get("balanceA (raw)", str(old["shippedBalanceA"])),
         "shippedBalanceB": logs.get("balanceB (raw)"),
         "shippedAgainstRef": {"mid": logs.get("reference mid"), "seq": int(logs["reference seq"]) if "reference seq" in logs else None},
+        "markAtShip": mark,
         "widenBpsPerMinute": old.get("widenBpsPerMinute", 2), "maxTiltBps": 5000,
         "note": old.get("note", "Balances here are the shipped amounts; live balances come from the fills subgraph."),
     }

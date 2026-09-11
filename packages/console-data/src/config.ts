@@ -38,12 +38,31 @@ export interface LegConfig {
   readonly shipped: ShippedRecord;
 }
 
+interface RawShipped {
+  shippedBalanceA: string;
+  shippedBalanceB?: string | null;
+  shippedAgainstRef?: { mid?: string | null; seq?: number | null } | null;
+  markAtShip?: string | null;
+  shipBlock?: number | null;
+}
+
+const shippedOf = (raw: RawShipped): ShippedRecord => ({
+  balanceA: BigInt(raw.shippedBalanceA),
+  balanceB: raw.shippedBalanceB == null ? null : BigInt(raw.shippedBalanceB),
+  mid: raw.shippedAgainstRef?.mid == null ? null : BigInt(raw.shippedAgainstRef.mid),
+  markAtShip: raw.markAtShip == null ? null : BigInt(raw.markAtShip),
+  seq: raw.shippedAgainstRef?.seq ?? null,
+  block: raw.shipBlock ?? null,
+});
+
 export interface ShippedRecord {
   readonly balanceA: bigint;
   /** null on generations recorded before the B side was written down */
   readonly balanceB: bigint | null;
   /** the reference mid the ship was sized to, null when the record has only the seq */
   readonly mid: bigint | null;
+  /** the mainnet mark at ship, recorded from 2026-09-11; hold profit is null without it */
+  readonly markAtShip: bigint | null;
   readonly seq: number | null;
   readonly block: number | null;
 }
@@ -137,13 +156,10 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     fillsSubgraphUrl: slow.fillsSubgraphUrl,
     referencePoolSubgraphUrl: slow.referencePoolSubgraphUrl,
     rpcUrl: rpcUrl(deployment.name),
-shipped: {
-  balanceA: BigInt(deployment.position.shippedBalanceA),
-  balanceB: deployment.position.shippedBalanceB == null ? null : BigInt(deployment.position.shippedBalanceB),
-  mid: deployment.position.shippedAgainstRef?.mid == null ? null : BigInt(deployment.position.shippedAgainstRef.mid),
-  seq: deployment.position.shippedAgainstRef?.seq ?? null,
-  block: deployment.position.shipBlock ?? null,
-},
+    // Read through a widened type: `markAtShip` is written by `scripts/reship.py` from 2026-09-11
+    // and is simply absent on every generation shipped before it, which is what leaves the hold
+    // effect unknown on those. The rest is present on every record.
+    shipped: shippedOf(deployment.position as RawShipped),
     volatilityMultiplierBps: slow.volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
   };
 });

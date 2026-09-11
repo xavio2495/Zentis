@@ -8,7 +8,12 @@ import { type LegQuote, type QuoteSet, fetchQuotes } from "./quotes.js";
 import { type Finality, type StoredRef, fetchFinality, fetchRef } from "./registry.js";
 import { type SpreadStack, recomputeVolatility, spreadStack } from "./spread.js";
 import { type SimReport, loadSimReport } from "./sim.js";
+import { ok } from "./graphql.js";
 import { humanDuration } from "./duration.js";
+import { type Mark, fetchMarks } from "./mark.js";
+import { type LegPnl, legPnl } from "./pnl.js";
+import { type Wallet, fetchWallet } from "./wallet.js";
+import { type BookTotals, bookTotals } from "./book.js";
 
 /** Everything one column needs, with the reasons any of it is missing. */
 export interface LegSnapshot {
@@ -21,6 +26,9 @@ export interface LegSnapshot {
   readonly quoteAToB: LegQuote | null;
   readonly quoteBToA: LegQuote | null;
   readonly finality: Finality | null;
+  /** what this leg's inventory and PnL are valued at; null when the mark could not be read */
+  readonly mark: Mark | null;
+  readonly pnl: LegPnl | null;
   /**
    * Why each source is missing, when it is.
    *
@@ -49,6 +57,10 @@ export interface Snapshot {
   /** collapsed: one publish across the legs is one row, so fills and refusals are not crowded out */
   readonly feed: FeedRow[];
   readonly sim: SimReport;
+  /** the whole book on one row: inventory, lean and profit, for the overall view */
+  readonly book: BookTotals;
+  /** the maker's own side; null when no chain answered */
+  readonly wallet: Wallet | null;
   readonly caveats: string[];
 }
 
@@ -100,8 +112,17 @@ export async function takeSnapshot(
     cache.get("quotes:BtoA", CADENCE_MS.quotes, () => quoteForB(quoteSize)),
   ]);
 
+  // The mark and the wallet are read on the fills cadence: neither moves faster than a minute in
+  // any way a reader acts on, and both cost a round trip per leg.
+  const [marks, wallet] = await Promise.all([
+    cache.get("mark", CADENCE_MS.fills, () => fetchMarks()),
+    cache.get<Wallet>("wallet", CADENCE_MS.fills, async () => ok(await fetchWallet(LEGS, BOOK.maker))),
+  ]);
+
   const caveats: string[] = [];
   if (aToB.error !== null) caveats.push(`quotes unavailable: ${aToB.error}`);
+  if (marks.error !== null) caveats.push(`the mainnet mark: ${marks.error}`);
+  if (wallet.error !== null) caveats.push(`the maker's wallet: ${wallet.error}`);
 
   // The decomposition is a property of the whole book — the book term reads every leg's weight — so
   // it is computed once over the legs that answered, or not at all. A decomposition over two of
@@ -164,6 +185,7 @@ export async function takeSnapshot(
       );
     }
 
+    const mark = marks.value?.get(config.chainId) ?? null;
     const shift = decomposition?.legs.find((l) => l.chainId === config.chainId) ?? null;
     if (shift !== null && !shift.agrees) {
       legCaveats.push(
@@ -183,6 +205,11 @@ export async function takeSnapshot(
       quoteAToB: aToB.value?.quotes.find((q) => q.chainId === config.chainId) ?? null,
       quoteBToA: bToA.value?.quotes.find((q) => q.chainId === config.chainId) ?? null,
       finality: finalities[i]!.value,
+      mark,
+      pnl:
+        history.value === null
+          ? null
+          : legPnl(history.value, config.shipped, mark?.mid ?? null, config.shipped.markAtShip),
       sources: {
         fills: history.value === null ? history.error : null,
         registry: ref.value === null ? ref.error : null,
@@ -213,6 +240,8 @@ export async function takeSnapshot(
       FEED_HISTORY,
     ),
     sim: loadSimReport(),
+    book: bookTotals(legs),
+    wallet: wallet.value,
     caveats,
   };
 }

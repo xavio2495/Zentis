@@ -32,7 +32,7 @@ test("hold is refused when the opening and closing marks come from different sou
   // price. On a testnet those differ by an order of magnitude, so valuing the opening basket at the
   // pool mid and the closing one at the market reports the gap between two price sources as a loss
   // the maker never took. Hold needs one source at both ends or it needs to say it cannot be had.
-  const shipped = { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, mid: (10n ** 30n) / 30_187n, seq: 1, block: 1 };
+  const shipped = { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, mid: (10n ** 30n) / 30_187n, markAtShip: null, seq: 1, block: 1 };
   const mark = (10n ** 30n) / 2_467n;
   const pnl = legPnl(sepolia, shipped, mark, null);
   expect(pnl.holdA).toBeNull();
@@ -52,7 +52,7 @@ test("trading and hold split the way the harness does, at the mark that is passe
     fills: [],
     position: { ...sepolia.position!, balanceA: 16_000_000n, balanceB: 450_000_000_000_000n },
   };
-  const pnl = legPnl(history, { balanceA: 15_000_000n, balanceB: 500_000_000_000_000n, mid: shipMid, seq: 1, block: 1 }, mark, shipMid);
+  const pnl = legPnl(history, { balanceA: 15_000_000n, balanceB: 500_000_000_000_000n, mid: shipMid, markAtShip: null, seq: 1, block: 1 }, mark, shipMid);
   expect(pnl.holdA).toBe(-5_000_000n);
   expect(pnl.tradingA).toBe(0n);
   expect(pnl.totalA).toBe(-5_000_000n);
@@ -60,7 +60,7 @@ test("trading and hold split the way the harness does, at the mark that is passe
 });
 
 test("no mark or no recorded opening means no number, with the reason", () => {
-  const shipped = { balanceA: 15_000_000n, balanceB: null, mid: null, seq: 1, block: 1 };
+  const shipped = { balanceA: 15_000_000n, balanceB: null, mid: null, markAtShip: null, seq: 1, block: 1 };
   expect(legPnl(sepolia, shipped, 1n, 1n).tradingA).toBeNull();
   expect(legPnl(sepolia, shipped, 1n, 1n).caveat).toContain("not recorded");
   expect(legPnl(sepolia, { ...shipped, balanceB: 1n, mid: 1n }, null, 1n).caveat).toContain("no mark");
