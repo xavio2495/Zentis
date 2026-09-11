@@ -45,8 +45,12 @@ export interface RunOptions {
 
 export interface Run {
   readonly screen: string;
+  /** the same frames with the colour codes taken out, for matching words rather than sequences */
+  readonly plain: string;
   readonly exitCode: number | null;
 }
+
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[a-zA-Z]`, "g");
 
 export function runBinary(binary: string, options: RunOptions = {}): Run {
   const { keys = "", waitSeconds = 2, args = [], cwd, env = {}, cols = 120, rows = 44 } = options;
@@ -78,5 +82,6 @@ export function runBinary(binary: string, options: RunOptions = {}): Run {
 
   // Whatever survived the window, by the binary's own path, which is unique to this test's temp dir.
   Bun.spawnSync({ cmd: ["pkill", "-9", "-f", binary], stdout: "ignore", stderr: "ignore" });
-  return { screen: new TextDecoder().decode(run.stdout), exitCode: run.exitCode };
+  const screen = new TextDecoder().decode(run.stdout);
+  return { screen, plain: screen.replace(ANSI, ""), exitCode: run.exitCode };
 }

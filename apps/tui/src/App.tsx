@@ -14,6 +14,7 @@ import {
 import type { Action } from "./action-types.js";
 import { type PublisherMode, quoteAvailability } from "./actions.js";
 import { readQuote } from "./quote.js";
+import { roleOf } from "./role.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
@@ -22,6 +23,7 @@ import { LegDetail } from "./components/LegDetail.js";
 import { CommandLine } from "./components/CommandLine.js";
 import { Panel, panelInner } from "./components/Panel.js";
 import { Pnl } from "./pages/Pnl.js";
+import { Onboarding } from "./pages/Onboarding.js";
 import { Positions } from "./pages/Positions.js";
 import { Status } from "./pages/Status.js";
 import { Simulation } from "./pages/Simulation.js";
@@ -69,6 +71,9 @@ export function App({
   makeStore = createStore,
   commands = null,
   publisher = "none",
+  address = null,
+  onboarding = false,
+  onChoose,
 }: {
   actions: Action[];
   /**
@@ -86,6 +91,16 @@ export function App({
    * they are not offered, not disabled — and the status page says which one is in use.
    */
   publisher?: PublisherMode;
+  /** the address this console holds a key for, or null when it holds none */
+  address?: string | null;
+  /**
+   * True when this console has no key and has not been told to watch: a stranger's first run. The
+   * live view is not drawn until they have chosen, because two of the three choices change what it
+   * would show.
+   */
+  onboarding?: boolean;
+  /** what to do with a choice: make a wallet, take a path, or watch. Null in the sandbox. */
+  onChoose?: ((choice: "generate" | "existing" | "watch") => Promise<string | null>) | null;
   /** resolves to the line the status bar should show once the command has finished */
   runAction: ((action: Action) => Promise<string>) | null;
   /**
@@ -108,6 +123,10 @@ export function App({
   // How far the help page has been scrolled. Reset whenever it is opened, so `?` always starts at
   // the top rather than wherever it was left.
   const [helpAt, setHelpAt] = useState(0);
+  // First run: which choice is being acted on, and what the signing child said about it.
+  const [choosing, setChoosing] = useState(false);
+  const [chose, setChose] = useState<string | null>(null);
+  const [onboarded, setOnboarded] = useState(false);
   const [legIndex, setLegIndex] = useState(0);
   // Which leg the chart region is showing while it rotates. Separate from `legIndex`, which is the
   // leg whose detail is pinned, so returning from a detail does not jerk the rotation somewhere else.
@@ -307,6 +326,30 @@ export function App({
   };
 
   useInput((input, key) => {
+    // First run takes the keyboard until it is answered: two of the three choices change what the
+    // live view would even show, so there is nothing useful to press behind this.
+    if (onboarding && !onboarded) {
+      if (input === "3") {
+        setOnboarded(true);
+        return;
+      }
+      if (input === "1" && !choosing && onChoose != null) {
+        setChoosing(true);
+        void onChoose("generate")
+          .then((said) => setChose(said))
+          .catch((cause: unknown) => setChose(String(cause)))
+          .finally(() => setChoosing(false));
+      }
+      if (input === "2" && onChoose != null) {
+        // A path is typed, so this hands over to the command row rather than inventing a second one.
+        setTyping("");
+        setAnswer({ text: "type the path to an env file with TAKER_PRIVATE_KEY in it", bad: false });
+        setOnboarded(true);
+      }
+      if (key.escape || input === "x") exit();
+      return;
+    }
+
     // While the row is open it has the keyboard, so no keystroke meant for a command can also fire
     // the key it happens to share a letter with. A pending confirmation still outranks it.
     if (typing !== null && confirming === null) {
@@ -466,6 +509,20 @@ export function App({
 
   const regions = fit(size.cols, size.rows);
 
+  if (onboarding && !onboarded) {
+    return (
+      <Box width={regions.legsWidth + regions.rightWidth} height={regions.draw} overflow="hidden">
+        <Panel title="zentis" width={regions.legsWidth + regions.rightWidth} height={regions.draw}>
+          <Onboarding
+            running={choosing}
+            said={chose}
+            {...panelInner(regions.legsWidth + regions.rightWidth, regions.draw)}
+          />
+        </Panel>
+      </Box>
+    );
+  }
+
   if (snapshot === null) {
     // A spinner and what it is waiting on. The sentence that used to be here listed every source the
     // console reads, which is the status panel's job the moment there is one.
@@ -571,6 +628,8 @@ export function App({
                 <Status
                   snapshot={snapshot}
                   publisher={publisher}
+                  role={roleOf(address)}
+                  address={address}
                   {...panelInner(regions.rightWidth, pageRows)}
                 />
               ) : (

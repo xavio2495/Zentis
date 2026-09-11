@@ -61,7 +61,9 @@ test("the binary can be run against the recorded fixtures, reaching no endpoint 
     });
     expect(build.exitCode).toBe(0);
 
-    const { screen, exitCode } = runBinary(binary, { keys: "", env: { ZENTIS_FIXTURES: "1" } });
+    // `watch`: this temp HOME has no wallet, so a bare start would be onboarding rather than the
+    // recorded screen this test is about.
+    const { screen, exitCode } = runBinary(binary, { keys: "", args: ["watch"], env: { ZENTIS_FIXTURES: "1" } });
     // The real screen, not the placeholder: cards, the overall view and the feed.
     expect(screen).toContain("Sepolia");
     expect(screen).toContain("book ");
@@ -161,10 +163,12 @@ test("started without a terminal, the binary says so in one line rather than in 
       stdout: "pipe",
       stderr: "pipe",
     });
-    // A pipe, not a pty: this is what a service manager or a CI step gives it.
+    // A pipe, not a pty: this is what a service manager or a CI step gives it. The binary is run
+    // directly, with an empty PATH of its own — a shell to redirect through would need one.
     const run = Bun.spawnSync({
-      cmd: ["sh", "-c", `${binary} < /dev/null`],
+      cmd: [binary],
       env: { PATH: dir, HOME: dir },
+      stdin: new TextEncoder().encode(""),
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -196,3 +200,41 @@ test("the binary states its version and exits, which is what an installer asks i
     rmSync(dir, { recursive: true, force: true });
   }
 }, 180_000);
+
+test("a fresh home reaches the live view as a taker, and the file it wrote is its owner's alone", () => {
+  // Plan 11's third gate. A stranger's machine: no wallet, no env file, no variables. One keystroke
+  // makes a wallet, one more goes on, and the console is a taker's — a role nobody chose.
+  const dir = mkdtempSync(join(tmpdir(), "zentis-first-run-"));
+  const binary = join(dir, "zentis");
+  try {
+    const build = Bun.spawnSync({
+      cmd: ["bun", "build", "--compile", "src/main.tsx", "--outfile", binary],
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(build.exitCode).toBe(0);
+
+    // "1" makes the wallet; the window is long enough for the signing child to finish and the page
+    // to redraw, because what this asserts is what the reader is shown afterwards.
+    const { screen } = runBinary(binary, { keys: "1", waitSeconds: 3, seconds: 20, env: { HOME: dir, ZENTIS_FIXTURES: "1" } });
+    expect(screen).toContain("no wallet yet");
+    expect(screen).toMatch(/address 0x[0-9a-fA-F]{40}/);
+
+    const walletFile = join(dir, ".zentis", "wallet.env");
+    expect(statSync(walletFile).mode & 0o777).toBe(0o600);
+    const key = readFileSync(walletFile, "utf8").split("=")[1]!.trim();
+    expect(screen).not.toContain(key);
+    expect(screen).not.toContain(key.slice(2));
+
+    // Started again, the wallet is found without anyone setting a variable, and the role follows
+    // from the address: this one is not the book's maker, so it is a taker's console.
+    const second = runBinary(binary, { keys: "d", waitSeconds: 4, seconds: 20, env: { HOME: dir, ZENTIS_FIXTURES: "1" } });
+    expect(second.plain).not.toContain("no wallet yet");
+    // Matched without the colour codes: a coloured word has escape sequences inside it.
+    expect(second.plain).toMatch(/role\s+taker/);
+    expect(second.screen).not.toContain(key);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 240_000);

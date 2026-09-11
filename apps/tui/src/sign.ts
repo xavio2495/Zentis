@@ -2,6 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import { createPublicClient, createWalletClient, http, type Address, type Hex, type Transport } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { LEGS, type LegConfig } from "@zentis/console-data";
+import { createWallet } from "./wallet-file.js";
 import { type Request, approveRequest, pushRequest, quoteRequest, swapRequest, tokenIn, wrapRequest } from "./intents.js";
 
 /**
@@ -32,9 +33,11 @@ export type Intent =
       needsApproval: boolean;
       keyName?: string;
     }
-  | { kind: "wallet-new"; path?: string };
+  | { kind: "wallet-new"; path?: string }
+  /** which address this env file's key belongs to; the answer is public, the key is not */
+  | { kind: "address"; keyName?: string };
 
-const KINDS = ["approve", "fill", "push", "wallet-new"];
+const KINDS = ["approve", "fill", "push", "wallet-new", "address"];
 
 export function parseIntent(text: string): Intent {
   let parsed: { kind?: string };
@@ -95,6 +98,14 @@ export interface Step {
   readonly note?: string;
 }
 
+/** The wallet-new intent: made here, in the process that signs, and never anywhere else. */
+function newWallet(log: (line: string) => void): void {
+  const created = createWallet();
+  log(`address ${created.address}`);
+  log(`written ${created.path} mode ${created.mode}`);
+  log("the key is in that file and will not be shown again");
+}
+
 export async function runIntent(
   intent: Intent,
   envPath: string,
@@ -102,7 +113,17 @@ export async function runIntent(
   /** injected by the tests, which pin the sequence rather than the chain */
   transport?: Transport,
 ): Promise<void> {
-  if (intent.kind === "wallet-new") throw new Error("wallet-new is not implemented yet");
+  if (intent.kind === "wallet-new") {
+    newWallet(log);
+    return;
+  }
+
+  if (intent.kind === "address") {
+    // Derived in the process that already holds the key, so the one drawing the screen never has to.
+    const account = privateKeyToAccount(readKey(envPath, intent.keyName ?? "TAKER_PRIVATE_KEY") as Hex);
+    log(`address ${account.address}`);
+    return;
+  }
 
   const leg = legOf(intent.chainId);
   const keyName = intent.keyName ?? (intent.kind === "push" ? "CRE_ETH_PRIVATE_KEY" : "TAKER_PRIVATE_KEY");
@@ -185,9 +206,12 @@ export async function runIntent(
 export async function signMain(stdin: string, envPath: string | null): Promise<number> {
   let key: string | undefined;
   try {
-    if (envPath === null) throw new Error("no env file: set ZENTIS_ENV or run the console's onboarding");
     const intent = parseIntent(stdin);
-    await runIntent(intent, envPath, (line) => process.stdout.write(`${redact(line, key)}\n`));
+    // Making a wallet is the one intent that needs no key, because it is where one comes from.
+    if (intent.kind !== "wallet-new" && envPath === null) {
+      throw new Error("no env file: set ZENTIS_ENV or run the console's onboarding");
+    }
+    await runIntent(intent, envPath ?? "", (line) => process.stdout.write(`${redact(line, key)}\n`));
     return 0;
   } catch (cause) {
     process.stderr.write(`${redact(String(cause instanceof Error ? cause.message : cause), key)}\n`);

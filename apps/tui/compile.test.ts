@@ -26,7 +26,9 @@ test("the compiled binary renders Ink and reads raw-mode input", () => {
     expect(new TextDecoder().decode(build.stderr)).not.toContain("error");
     expect(build.exitCode).toBe(0);
 
-    const run = runBinary(binary, { keys: "" });
+    // `watch` rather than a bare start: with no wallet and no env file, a bare start is a stranger's
+    // first run and opens the choice instead of the live view. What this test is about is Ink.
+    const run = runBinary(binary, { keys: "", args: ["watch"] });
     const screen = run.screen;
 
     expect(screen).toMatch(/reading the chains/); // the app's own first frame, a spinner and a label

@@ -60,6 +60,8 @@ export async function drive(
      * exports ZENTIS_GCP_PROJECT is not something a test's result should depend on.
      */
     publisher?: "cloud" | "local" | "none";
+    /** a stranger's first run: no wallet, no env file, nothing chosen yet */
+    onboarding?: boolean;
   } = {},
 ): Promise<Frame> {
   const stdin = Object.assign(new PassThrough(), {
@@ -93,6 +95,8 @@ export async function drive(
       makeStore={makeStore}
       commands={commands}
       publisher={publisherMode(envFile, findRepoRoot(), project)}
+      onboarding={options.onboarding === true}
+      onChoose={async () => "address 0x0000000000000000000000000000000000000001\nwritten ~/.zentis/wallet.env mode 600"}
     />,
     {
     stdout: stdout as never,

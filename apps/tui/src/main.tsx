@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { render } from "ink";
 import { App } from "./App.js";
-import { buildActions, commandActions, findRepoRoot, publisherMode } from "./actions.js";
+import { buildActions, commandActions, findRepoRoot, publisherMode, selfCommand } from "./actions.js";
+import { resolveEnvPath } from "./wallet-file.js";
 import { fixedStore } from "../sandbox/state.js";
 import { fakeSnapshot } from "../sandbox/world.js";
 import { run, summarise } from "./runner.js";
@@ -52,17 +53,97 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
  * hash and a status, and exits. The interactive process spawns it and reads those lines back, so the
  * key exists only in a process that has no terminal and no screen.
  */
-if (process.argv.slice(2)[0] === "sign") {
+const argument = process.argv.slice(2)[0];
+
+/**
+ * `zentis --version` — what an installer asks, and what a bug report should carry.
+ *
+ * The tag and commit are compiled in by the release build; from source there is no tag, and saying
+ * "dev" is more honest than inventing one.
+ */
+if (argument === "--version" || argument === "-v") {
+  process.stdout.write(`${process.env["ZENTIS_VERSION"] ?? "dev"}\n`);
+  process.exit(0);
+}
+
+/** `zentis update` — the same one-line install, run again. */
+if (argument === "update") {
+  const child = Bun.spawnSync({
+    cmd: ["sh", "-c", "curl -fsSL https://zentis-eth.vercel.app/install.sh | bash"],
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  process.exit(child.exitCode ?? 1);
+}
+
+if (argument === "sign") {
   const { signMain } = await import("./sign.js");
   const stdin = await new Response(Bun.stdin.stream()).text();
   process.exit(await signMain(stdin, process.env["ZENTIS_ENV"] ?? null));
 }
 
 const watchOnly = process.argv.slice(2).includes("watch");
-const envFile = watchOnly ? null : (process.env.ZENTIS_ENV ?? null);
+
+/**
+ * A terminal, or one line saying so.
+ *
+ * Ink arms raw mode on start, and without a tty that throws "Raw mode is not supported on the
+ * current process.stdin" with a React stack under it — which tells a reader that the console is
+ * broken rather than that it is in the wrong place. A service manager, a CI step and a pipe all
+ * arrive here.
+ */
+if (!process.stdin.isTTY) {
+  process.stderr.write("zentis needs a terminal; run it from a shell, or `zentis watch` for one frame\n");
+  process.exit(2);
+}
+
+// What the operator told it, what it remembers, then the wallet it made for them. Nobody sets a
+// variable by hand after onboarding.
+const envFile = watchOnly ? null : resolveEnvPath();
 
 const runAction = async (action: Action): Promise<string> =>
   summarise(action, await run(action.command!));
+
+/**
+ * The address this console holds a key for, read without reading the key.
+ *
+ * It asks the signing child, which is the only process that opens the env file. A console that
+ * derived the address here would have had the key in its own memory to do it.
+ */
+const addressOf = (path: string | null): string | null => {
+  if (path === null) return null;
+  const child = Bun.spawnSync({
+    // `selfCommand` knows how to re-invoke this program whether it was compiled or run from source;
+    // spelling it out here produced `zentis <path-to-itself> sign`, which quietly started a second
+    // console instead of a signer.
+    cmd: selfCommand("sign"),
+    env: { ...process.env, ZENTIS_ENV: path },
+    stdin: new TextEncoder().encode(JSON.stringify({ kind: "address" })),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const said = new TextDecoder().decode(child.stdout);
+  return /0x[0-9a-fA-F]{40}/.exec(said)?.[0] ?? null;
+};
+
+/**
+ * A stranger's first run: no key anywhere, and nothing said about watching.
+ *
+ * The live view is not drawn until they have chosen, because two of the three choices change what
+ * it would show — and the third, watching, is one keystroke away.
+ */
+const onboarding = !watchOnly && envFile === null;
+
+/** Making a wallet, or taking a path: both go to the child, which is where keys are handled. */
+const choose = async (choice: "generate" | "existing" | "watch"): Promise<string | null> => {
+  if (choice !== "generate") return null;
+  const result = await run({
+    cmd: selfCommand("sign"),
+    cwd: process.cwd(),
+    stdin: JSON.stringify({ kind: "wallet-new" }),
+  });
+  return result.tail;
+};
 
 /**
  * `ZENTIS_FIXTURES=1` runs the console against the recorded moment instead of the network.
@@ -85,6 +166,9 @@ const app = render(
     runAction={runAction}
     commands={commandActions(envFile)}
     publisher={publisherMode(envFile, findRepoRoot())}
+    address={addressOf(envFile)}
+    onboarding={onboarding}
+    onChoose={choose}
     makeStore={makeStore}
   />,
 );

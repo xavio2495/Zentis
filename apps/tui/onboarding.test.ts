@@ -10,14 +10,17 @@ import { roleOf } from "./src/role.js";
  * do afterwards follows from which address it ends up holding — nobody is asked to choose a role,
  * because the chain already decided it.
  */
+/** The frame as prose: wrapped lines rejoined, so a sentence is matched rather than a row. */
+const said = (lines: string[]) => lines.join(" ").replace(/[│┌┐╰╯─]/g, " ").replace(/\s+/g, " ");
+
 test("with no wallet and no env file, the console opens on the choice rather than the live view", async () => {
   const frame = await drive(120, 40, { onboarding: true });
-  const text = frame.lines.join("\n");
-  expect(text).toMatch(/generate|make a wallet/i);
-  expect(text).toMatch(/env file|existing/i);
-  expect(text).toMatch(/watch/i);
+  const text = said(frame.lines);
+  expect(text).toMatch(/make one here/i);
+  expect(text).toMatch(/use a key you already have/i);
+  expect(text).toMatch(/watch only/i);
   // Not the live view: no cards, no feed, until one of the three is chosen.
-  expect(text).not.toContain("┌ feed");
+  expect(frame.lines.join("\n")).not.toContain("┌ feed");
   expect(frame.overflows).toBe(false);
 }, 60_000);
 
@@ -28,7 +31,7 @@ test("choosing to watch goes straight to the live view, with nothing that signs"
 }, 60_000);
 
 test("the page says what generating one will do before it does it", async () => {
-  const text = (await drive(120, 40, { onboarding: true })).lines.join("\n");
+  const text = said((await drive(120, 40, { onboarding: true })).lines);
   expect(text).toMatch(/\.zentis\/wallet\.env/);
   // The two facts that matter about a key file, said before it exists rather than after.
   expect(text).toMatch(/600/);

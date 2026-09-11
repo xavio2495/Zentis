@@ -1,7 +1,8 @@
 import { Box, Text } from "ink";
 import { type Snapshot, humanDuration, providersOf } from "@zentis/console-data";
 import type { PublisherMode } from "../actions.js";
-import { type Seg, padRows, trunc } from "../layout.js";
+import { type Role, roleReason } from "../role.js";
+import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
 import { Segments } from "../components/Segments.js";
 import { DOT, dotColour } from "../components/Providers.js";
 import { UI } from "../theme.js";
@@ -20,10 +21,15 @@ const STATE_WORD = { up: "answering", stale: "last-good", down: "down" } as cons
 export function Status({
   snapshot,
   publisher,
+  role = "watcher",
+  address = null,
   width,
   height,
 }: {
   snapshot: Snapshot;
+  /** what this console may do, inferred from the address it holds */
+  role?: Role;
+  address?: string | null;
   /** which publisher this console can reach, which is what decides whether `r` and `s` exist */
   publisher: PublisherMode;
   width: number;
@@ -109,14 +115,50 @@ export function Status({
     local: "local — cre run from this checkout, with the key in ZENTIS_ENV",
     none: "none — the workflows run on their own; republishing is not offered here",
   };
-  rows.push(<Text key="sp3"> </Text>);
+  // What this console is allowed to do, and why — read off the address it holds rather than chosen.
+  rows.push(<Text key="sp4"> </Text>);
+  // Measured, like every other row: unmeasured, Ink squeezed it into "role  take 0x…", which is a
+  // word this page is the authority on.
+  rows.push(
+    <Segments
+      key="role"
+      segs={fitSegments(
+        [
+          [
+            { text: "role       ", color: UI.muted },
+            { text: role, color: role === "watcher" ? UI.muted : UI.heading },
+            { text: `  ${roleReason(role, address)}`, color: UI.muted },
+          ],
+          [
+            { text: "role       ", color: UI.muted },
+            { text: role, color: role === "watcher" ? UI.muted : UI.heading },
+            { text: address === null ? "" : `  ${address}`, color: UI.muted },
+          ],
+          [
+            { text: "role       ", color: UI.muted },
+            { text: role, color: role === "watcher" ? UI.muted : UI.heading },
+          ],
+        ],
+        width,
+      )}
+    />,
+  );
   rows.push(
     <Segments
       key="publisher"
-      segs={[
-        { text: "publisher  ", color: UI.muted },
-        { text: PUBLISHER_WORDS[publisher], color: publisher === "none" ? UI.muted : UI.heading },
-      ]}
+      segs={fitSegments(
+        [
+          [
+            { text: "publisher  ", color: UI.muted },
+            { text: PUBLISHER_WORDS[publisher], color: publisher === "none" ? UI.muted : UI.heading },
+          ],
+          [
+            { text: "publisher  ", color: UI.muted },
+            { text: publisher, color: publisher === "none" ? UI.muted : UI.heading },
+          ],
+        ],
+        width,
+      )}
     />,
   );
 
