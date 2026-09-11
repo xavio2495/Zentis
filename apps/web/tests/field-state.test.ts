@@ -1,0 +1,93 @@
+import { describe, expect, test } from "bun:test";
+import {
+  MARK_HALF_EXTENT,
+  fieldState,
+  pixelsPerWorldUnit,
+  textColumnHalfWidth,
+} from "../src/lib/field-state";
+
+/** The viewports the field has to behave at, not just the one it was tuned on. */
+const VIEWPORTS = [
+  { viewportWidth: 390, viewportHeight: 844 }, // phone
+  { viewportWidth: 820, viewportHeight: 1180 }, // tablet
+  { viewportWidth: 1040, viewportHeight: 1150 }, // the one the defect was found at
+  { viewportWidth: 1440, viewportHeight: 900 },
+  { viewportWidth: 2560, viewportHeight: 1440 },
+];
+
+/** A document roughly the shape the landing builds: hero, traverse, prose, outro. */
+function docHeight(viewportHeight: number) {
+  return viewportHeight * 6.2;
+}
+
+describe("the field yields to the words", () => {
+  for (const viewport of VIEWPORTS) {
+    const { viewportWidth, viewportHeight } = viewport;
+    const height = docHeight(viewportHeight);
+
+    test(`clears or dims over every prose scroll position at ${viewportWidth}x${viewportHeight}`, () => {
+      const first = fieldState({ scrollY: 0, ...viewport, docHeight: height });
+      const proseFrom = first.proseFrom;
+      const proseTo = first.outroFrom;
+      expect(proseTo).toBeGreaterThan(proseFrom);
+
+      for (let scrollY = proseFrom; scrollY <= proseTo; scrollY += viewportHeight / 8) {
+        const state = fieldState({ scrollY, ...viewport, docHeight: height });
+        const perUnit = pixelsPerWorldUnit(viewportHeight, state.positionZ);
+        const halfExtentPx = MARK_HALF_EXTENT * state.scale * perUnit;
+        const offsetPx = Math.abs(state.positionX) * perUnit;
+        const clearsColumn = offsetPx - halfExtentPx >= textColumnHalfWidth(viewportWidth);
+
+        // Either it is out of the column, or it is faint enough not to read as
+        // texture across the paragraph.
+        expect(clearsColumn || state.opacity <= 0.06).toBe(true);
+      }
+    });
+  }
+});
+
+describe("the field still does its job", () => {
+  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const height = docHeight(viewport.viewportHeight);
+
+  test("is present and centred on the first screen", () => {
+    const state = fieldState({ scrollY: 0, ...viewport, docHeight: height });
+    expect(state.positionX).toBe(0);
+    expect(state.opacity).toBeGreaterThan(0.2);
+  });
+
+  test("comes toward the reader and grows through the traverse", () => {
+    const start = fieldState({ scrollY: 0, ...viewport, docHeight: height });
+    const end = fieldState({
+      scrollY: viewport.viewportHeight * 2.2,
+      ...viewport,
+      docHeight: height,
+    });
+    expect(end.positionZ).toBeGreaterThan(start.positionZ);
+    expect(end.scale).toBeGreaterThan(start.scale);
+    expect(end.opacity).toBeGreaterThan(start.opacity);
+  });
+
+  test("comes back for the scatter at the end of the page", () => {
+    const outro = fieldState({ scrollY: height, ...viewport, docHeight: height });
+    expect(outro.scatter).toBeGreaterThan(0.9);
+    expect(outro.opacity).toBeGreaterThan(0.2);
+  });
+
+  test("never leaves the mark part-way through its move", () => {
+    // Whatever the scroll position, the mark is either on the centre line or
+    // fully committed to its offset — never straddling the column edge.
+    const state = fieldState({
+      scrollY: viewport.viewportHeight * 2.4,
+      ...viewport,
+      docHeight: height,
+    });
+    const perUnit = pixelsPerWorldUnit(viewport.viewportHeight, state.positionZ);
+    const halfExtentPx = MARK_HALF_EXTENT * state.scale * perUnit;
+    const offsetPx = Math.abs(state.positionX) * perUnit;
+    expect(
+      offsetPx - halfExtentPx >= textColumnHalfWidth(viewport.viewportWidth) ||
+        state.opacity <= 0.06,
+    ).toBe(true);
+  });
+});
