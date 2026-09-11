@@ -50,3 +50,30 @@ test("the status page says which role the console is in, and why", async () => {
   const text = (await drive(190, 50, { keys: ["d"] })).lines.join("\n");
   expect(text).toMatch(/role\s+(watcher|taker|maker)/);
 }, 60_000);
+
+test("after a wallet is made there is a way forward, and it does not involve quitting", async () => {
+  // Live, this page made a wallet and then offered nothing: the only route to using it was to quit
+  // and start again, which is not a route, and the user had to be told it.
+  const made = said((await drive(120, 40, { onboarding: true, keys: ["1"] })).lines);
+  expect(made).toMatch(/enter to continue/i);
+
+  const continued = (await drive(120, 40, { onboarding: true, keys: ["1", "ENTER"] })).lines.join("\n");
+  expect(continued).toContain("┌ feed");
+  expect(continued).not.toContain("no wallet yet");
+}, 120_000);
+
+test("choosing to watch after making a wallet uses the wallet, because it exists now", async () => {
+  const continued = (await drive(120, 40, { onboarding: true, keys: ["1", "3"] })).lines.join("\n");
+  expect(continued).toContain("┌ feed");
+}, 120_000);
+
+test("the address is the first thing under the choices, and is never cut", async () => {
+  const lines = (await drive(80, 24, { onboarding: true, keys: ["1"] })).lines;
+  const shown = lines.map((l) => l.replace(/[│┌┐╰╯]/g, "").trimEnd());
+  const addressAt = shown.findIndex((l) => /0x[0-9a-fA-F]{40}/.test(l));
+  expect(addressAt).toBeGreaterThan(-1);
+  // The address is what a reader has to copy into a faucet, so it is whole and it is first.
+  expect(shown[addressAt]).not.toContain("…");
+  const pathAt = shown.findIndex((l) => l.includes("wallet.env"));
+  expect(addressAt).toBeLessThan(pathAt === -1 ? Number.MAX_SAFE_INTEGER : pathAt);
+}, 60_000);
