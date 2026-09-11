@@ -4,6 +4,7 @@ import {
   BOOK,
   LEGS,
   type LegConfig,
+  QUOTE_SIZE_A,
   type PushPlan,
   type Store,
   createStore,
@@ -85,6 +86,7 @@ export function App({
     fill: (fill: { leg: LegConfig; amountRaw: bigint; isAToB: boolean }) => Action;
     republish: (workflow: "fast" | "slow") => Action | null;
     push: (push: { leg: LegConfig; plan: PushPlan }) => Action;
+    approve: (approve: { leg: LegConfig; amountRaw: bigint }) => Action;
   } | null;
   /**
    * Which publisher this console can reach. It decides whether `r` and `s` exist at all — with none
@@ -283,6 +285,23 @@ export function App({
           return;
         }
         const action = commands.push({ leg: command.leg, plan: { ...planned, topUpB: command.amountRaw } });
+        if (action.disabledReason !== null) {
+          setAnswer({ text: action.disabledReason, bad: true });
+          return;
+        }
+        setTyping(null);
+        setAnswer(null);
+        setConfirming(action);
+        say(`press y to broadcast — ${action.label}: ${action.describe}`);
+        return;
+      }
+      case "approve": {
+        if (commands === null) {
+          setAnswer({ text: "this console was given no way to sign, so it cannot run that", bad: true });
+          return;
+        }
+        // The usual size unless one is typed: what a fill of the book's own quote size will pull.
+        const action = commands.approve({ leg: command.leg, amountRaw: command.amountRaw ?? QUOTE_SIZE_A });
         if (action.disabledReason !== null) {
           setAnswer({ text: action.disabledReason, bad: true });
           return;

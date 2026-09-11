@@ -273,6 +273,12 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
    * The book is still there and still quoting — it is the maker's, not theirs — but they hold no
    * gas and no tokens on any chain, which is the state the wallet page has to get them out of.
    */
+  /**
+   * A wallet with nothing in it: what a stranger has the minute after generating one.
+   *
+   * The book is still there and still quoting — it is the maker's, not theirs — but they hold no
+   * gas and no tokens on any chain, which is the state the wallet page has to get them out of.
+   */
   if (scenario === "empty") {
     return {
       ...(fakeSnapshot("fresh", now) as Snapshot),

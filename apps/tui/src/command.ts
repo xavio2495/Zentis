@@ -22,11 +22,13 @@ export type Command =
   | { kind: "fill"; leg: LegConfig; amountRaw: bigint; isAToB: boolean }
   | { kind: "republish"; workflow: "fast" | "slow" }
   | { kind: "rebalance"; leg: LegConfig }
-  | { kind: "push"; leg: LegConfig; token: TokenConfig; amountRaw: bigint };
+  | { kind: "push"; leg: LegConfig; token: TokenConfig; amountRaw: bigint }
+  /** the approval a fill settles against; the amount is optional and defaults to the fill size */
+  | { kind: "approve"; leg: LegConfig; amountRaw: bigint | null };
 
 export type Parsed = { command: Command } | { error: string };
 
-const KNOWN = ["fill", "quote", "republish", "window", "page", "rebalance", "push"] as const;
+const KNOWN = ["fill", "quote", "approve", "republish", "window", "page", "rebalance", "push"] as const;
 
 /**
  * A decimal amount in a token's raw units, scaled as text.
@@ -104,6 +106,15 @@ export function parseCommand(line: string, legs: readonly LegConfig[]): Parsed {
       return workflow === "fast" || workflow === "slow"
         ? { command: { kind: "republish", workflow } }
         : { error: "republish takes fast or slow" };
+    }
+    case "approve": {
+      const found = legAnd(rest[0], "a leg");
+      if ("error" in found) return found;
+      const amountRaw = rest[1] === undefined ? null : parseAmount(rest[1], found.leg.tokenA.decimals);
+      if (rest[1] !== undefined && amountRaw === null) {
+        return { error: `approve takes an amount in ${found.leg.tokenA.symbol}, or none for the usual size` };
+      }
+      return { command: { kind: "approve", leg: found.leg, amountRaw } };
     }
     case "rebalance": {
       const found = legAnd(rest[0], "a leg");

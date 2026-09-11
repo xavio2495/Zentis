@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { FAUCETS, type Snapshot, type TokenHolding } from "@zentis/console-data";
+import { FAUCETS, QUOTE_SIZE_A, type Snapshot, type TokenHolding } from "@zentis/console-data";
 import { tokenAmount } from "../format.js";
 import { type Seg, fitSegments, padRows, trunc, wrapLines } from "../layout.js";
 import { Segments } from "../components/Segments.js";
@@ -139,7 +139,9 @@ export function WalletPage({
       );
       for (const chain of empty) {
         const leg = snapshot.legs.find((l) => l.config.chainId === chain.chainId);
-        const name = chain.chain.replace(/-sepolia$/i, "").trim();
+        // The leg's own short name, not the wallet's recorded label: "Arbitrum Sepolia" is wider
+        // than the column and pushed its row out of line with the others.
+        const name = (leg?.config.name ?? chain.chain).replace(/-sepolia$/i, "").trim();
         // Keyed by the leg's own name, not by whatever the wallet recorded as a label: the recorded
         // wallet carries "Arbitrum Sepolia" where the faucet list is keyed "arbitrum-sepolia".
         for (const [i, faucet] of (FAUCETS[leg?.config.name ?? ""] ?? []).entries()) {
@@ -149,7 +151,7 @@ export function WalletPage({
               segs={fitSegments(
                 [
                   [
-                    { text: `${i === 0 ? name.padEnd(10) : "".padEnd(10)}  `, color: legColour(chain.chainId) },
+                    { text: `${(i === 0 ? name : "").padEnd(10)}  `, color: legColour(chain.chainId) },
                     { text: faucet, color: UI.action },
                   ],
                   [{ text: faucet, color: UI.action }],
@@ -182,6 +184,40 @@ export function WalletPage({
             />,
           );
         }
+      }
+    }
+
+    // Where the allowance column already shows a shortfall, the one thing to do about it.
+    const short = wallet.chains.filter((chain) => chain.tokenA.allowance < QUOTE_SIZE_A || chain.tokenA.allowanceShort);
+    if (short.length > 0) {
+      rows.push(<Text key="appsp"> </Text>);
+      rows.push(
+        <Text key="apphead" color={UI.heading} bold>
+          {trunc("approve, so a fill can settle", width)}
+        </Text>,
+      );
+      for (const chain of short) {
+        const leg = snapshot.legs.find((l) => l.config.chainId === chain.chainId);
+        const name = (leg?.config.name ?? chain.chain).replace(/-sepolia$/i, "").trim();
+        rows.push(
+          <Segments
+            key={`approve-${chain.chainId}`}
+            segs={fitSegments(
+              [
+                [
+                  { text: `${name.padEnd(10)}  `, color: legColour(chain.chainId) },
+                  { text: `: approve ${name}`, color: UI.action },
+                  { text: `  (it asks before it broadcasts)`, color: UI.muted },
+                ],
+                [
+                  { text: `${name.padEnd(10)}  `, color: legColour(chain.chainId) },
+                  { text: `: approve ${name}`, color: UI.action },
+                ],
+              ],
+              width,
+            )}
+          />,
+        );
       }
     }
 

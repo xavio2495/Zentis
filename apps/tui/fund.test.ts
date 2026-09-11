@@ -43,13 +43,15 @@ test("the page shows the wallet this console holds, not the book's maker", async
 test("a chain whose approval is short is offered the command that fixes it", async () => {
   // The allowance column already shows the shortfall; what it lacked was the one thing to do about
   // it. Aqua pulls at settlement against this approval, so a fill reverts on it rather than on price.
-  const text = said((await drive(190, 50, { keys: ["w"] })).lines);
+  // A wallet fresh from onboarding has approved nothing, which is where this matters.
+  const text = said((await drive(190, 50, { scenario: "empty", keys: ["w"] })).lines);
   expect(text).toMatch(/approve/i);
   expect(text).toMatch(/: ?approve sepolia/);
 }, 60_000);
 
 test("a chain that is already approved is not told to approve again", async () => {
-  const text = said((await drive(190, 50, { scenario: "approved", keys: ["w"] })).lines);
+  // The recorded wallet's USDC allowance already covers a fill of the book's own size.
+  const text = said((await drive(190, 50, { keys: ["w"] })).lines);
   expect(text).not.toMatch(/: ?approve /);
 }, 60_000);
 
@@ -57,7 +59,8 @@ test("a typed approve is the binary signing for itself, for the router that will
   const frame = await drive(150, 44, { keys: [":", ..."approve sepolia", "ENTER"], armed: true });
   const text = frame.lines.join("\n");
   expect(text).toContain("press y");
-  expect(text).not.toContain("cast");
+  // "broadcast" contains the word; what must not be there is the tool.
+  expect(text).not.toMatch(/\bcast /);
 }, 60_000);
 
 test("watch-only is told why it cannot approve, and nothing is asked of it", async () => {

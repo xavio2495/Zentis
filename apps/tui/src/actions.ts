@@ -398,6 +398,45 @@ export function buildPushAction(
 }
 
 /**
+ * The approval a fill settles against.
+ *
+ * Aqua pulls the taker's side at settlement, so a fill whose approval is short reverts on the
+ * approval rather than on the price — which reads as the quote being wrong. This is the one thing
+ * that has to happen between funding a wallet and taking a quote with it.
+ */
+export function buildApproveAction(
+  envFile: string | null,
+  approve: { leg: LegConfig; amountRaw: bigint },
+): Action {
+  const { leg, amountRaw } = approve;
+  const spender = leg.fill?.router ?? leg.app;
+  const blocked = envFile === null ? NO_ENV : null;
+  return {
+    key: "",
+    short: "approve",
+    blocker: envFile === null ? "env" : null,
+    label: `approve ${decimalOf(amountRaw, leg.tokenA.decimals)} ${leg.tokenA.symbol} on ${leg.name.replace(/-sepolia$/, "")}`,
+    disabledReason: blocked,
+    command:
+      blocked === null
+        ? {
+            cmd: selfCommand("sign"),
+            cwd: process.cwd(),
+            env: { ZENTIS_ENV: envFile! },
+            stdin: JSON.stringify({
+              kind: "approve",
+              chainId: leg.chainId,
+              token: leg.tokenA.address,
+              spender,
+              amount: String(amountRaw),
+            }),
+          }
+        : null,
+    describe: `lets the router pull ${leg.tokenA.symbol} from this wallet when a fill settles`,
+  };
+}
+
+/**
  * The factory the command line is given, so a typed command and its key build the same `Action`.
  *
  * `push` has no script in `contracts/script` yet, so it returns null and the row says so rather than
@@ -412,5 +451,6 @@ export function commandActions(envFile: string | null, repo: string | null = fin
       buildActions(envFile, repo).find((a) => a.label === `republish ${workflow}`) ?? null,
     // No repository in its arguments: a push is three `cast` calls the binary makes itself.
     push: (push: { leg: LegConfig; plan: PushPlan }): Action => buildPushAction(envFile, push),
+    approve: (approve: { leg: LegConfig; amountRaw: bigint }): Action => buildApproveAction(envFile, approve),
   };
 }
