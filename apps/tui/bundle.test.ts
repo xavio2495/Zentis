@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { runBinary } from "./testing/binary.js";
 
 const dir = mkdtempSync(join(tmpdir(), "zentis-bundle-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -93,32 +94,23 @@ test("the compiled binary finds the repository from its working directory, not f
   writeFileSync(envFile, "CRE_ETH_PRIVATE_KEY=0x00\n");
   const repo = resolve(import.meta.dir, "..", "..");
 
-  const drive = (cwd: string, env: string) =>
-    new TextDecoder().decode(
-      Bun.spawnSync({
-        cmd: [
-          "sh",
-          "-c",
-          `cd ${JSON.stringify(cwd)} && (sleep 16; printf r; sleep 4; printf x; sleep 2) | ` +
-            `${env} script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary}`)} /dev/null`,
-        ],
-        stdout: "pipe",
-        stderr: "pipe",
-        timeout: 40_000,
-      }).stdout,
-    );
+  // Sixteen seconds before the key, because the actions are only offered once the first poll has
+  // come back; the window and the cleanup are the driver's, and every endpoint it hands the console
+  // points at a closed port.
+  const drive = (cwd: string, env: Record<string, string>) =>
+    runBinary(binary, { keys: "r", waitSeconds: 16, cwd, env }).screen;
 
   // Inside the repository the action is offered, and the confirmation is reached.
-  const inside = drive(repo, `ZENTIS_ENV=${envFile}`);
+  const inside = drive(repo, { ZENTIS_ENV: envFile });
   expect(inside).toContain("press y to broadcast");
 
   // Outside it, the keys are disabled with a reason the operator can act on, rather than failing at
   // spawn time after they have already confirmed a broadcast.
-  const outside = drive(dir, `ZENTIS_ENV=${envFile}`);
+  const outside = drive(dir, { ZENTIS_ENV: envFile });
   expect(outside).toContain("ZENTIS_REPO");
   expect(outside).not.toContain("press y to broadcast");
 
-  const pointed = drive(dir, `ZENTIS_ENV=${envFile} ZENTIS_REPO=${repo}`);
+  const pointed = drive(dir, { ZENTIS_ENV: envFile, ZENTIS_REPO: repo });
   expect(pointed).toContain("press y to broadcast");
 }, 180_000);
 

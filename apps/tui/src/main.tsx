@@ -52,4 +52,11 @@ const runAction = async (action: Action): Promise<string> =>
 const app = render(
   <App actions={buildActions(envFile)} runAction={runAction} commands={commandActions(envFile)} />,
 );
-void app.waitUntilExit().then(leaveAlternate);
+void app.waitUntilExit().then(() => {
+  leaveAlternate();
+  // Quit means quit. Unmounting Ink does not end the process while a read is still in flight, and a
+  // read against an unreachable endpoint retries with backoff — pressing `x` with the network down
+  // left the console on screen for as long as those retries took. Nothing here writes anything, so
+  // there is nothing in flight worth waiting for.
+  process.exit(0);
+});

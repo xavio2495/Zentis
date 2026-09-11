@@ -175,11 +175,18 @@ export function App({
         return;
       }
       case "rebalance":
-        setAnswer({ text: `the rebalance panel is not built yet — ${command.leg.name}'s shift and room are on its card`, bad: true });
+        // The panel is the answer to this question: it sizes the top-up from the leg's own reserves
+        // against the mid, and says so for every leg at once.
+        setPage("positions");
+        setAnswer({ text: `${command.leg.name}'s rebalance is on the positions page`, bad: false });
         return;
       case "push":
-        // Honest rather than helpful: there is no push script to run, so nothing here pretends to.
-        setAnswer({ text: "push is not wired: contracts/script has no Push.s.sol yet", bad: true });
+        // Named, never run. A push moves the maker's own money, the script sizes it from the chain
+        // rather than from anything on this screen, and the operator is the one who signs it.
+        setAnswer({
+          text: `run it yourself: python3 scripts/rebalance.py --only ${command.leg.name}  (--dry-run reads it first)`,
+          bad: false,
+        });
         return;
       case "fill":
       case "republish": {

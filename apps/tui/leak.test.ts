@@ -45,3 +45,28 @@ test("the driver points every endpoint at nothing, so a test process cannot reac
     expect(Object.keys(OFFLINE_ENV).some((k) => k.startsWith(prefix))).toBe(true);
   }
 });
+
+test("the binary can be run against the recorded fixtures, reaching no endpoint at all", () => {
+  // A console that renders without the network is what a test drives and what a demo can fall back
+  // on. `ZENTIS_FIXTURES=1` serves the recorded moment: the whole screen, no poll, nothing spent.
+  const dir = mkdtempSync(join(tmpdir(), "zentis-fixture-"));
+  const binary = join(dir, "zentis");
+  try {
+    const build = Bun.spawnSync({
+      cmd: ["bun", "build", "--compile", "src/main.tsx", "--outfile", binary],
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(build.exitCode).toBe(0);
+
+    const { screen, exitCode } = runBinary(binary, { keys: "", env: { ZENTIS_FIXTURES: "1" } });
+    // The real screen, not the placeholder: cards, the overall view and the feed.
+    expect(screen).toContain("Sepolia");
+    expect(screen).toContain("book ");
+    expect(screen).not.toContain("reading three chains");
+    expect(exitCode).toBe(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 120_000);

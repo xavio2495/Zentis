@@ -2,30 +2,13 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runBinary } from "./testing/binary.js";
 
-// The binary is the delivery format, so the thing under test is the binary: Ink has to
-// render and take raw-mode keystrokes after `bun build --compile`, not just under `bun run`.
-// Driving it needs a real tty, hence `script`; the keystrokes are delayed because raw mode
-// is only armed once the app has mounted.
-const drive = (binary: string, keys: string) =>
-  Bun.spawnSync({
-    cmd: [
-      "sh",
-      "-c",
-      `(sleep 2; printf %s ${JSON.stringify(keys)}; sleep 2; printf x; sleep 2) | ` +
-        `script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary}`)} /dev/null`,
-    ],
-    stdout: "pipe",
-    stderr: "pipe",
-    // Colour depth is negotiated with the terminal, and the one a test runner inherits is whatever
-    // the machine happens to advertise: the same binary emits 24-bit codes under a truecolour
-    // terminal and 256-colour codes without COLORTERM, which made this assertion pass on one
-    // machine and fail on the next with nothing about the build having changed. The terminal is
-    // therefore stated rather than inherited, and what is proven is that the compile keeps the
-    // colour the terminal offers.
-    env: { ...process.env, COLORTERM: "truecolor", TERM: "xterm-256color" },
-    timeout: 30_000,
-  });
+// The binary is the delivery format, so the thing under test is the binary: Ink has to render and
+// take raw-mode keystrokes after `bun build --compile`, not just under `bun run`. Driving it needs a
+// real tty and a hard deadline, and it must not be able to reach an indexer while it is up — all
+// three live in `testing/binary.ts`, because a test that starts a console and leaves it running
+// costs the maker its daily allowance.
 
 // Asserted against the first frame, which is the one drawn before any source has answered. That
 // keeps the binary's proof — Ink renders, yoga lays out, colour survives, raw mode arms and unwinds
@@ -43,8 +26,8 @@ test("the compiled binary renders Ink and reads raw-mode input", () => {
     expect(new TextDecoder().decode(build.stderr)).not.toContain("error");
     expect(build.exitCode).toBe(0);
 
-    const run = drive(binary, "");
-    const screen = new TextDecoder().decode(run.stdout);
+    const run = runBinary(binary, { keys: "" });
+    const screen = run.screen;
 
     expect(screen).toContain("reading three chains"); // the app's own first frame
     expect(screen).toContain("[?25l"); // the cursor was hidden, i.e. Ink took the terminal
