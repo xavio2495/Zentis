@@ -5,11 +5,18 @@ import type { ShippedRecord } from "./config.js";
  * What a leg has earned, in tokenA's raw units, with the same split the simulation harness uses.
  *
  * The harness's `trading_pnl_a` is the closing value minus the opening value with the hold effect
- * removed, where hold is what the opening balances would be worth at the closing price. Written
- * out per leg: trading = (balanceA − shippedA) + (balanceB − shippedB) × mark; hold = shippedB ×
- * (mark − openingMark). The mark is a parameter because on a testnet the leg's own pool can sit an
- * order of magnitude off the market: the caller passes the mainnet mark and can pass the pool mid
- * to see the other answer.
+ * removed. Written out per leg: hold = shippedB × (mark − openingMark), and trading is the sum over
+ * the leg's fills of what each one moved, valued at the mark.
+ *
+ * Trading is summed from the fills rather than read off the balance delta against what was shipped,
+ * and the difference matters the moment the maker rebalances. `push()` raises a leg's recorded
+ * balance with no trade behind it, so a balance delta counts the top-up as profit: the Sepolia leg
+ * was pushed 0.005575 WETH on 2026-09-11 to put its curve back on the mid, which would have read as
+ * about 13.77 USDC nobody earned. The fills are the only record of what trading actually did, and
+ * they are immune to top-ups, to withdrawals, and to who performed them.
+ *
+ * The mark is a parameter because on a testnet the leg's own pool can sit an order of magnitude off
+ * the market: the caller passes the mainnet mark and can pass the pool mid to see the other answer.
  *
  * Hold takes a **second** mark, the one the same source gave when the leg was shipped, and returns
  * null without it. Trading applies one mark to a balance *delta*, so any mark answers it; hold is a
@@ -51,6 +58,14 @@ export interface LegPnl {
 
 /** tokenB raw units valued in tokenA raw units at a mid (raw B per 1e18 raw A). */
 export const bInA = (amountB: bigint, mid: bigint): bigint => (mid === 0n ? 0n : (amountB * ONE) / mid);
+
+/** What one fill moved the maker's two sides by, signed, in each token's own raw units. */
+export function fillDelta(fill: IndexedFill): { deltaA: bigint; deltaB: bigint } {
+  // Taker sold A: the maker took amountIn of A in and gave amountOut of B away. And the reverse.
+  return fill.isAToB
+    ? { deltaA: fill.amountIn, deltaB: -fill.amountOut }
+    : { deltaA: -fill.amountOut, deltaB: fill.amountIn };
+}
 
 /** What the maker took against `mid` on this fill, in tokenA raw units, signed. */
 export function edgeAgainst(fill: IndexedFill, mid: bigint): bigint {
@@ -94,16 +109,18 @@ export function legPnl(
   const edgeA = perFill.reduce((sum, f) => sum + (f.edgeA ?? 0n), 0n);
   const markoutA = perFill.every((f) => f.markoutA !== null) ? perFill.reduce((sum, f) => sum + (f.markoutA ?? 0n), 0n) : null;
 
-  const position = history.position;
   let caveat: string | null = null;
   if (mark === null) caveat = "no mark, so inventory cannot be valued";
-  else if (position === null) caveat = "the position could not be read, so its balances are unknown";
   else if (shipped.balanceB === null) caveat = "this generation's shipped B side was not recorded, so there is no opening value";
-  if (caveat !== null || mark === null || position === null) {
+  if (caveat !== null || mark === null) {
     return { fills, volumeA, edgeA, markoutA, tradingA: null, holdA: null, totalA: null, caveat, perFill };
   }
   const shippedB = shipped.balanceB as bigint;
-  const tradingA = position.balanceA - shipped.balanceA + bInA(position.balanceB - shippedB, mark);
+  // Summed over the fills, not taken from the balance: see the note at the top of this file.
+  const tradingA = history.fills.reduce((sum, fill) => {
+    const { deltaA, deltaB } = fillDelta(fill);
+    return sum + deltaA + bInA(deltaB, mark);
+  }, 0n);
   if (openingMark === null || openingMark === 0n) {
     return {
       fills,
