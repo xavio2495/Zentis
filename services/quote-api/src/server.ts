@@ -4,6 +4,7 @@ import { QuoteRefused, quoteLeg } from "./quote.js";
 import { absenceCaveat, explain } from "./reason.js";
 import { type Refusal, decodeRefusal } from "./refusal.js";
 import { fetchMark } from "./mark.js";
+import { fetchMarkHistory, historyConfig } from "./history.js";
 import { crowdingBps, fetchVenue } from "./crowding.js";
 
 interface LegQuote {
@@ -162,6 +163,15 @@ async function handleMark(): Promise<Response> {
   return json({ marks });
 }
 
+/**
+ * The one market series the book is priced and measured against, for the console's chart. Hourly
+ * over a week, in the registry's units, from the same subgraph and pool the volatility term uses.
+ */
+async function handleMarkHistory(): Promise<Response> {
+  const { subgraphUrl, pool, apiKey } = historyConfig();
+  return json(await fetchMarkHistory(subgraphUrl, pool, apiKey));
+}
+
 async function handleCrowding(url: URL): Promise<Response> {
   const first = Number(url.searchParams.get("first") ?? "20");
   const midRaw = url.searchParams.get("mid");
@@ -236,6 +246,7 @@ const server = Bun.serve({
     if (url.pathname === "/quote") return handleQuote(url);
     if (url.pathname === "/crowding") return handleCrowding(url);
     if (url.pathname === "/mark") return handleMark();
+    if (url.pathname === "/mark/history") return handleMarkHistory();
     if (url.pathname === "/health") return json({ ok: true, chains: CHAINS.map((c) => c.name) });
     return json({ error: "not found" }, 404);
   }
