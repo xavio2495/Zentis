@@ -39,3 +39,22 @@ test("how to arm the console is in the help overlay", async () => {
   const help = (await drive(120, 40, { keys: ["?"] })).lines.join("\n");
   expect(help).toContain("ZENTIS_ENV");
 });
+
+test("the hints name the pages and the command line, since a key nobody is told about is not a key", async () => {
+  // The pages and the colon arrived after the hint row was written, so the row went on listing the
+  // live view's keys alone: three pages and a command line that only the help page knew existed.
+  const hints = (await drive(190, 50, { armed: true })).lines.find((l) => /\br republish/.test(l))!;
+  expect(hints).toBeDefined();
+  for (const key of ["p", "n", "w", "m", ":"]) {
+    expect(hints).toContain(key);
+  }
+  expect(hints).toMatch(/pages|positions/);
+}, 60_000);
+
+test("the narrow hint row keeps every key, dropping only the words around them", async () => {
+  const hints = (await drive(80, 24, { armed: true })).lines.find((l) => /^│r /.test(l.slice(l.lastIndexOf("││") + 1)) || /r s f q/.test(l))!;
+  expect(hints).toBeDefined();
+  for (const key of ["r", "s", "f", "q", "p", "n", "w", "m", ":", "?", "x"]) {
+    expect(hints).toContain(key);
+  }
+}, 60_000);
