@@ -25,6 +25,28 @@
 
   --font-sans: var(--font-manrope), system-ui, sans-serif;
   --font-serif: var(--font-instrument-serif), Georgia, serif;
+  /* The console route's own surfaces. The landing needs none of these: it has no panels, no
+     rules and no disabled states. One @theme block rather than a second sheet — docs/console-mock.html
+     is what a second source of truth looks like six weeks on, off-brand on both base and accent. */
+  --color-panel: #121212;
+  --color-inset: #0e0e0e;
+  --color-line2: #2c2c2c;
+  --color-ink-dim: #4a4a4a;
+
+  /* Which side of the pair a number belongs to. Deliberately not derived from the accent: the
+     accent means "this is what Zentis computed" — the shift, the band edge, the trigger — and a leg
+     is a fact about the position, not an output of the model. These are the TUI's own leg colours,
+     so a reader crossing between the two surfaces keeps the mapping they already learned. */
+  --color-side-a: #4f8cff;
+  --color-side-b: #b48cff;
+
+  /* The two status hues. Severity is still brightness everywhere it is ranked; these two are a
+     binary health signal, which is the one place hue is the convention and was asked for by name. */
+  --color-warn: #ffd75f;
+  --color-bad: #ff5f5f;
+
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
 }
 
 /* One curve for every transition and keyframe on the page. */
@@ -281,4 +303,116 @@ body.ready .rise-4 {
   height: 18px;
   border: 0 solid var(--color-em);
   pointer-events: none;
+}
+
+/* ── the console route ──────────────────────────────────────────────────────
+   Below the landing's classes, and prefixed apart from them. Everything here is
+   the instrument surface: a masked grid, drawing-board corners, and numerals
+   that do not change width while the replay runs. */
+
+/* A grid that fades out before it reaches the frame, so it reads as paper and
+   never as a template. */
+.blueprint,
+.blueprint-fine {
+  background-image:
+    linear-gradient(to right, #ffffff0a 1px, transparent 1px),
+    linear-gradient(to bottom, #ffffff0a 1px, transparent 1px);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%);
+  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%);
+}
+
+.blueprint {
+  background-size: 48px 48px;
+}
+
+.blueprint-fine {
+  background-size: 24px 24px;
+  background-image:
+    linear-gradient(to right, #ffffff07 1px, transparent 1px),
+    linear-gradient(to bottom, #ffffff07 1px, transparent 1px);
+}
+
+/* Four characters of CSS that make a box read as an engineering drawing. */
+.tick-frame {
+  position: relative;
+}
+
+.tick-frame::before,
+.tick-frame::after {
+  position: absolute;
+  color: var(--color-ink-dim);
+  font-size: 10px;
+  line-height: 1;
+  content: "+";
+  pointer-events: none;
+}
+
+.tick-frame::before {
+  top: -4px;
+  left: -4px;
+}
+
+.tick-frame::after {
+  right: -4px;
+  bottom: -4px;
+}
+
+/* Tabular numerals, so no digit changes width as the playhead moves. A figure
+   that shifts by a pixel every tick is a figure nobody can read. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Square and quiet: a native scrollbar is usually what breaks the aesthetic. */
+.console-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.console-scroll::-webkit-scrollbar-track {
+  background: var(--color-inset);
+}
+
+.console-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line2);
+}
+
+/* The scrub. Built rather than themed, because the native thumb cannot be made
+   to look like part of an instrument. */
+.cb-range {
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.cb-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--color-inset);
+  border: 1px solid var(--color-stroke);
+}
+
+.cb-range::-webkit-slider-thumb {
+  width: 12px;
+  height: 18px;
+  margin-top: -8px;
+  background: var(--color-ink);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.cb-range::-moz-range-track {
+  height: 4px;
+  background: var(--color-inset);
+  border: 1px solid var(--color-stroke);
+}
+
+.cb-range::-moz-range-thumb {
+  width: 12px;
+  height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-ink);
 }
