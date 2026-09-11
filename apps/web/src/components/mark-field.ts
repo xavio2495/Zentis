@@ -10,6 +10,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { BAR, sampleMark } from "@/lib/mark-geometry";
+import { fieldState } from "@/lib/field-state";
 
 /**
  * The mark, built out of points and flown through.
@@ -63,14 +64,6 @@ void main() {
   gl_FragColor = vec4(vColor, a);
 }
 `;
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.min(hi, Math.max(lo, v));
-}
-
-function easeOut(t: number) {
-  return 1 - Math.pow(1 - t, 3);
-}
 
 /** Builds the field into `host`. Returns a teardown. */
 export function mountMarkField(host: HTMLElement): () => void {
@@ -181,32 +174,24 @@ export function mountMarkField(host: HTMLElement): () => void {
 
   const frame = (now: number) => {
     const time = (now - start) / 1000;
-    const viewport = innerHeight;
-    const scrolled = scrollY;
 
-    // One number: how far the reader is through hero plus traverse.
-    const traverse = clamp(scrolled / (viewport * 2.2), 0, 1);
-    const eased = easeOut(traverse);
+    // Where the mark stands, and how brightly, is computed apart from here so
+    // the rule that it never sits on the text can be held to by test.
+    const state = fieldState({
+      scrollY,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      docHeight: document.documentElement.scrollHeight,
+    });
 
-    // The field comes toward the reader and opens out of the wordmark.
-    group.position.z = -34 + 34 * eased;
-    group.scale.setScalar(0.22 + 0.78 * eased);
+    group.position.x = state.positionX;
+    group.position.z = state.positionZ;
+    group.scale.setScalar(state.scale);
+    group.rotation.y = state.rotationY + (reduced ? 0 : time * 0.06);
+    group.rotation.x = state.rotationX;
 
-    // Past the traverse it turns slowly, by scroll and, unless the reader asked
-    // otherwise, a little by itself.
-    const past = clamp((scrolled - viewport * 2.2) / (viewport * 0.8), 0, 1);
-    group.rotation.y = past * Math.PI * 0.9 + (reduced ? 0 : time * 0.06);
-    group.rotation.x = past * 0.2;
-
-    // Once there are words on screen the mark yields to them: it moves off the
-    // centre line on a wide viewport, and gives up most of its light either way.
-    group.position.x = (innerWidth < 768 ? 0 : 6.8) * past;
-    material.uniforms.uOpacity.value = (0.25 + 0.75 * eased) * (1 - 0.72 * past);
-
-    // The scatter, over the last screen of the document.
-    const docEnd = document.documentElement.scrollHeight - viewport;
-    const outro = clamp((scrolled - (docEnd - viewport * 1.1)) / (viewport * 1.1), 0, 1);
-    material.uniforms.uScatter.value = easeOut(outro);
+    material.uniforms.uOpacity.value = state.opacity;
+    material.uniforms.uScatter.value = state.scatter;
     material.uniforms.uTime.value = time;
 
     renderer.render(scene, camera);
