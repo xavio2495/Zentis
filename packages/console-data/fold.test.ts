@@ -6,6 +6,7 @@ const round = (timestamp: bigint, seq: number, tilts: [number, number][]): FeedR
   timestamp,
   seq,
   count: tilts.length,
+  spanSeconds: 0,
   legs: tilts.map(([chainId, tiltBps]) => ({ chainId, tiltBps, mid: 1n, transaction: "0x" })),
 });
 const fill: FeedRow = {

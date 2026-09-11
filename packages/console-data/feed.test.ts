@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { LEGS } from "./src/config.js";
-import { FEED_ROWS, type FeedRow, collapseFeed, mergeFeed, parseHistory } from "./src/fills.js";
+import { FEED_ROWS, type FeedRow, collapseFeed, foldRounds, mergeFeed, parseHistory } from "./src/fills.js";
 
 import historySepolia from "./fixtures/history-sepolia.json" with { type: "json" };
 import historyArbitrum from "./fixtures/history-arbitrum-sepolia.json" with { type: "json" };
@@ -50,8 +50,12 @@ test("a round is dated by its last leg to land, and says how long the writes too
   expect(round.spanSeconds).toBe(12);
 });
 
-test("the collapsed feed surfaces the fill and the refusals the raw one buried", () => {
-  const shown = rows(FEED_ROWS);
+test("the feed the operator sees surfaces the fill and the refusals the raw one buried", () => {
+  // Collapsing three writes into one round is not enough on its own: the workflow publishes every
+  // few minutes whether or not a shift moved, so after an hour of quiet the screen is thirteen
+  // identical rounds and the fill is off the bottom. What the operator sees is the folded feed,
+  // and that is what this asserts — the raw collapse is only half of the claim.
+  const shown = foldRounds(rows(200)).slice(0, FEED_ROWS);
   expect(shown.some((r) => r.kind === "fill")).toBe(true);
   expect(shown.some((r) => r.kind === "rejection")).toBe(true);
 });
@@ -70,11 +74,15 @@ test("the collapsed feed stays in time order, newest first", () => {
 });
 
 test("a round records what each leg's shift became, so a reference row says what changed", () => {
-  const newest = rows(40).find((r) => r.kind === "round")!;
+  const newest = rows(200).find((r) => r.kind === "round")!;
   for (const leg of newest.legs) {
     expect(typeof leg.tiltBps).toBe("number");
   }
-  expect(newest.legs.map((l) => l.tiltBps)).toContain(129);
+  // The publish at this seq is the last one before the legs were re-shipped on 2026-09-11, and it
+  // is the reason they were: each leg's correction had run past the 500-bps cap the orders then
+  // carried. A round has to carry the three different numbers, or the screen cannot show that.
+  const pinned = rows(200).filter((r) => r.kind === "round").find((r) => r.seq === 1789099204)!;
+  expect(pinned.legs.map((l) => l.tiltBps).sort((a, b) => a - b)).toEqual([-1626, 1842, 3022]);
 });
 
 test("a collapsed round says how many writes it folded in", () => {

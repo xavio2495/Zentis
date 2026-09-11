@@ -53,13 +53,33 @@ test("the shift splits into a correction and a concession that add back up to it
   }
 });
 
+/**
+ * The same book with one leg's boundary spent: its inventory skewed enough to want a concession,
+ * and a published boundary equal to its published shift, so the recovered room is exactly zero.
+ *
+ * Constructed rather than recorded. Whether any leg is in this state on the day the fixtures are
+ * taken is a fact about the testnet pools, not about the policy: the first recording had Base here
+ * and a later one, taken minutes after a re-ship, had all three legs evenly split with nothing
+ * capped. The edge is worth a test either way, so the test makes the edge.
+ */
+const boundarySpent = () =>
+  inputs.map((input) =>
+    input.leg.label === "Base Sepolia"
+      ? {
+          ...input,
+          history: {
+            ...input.history,
+            position: { ...input.history.position!, balanceA: (input.history.position!.balanceA * 14n) / 10n },
+          },
+          ref: { ...input.ref, tiltBps: -300, bandEdgeBps: 300 },
+        }
+      : input,
+  );
+
 test("a leg whose boundary equals its shift has no room left, so it concedes nothing", () => {
-  const book = decomposeBook(inputs, ASSUMED_GAINS, BOOK.maxTiltBps);
+  const book = decomposeBook(boundarySpent(), ASSUMED_GAINS, BOOK.maxTiltBps);
   const base = book.legs.find((l) => l.label === "Base Sepolia")!;
 
-  // Base's pool moved after the leg was shipped, so its correction ran the boundary out: room is
-  // zero and the whole published shift is correction. This is the case that makes the split worth
-  // drawing — a shift of this size that is all correction means something else entirely.
   expect(base.roomBps).toBe(0n);
   expect(base.concession).toBe(0n);
   expect(base.correction).toBe(base.tiltBps);
@@ -111,8 +131,11 @@ test("a leg whose shift sits at the signed cap reports its room as unknown, not 
   expect(book.legs[0]!.roomBps).toBe(0n);
   expect(book.legs[0]!.roomUnknownAtCap).toBe(true);
 
-  // Base's zero is real: its boundary is below the cap, so the zero is a budget and not an artefact.
-  const base = book.legs.find((l) => l.label === "Base Sepolia")!;
+  // A zero that is real: the boundary sits below the cap and equals the shift, so the zero is a
+  // budget the enclave set and not an artefact of the clamp. That distinction is the point of the
+  // test, and it needs a leg in each state at once.
+  const spent = decomposeBook(boundarySpent(), ASSUMED_GAINS, BOOK.maxTiltBps);
+  const base = spent.legs.find((l) => l.label === "Base Sepolia")!;
   expect(base.roomBps).toBe(0n);
   expect(base.roomUnknownAtCap).toBe(false);
 });

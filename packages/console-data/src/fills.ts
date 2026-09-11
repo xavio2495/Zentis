@@ -211,12 +211,19 @@ export const mergeFeed = (histories: LegHistory[], limit: number): FeedEvent[] =
  *
  * Left raw, the feed spends itself restating the header: three chains times a write a minute buries
  * the fill and the refusals, which are the only rows on this screen that record something changing.
- * A run of references sharing a seq therefore collapses into a single round carrying what each leg's
- * shift became — which is also the shape the demo's beat wants, since the point of the beat is that
- * one publish moved three legs and no transaction touched two of them.
+ * References sharing a seq therefore collapse into a single round carrying what each leg's shift
+ * became — which is also the shape the demo's beat wants, since the point of the beat is that one
+ * publish moved three legs and no transaction touched two of them.
  *
- * Fills and refusals never collapse. Time order is preserved throughout, so the beat still reads in
- * the order it happened.
+ * The fold is by seq across the whole window rather than by consecutive run. One seq is one
+ * decision by construction: the enclave computes a single report and every leg's write carries its
+ * number. The legs' writes land seconds apart, and anything landing in between — a fill, a refusal —
+ * used to break the run and split one publish into two rows, one claiming a single leg and one
+ * claiming two. On a console whose claim is one mid and one book, that is the worst available lie.
+ * A round is dated by the last leg to land and carries the span, so a reader can see that the
+ * writes are not atomic instead of inferring it from rows that disagree.
+ *
+ * Fills and refusals never collapse, and keep their own place in time.
  */
 export interface FeedRound {
   readonly kind: 'round'
@@ -224,6 +231,8 @@ export interface FeedRound {
   readonly seq: number
   /** how many writes were folded in: one per leg that published this seq */
   readonly count: number
+  /** seconds between the first and last leg's write; zero when they landed in the same second */
+  readonly spanSeconds: number
   readonly legs: { chainId: number; tiltBps: number; mid: bigint; transaction: string }[]
 }
 
@@ -236,27 +245,45 @@ export type FeedRow = IndexedFill | IndexedRejection | FeedRound
 export const FEED_ROWS = 13
 
 export function collapseFeed(events: FeedEvent[], limit: number): FeedRow[] {
-	const rows: FeedRow[] = []
-	for (let i = 0; i < events.length && rows.length < limit; ) {
-		const event = events[i]!
-		if (event.kind !== 'reference') {
-			rows.push(event)
-			i += 1
-			continue
-		}
-		// A run ends at the first event that is not a reference, or at a change of seq: two seqs in
-		// one row would claim the legs published together when they did not.
-		const legs: FeedRound['legs'] = []
-		const seq = event.seq
-		while (i < events.length) {
-			const next = events[i]!
-			if (next.kind !== 'reference' || next.seq !== seq) break
-			legs.push({ chainId: next.chainId, tiltBps: next.tiltBps, mid: next.mid, transaction: next.transaction })
-			i += 1
-		}
-		rows.push({ kind: 'round', timestamp: event.timestamp, seq, count: legs.length, legs })
-	}
-	return rows
+  // One pass to gather every leg that published each seq, wherever in the window its write landed.
+  const rounds = new Map<number, { newest: bigint; oldest: bigint; legs: FeedRound['legs'] }>()
+  for (const event of events) {
+    if (event.kind !== 'reference') continue
+    const leg = { chainId: event.chainId, tiltBps: event.tiltBps, mid: event.mid, transaction: event.transaction }
+    const round = rounds.get(event.seq)
+    if (round === undefined) {
+      rounds.set(event.seq, { newest: event.timestamp, oldest: event.timestamp, legs: [leg] })
+      continue
+    }
+    round.legs.push(leg)
+    if (event.timestamp > round.newest) round.newest = event.timestamp
+    if (event.timestamp < round.oldest) round.oldest = event.timestamp
+  }
+
+  const rows: FeedRow[] = []
+  const emitted = new Set<number>()
+  for (const event of events) {
+    if (rows.length >= limit) break
+    if (event.kind !== 'reference') {
+      rows.push(event)
+      continue
+    }
+    // The round takes the place of its newest write, so it sorts where the publish finished and is
+    // emitted exactly once however far apart its legs landed.
+    if (emitted.has(event.seq)) continue
+    const round = rounds.get(event.seq)
+    if (round === undefined || event.timestamp !== round.newest) continue
+    emitted.add(event.seq)
+    rows.push({
+      kind: 'round',
+      timestamp: round.newest,
+      seq: event.seq,
+      count: round.legs.length,
+      spanSeconds: Number(round.newest - round.oldest),
+      legs: round.legs,
+    })
+  }
+  return rows
 }
 
 /**
