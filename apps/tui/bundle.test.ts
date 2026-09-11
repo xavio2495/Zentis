@@ -46,7 +46,7 @@ test("the node bundle runs the console under node and draws its first frame", ()
     timeout: 30_000,
   });
   const screen = new TextDecoder().decode(run.stdout);
-  expect(screen).toContain("reading three chains");
+  expect(screen).toContain("reading the chains");
   expect(screen).not.toContain("Raw mode is not supported");
   expect(run.exitCode).toBe(0);
 }, 90_000);

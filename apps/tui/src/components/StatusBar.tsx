@@ -31,14 +31,13 @@ export function bookState(snapshot: Snapshot, armed: boolean): BookState {
     const why = unread[0]!.sources.fills!;
     // Also offered short, because the mode — armed or watch-only — has to survive beside it. A
     // console that stops saying whether it can sign is a console someone may assume can.
-    const brief = why.replace(/^subgraph HTTP /, "");
+    // Short, because the reason is on that source's own line two rows below: this row says what
+    // state the book is in, not what an endpoint replied.
     return {
       tone: UI.rejection,
       variants: [
-        `fills subgraph unavailable (${why}) — showing what it last read`,
-        `fills subgraph unavailable (${why})`,
-        `fills unavailable (${brief})`,
-        `fills unavailable`,
+        `every leg unread — showing what was last read`,
+        `every leg unread`,
       ],
     };
   }

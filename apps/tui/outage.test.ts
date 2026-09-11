@@ -51,7 +51,9 @@ test("the status bar leads with the outage when every fills read failed", () => 
 
   const state = bookState(snapshot, false);
   // Not "legs are on different references": they are not on different references, they are unread,
-  // and saying the book has come apart when it has not is the worse of the two errors.
-  expect(state.variants[0]).toContain("429");
+  // and saying the book has come apart when it has not is the worse of the two errors. What the
+  // endpoint actually replied is on its own status line now, so this row says the state and not the
+  // reply.
+  expect(state.variants[0]).toContain("unread");
   expect(state.variants[0]).not.toContain("different references");
 });

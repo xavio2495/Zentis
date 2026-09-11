@@ -29,7 +29,7 @@ test("the compiled binary renders Ink and reads raw-mode input", () => {
     const run = runBinary(binary, { keys: "" });
     const screen = run.screen;
 
-    expect(screen).toContain("reading three chains"); // the app's own first frame
+    expect(screen).toMatch(/reading the chains/); // the app's own first frame, a spinner and a label
     expect(screen).toContain("[?25l"); // the cursor was hidden, i.e. Ink took the terminal
     expect(screen).not.toContain("Raw mode is not supported"); // stdin arrived as a tty
     expect(screen).toContain("38;2;"); // 24-bit colour survives the compile, given a terminal for it

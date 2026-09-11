@@ -41,8 +41,11 @@ test("the sparkline is a few rows at the bottom, not most of the card", async ()
 
 test("an unread card says what was unread and what was not, once", async () => {
   const card = cardOf((await drive(120, 40, { scenario: "outage" })).lines, "1 Sepolia").join("\n");
-  expect(card).toContain("position unread");
+  // A spinner and the source it is waiting on; what that source replied is one line in the panel
+  // above, said once for the whole book rather than three times down the cards.
+  expect(card).toMatch(/waiting on fills|position unread/);
   expect((card.match(/could not be read/g) ?? []).length).toBeLessThanOrEqual(1);
+  expect(card).not.toContain("429");
 });
 
 test("the card is titled with the same name the detail uses", async () => {

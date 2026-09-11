@@ -5,6 +5,7 @@ import { chooseFit, duration, pairPrice, priceFigure } from "../format.js";
 import { quoted } from "../quoted.js";
 import { trunc } from "../layout.js";
 import { UI, legColour } from "../theme.js";
+import { spinnerAt } from "../spinner.js";
 
 /**
  * The one market the book prices from, with the beat ticked against it.
@@ -36,14 +37,13 @@ export function Graphs({
   const tokenA = leg.config.tokenA;
   const tokenB = leg.config.tokenB;
 
-  // A blank chart asserts the market did not move, and nothing read says that.
+  // A blank chart asserts the market did not move, and nothing read says that. What it shows instead
+  // is a spinner and the name of the source: whether that source is slow or refusing, and why, is one
+  // line in the panel above rather than a paragraph in the middle of an empty chart.
   if (market === null) {
-    const why = snapshot.caveats.find((c) => c.startsWith("the market series")) ?? null;
     return (
       <Box flexDirection="column" width={width} height={height} overflow="hidden">
-        <Text color={UI.caveat}>
-          {trunc(why ?? "the market series is unavailable, so there is no price history to draw", width)}
-        </Text>
+        <Text color={UI.muted}>{trunc(`${spinnerAt(Date.now())} waiting on the market series`, width)}</Text>
       </Box>
     );
   }

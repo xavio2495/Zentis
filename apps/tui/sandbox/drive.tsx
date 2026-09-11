@@ -63,8 +63,11 @@ export async function drive(
 
   // The store answers a fixed snapshot: the app under test is the real one, and only the world
   // behind it is fake. A sandbox that needed the app written differently would test a different app.
-  const { fixedStore } = await import("./state.js");
-  const makeStore = fixedStore(fakeSnapshot(options.scenario ?? "fresh"));
+  const { fixedStore, loadingStore } = await import("./state.js");
+  // "loading" is the one scenario with no snapshot at all: the first frame, before any source has
+  // answered, which is the state the console opens in every time it is started.
+  const makeStore =
+    options.scenario === "loading" ? loadingStore() : fixedStore(fakeSnapshot(options.scenario ?? "fresh"));
 
   const actions: Action[] =
     // Watch-only the way the real binary is when run from the repo: a repository, no signing key.

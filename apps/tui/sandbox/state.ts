@@ -24,3 +24,17 @@ export const fixedStore = (snapshot: Snapshot) => {
   };
   return () => store;
 };
+
+/** A store that is still waiting for its first poll, which is what the console opens on. */
+export const loadingStore = () => {
+  const state = { snapshot: null, loading: true, error: null, lastPollSeconds: null };
+  const store: Store = {
+    getState: () => state,
+    subscribe: () => () => undefined,
+    refresh: async () => undefined,
+    setMarketHours: () => undefined,
+    start: () => undefined,
+    stop: () => undefined,
+  };
+  return () => store;
+};

@@ -30,7 +30,8 @@ export type Scenario =
   | "partial"
   | "refused"
   | "pinned"
-  | "long";
+  | "long"
+  | "loading";
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;

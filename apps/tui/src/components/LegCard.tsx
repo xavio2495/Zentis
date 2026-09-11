@@ -5,6 +5,7 @@ import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weig
 import { plot } from "../chart.js";
 import { quoted } from "../quoted.js";
 import { Panel, panelInner } from "./Panel.js";
+import { spinnerAt } from "../spinner.js";
 import { type Seg, fitSegments, fitTogether, padRows, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { STATE, TERM, UI, legColour } from "../theme.js";
@@ -139,13 +140,8 @@ export function LegCard({
     // only said "could not be read" above a working price line contradicted itself.
     rows.push(
       <Text color={UI.caveat}>
-        {chooseFit(
-          [
-            `position unread (${leg.sources.fills.replace(/^subgraph /, "")})`,
-            "position unread",
-          ],
-          inner,
-        )}
+        {/* The source, not its excuse: what the endpoint said is one line in the panel above. */}
+        {chooseFit([`${spinnerAt(Date.now())} waiting on fills`, "position unread"], inner)}
       </Text>,
     );
     if (leg.series !== null) rows.push(<Text color={UI.muted}>{trunc("pool price from RPC", inner)}</Text>);

@@ -32,3 +32,18 @@ test("a chart with no series shows the spinner and the source, not the endpoint'
   // The market panel names what it is waiting on; the reason is on that source's own status line.
   expect(text).toMatch(/market series/);
 }, 60_000);
+
+test("an unread leg's card names the source it is waiting on, not the endpoint's message", async () => {
+  // "position unread (HTTP 429, resets 21:52Z)" put an endpoint's excuse inside a card. The card
+  // says which source has not answered; the panel above says what that source said.
+  const text = (await drive(120, 40, { scenario: "partial" })).lines.join("\n");
+  expect(text).not.toMatch(/position unread \(/);
+  expect(text).toMatch(/waiting on fills|position unread/);
+}, 60_000);
+
+test("the state line says a source is down without repeating what it said", async () => {
+  const text = (await drive(190, 50, { scenario: "outage" })).lines.join("\n");
+  expect(text).not.toContain("showing what it last read");
+  // Once, on the source's own line.
+  expect((text.match(/429/g) ?? []).length).toBeLessThanOrEqual(4);
+}, 60_000);

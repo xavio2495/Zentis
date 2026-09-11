@@ -20,6 +20,7 @@ import { chooseFit, pairPrice, tokenAmount } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
 import { type Command, parseCommand } from "./command.js";
 import { resolve } from "./keymap.js";
+import { spinnerAt } from "./spinner.js";
 import { LEG_ORDER, UI, legColour } from "./theme.js";
 import { WINDOWS, autoWindow } from "./window.js";
 
@@ -389,10 +390,12 @@ export function App({
   const regions = fit(size.cols, size.rows);
 
   if (snapshot === null) {
+    // A spinner and what it is waiting on. The sentence that used to be here listed every source the
+    // console reads, which is the status panel's job the moment there is one.
     return (
       <Box width={regions.legsWidth + regions.rightWidth} height={regions.draw} overflow="hidden">
-        <Text color={UI.muted}>
-          {state.error ?? "reading three chains, three subgraphs and the quote service…"}
+        <Text color={state.error === null ? UI.muted : UI.caveat}>
+          {state.error === null ? `${spinnerAt(Date.now())} reading the chains and the services` : state.error}
         </Text>
       </Box>
     );
