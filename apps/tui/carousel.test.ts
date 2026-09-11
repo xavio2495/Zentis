@@ -15,13 +15,16 @@ test("the chart is the book's one market, so there is nothing left to rotate bet
   }
 });
 
-test("the arrow keys step which leg the numbers and the detail act on, both ways", async () => {
-  // The chart no longer moves with them; what they choose is the leg, and the detail is where that
-  // choice becomes visible.
-  const detailTitle = (frame: string) => frame.split("\n").find((line) => line.includes("esc to close")) ?? "";
-  expect(detailTitle(await text(["RIGHT", "ENTER"]))).toContain("Base Sepolia");
-  expect(detailTitle(await text(["RIGHT", "RIGHT", "ENTER"]))).toContain("Arbitrum Sepolia");
-  expect(detailTitle(await text(["LEFT", "ENTER"]))).toContain("Arbitrum Sepolia");
+test("the arrow keys move the chart through its views, both ways", async () => {
+  // They drive the chart now: the book's market, then each leg's own published shift. The numbers
+  // own the detail, and one keystroke does one thing.
+  const titleOf = (frame: string) => frame.split("\n").find((line) => /┌ (market|\w+ shift|Sepolia|Base|Arbitrum)/.test(line.slice(38))) ?? "";
+  expect(await text([])).toMatch(/┌ market/);
+  expect(await text(["RIGHT"])).toMatch(/Sepolia shift/);
+  expect(await text(["RIGHT", "RIGHT"])).toMatch(/Base Sepolia shift/);
+  // Left from the first view wraps to the last rather than stopping.
+  expect(await text(["LEFT"])).toMatch(/Arbitrum Sepolia shift/);
+  expect(titleOf(await text([]))).not.toBe("");
 });
 
 test("a leg's number opens its detail where the chart was, and the same number closes it", async () => {

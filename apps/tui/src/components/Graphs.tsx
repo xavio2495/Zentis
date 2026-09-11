@@ -1,11 +1,12 @@
 import { Box, Text } from "ink";
 import { BACKFILLING, type LegSnapshot, type Snapshot, invertMid } from "@zentis/console-data";
 import { axisMarks, plot } from "../chart.js";
-import { chooseFit, duration, pairPrice, priceFigure } from "../format.js";
+import { chooseFit, duration, pairPrice, priceFigure, signed } from "../format.js";
 import { quoted } from "../quoted.js";
 import { trunc } from "../layout.js";
 import { UI, legColour } from "../theme.js";
 import { spinnerAt } from "../spinner.js";
+import { plotSigned, shiftSeries } from "../shift-line.js";
 
 /**
  * The one market the book prices from, with the beat ticked against it.
@@ -22,17 +23,21 @@ import { spinnerAt } from "../spinner.js";
 export function Graphs({
   snapshot,
   leg,
+  shift = false,
   width,
   height,
   windowSeconds,
 }: {
   snapshot: Snapshot;
-  /** the leg whose fills are marked; the line itself belongs to the whole book */
+  /** the leg whose fills are marked; the market line itself belongs to the whole book */
   leg: LegSnapshot;
+  /** draw this leg's published shift instead of the market: a signed line, on its own scale */
+  shift?: boolean;
   width: number;
   height: number;
   windowSeconds: bigint;
 }) {
+  if (shift) return <ShiftChart snapshot={snapshot} leg={leg} width={width} height={height} />;
   const market = snapshot.market;
   const tokenA = leg.config.tokenA;
   const tokenB = leg.config.tokenB;
@@ -118,4 +123,56 @@ export function marketPrice(snapshot: Snapshot): string | null {
   const leg = snapshot.legs[0];
   if (newest === null || leg === undefined) return null;
   return pairPrice(newest.mid, leg.config.tokenA, leg.config.tokenB);
+}
+
+/**
+ * One leg's published shift, over whatever the feed holds.
+ *
+ * Drawn on its own linear scale because a shift is signed, and labelled in basis points at both ends
+ * so nobody reads it as a price. The market's line and this one never share an axis: they are not
+ * the same quantity and a shared scale would flatten whichever moved less.
+ */
+function ShiftChart({
+  snapshot,
+  leg,
+  width,
+  height,
+}: {
+  snapshot: Snapshot;
+  leg: LegSnapshot;
+  width: number;
+  height: number;
+}) {
+  const points = shiftSeries(snapshot, leg.config.chainId);
+  if (points.length < 2) {
+    return (
+      <Box flexDirection="column" width={width} height={height} overflow="hidden">
+        <Text color={UI.muted}>{trunc(`${spinnerAt(Date.now())} waiting for publishes on ${leg.config.label}`, width)}</Text>
+      </Box>
+    );
+  }
+
+  const top = `${signed(points.reduce((max, p) => Math.max(max, p.bps), points[0]!.bps))} bps`;
+  const bottom = `${signed(points.reduce((min, p) => Math.min(min, p.bps), points[0]!.bps))} bps`;
+  const gutter = Math.max(top.length, bottom.length) + 1;
+  const plotWidth = Math.max(1, width - gutter);
+  const drawn = plotSigned(points, plotWidth, Math.max(1, height - 1));
+  const over = duration(Number(points[points.length - 1]!.timestamp - points[0]!.timestamp));
+
+  return (
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+      {drawn.rows.map((row, i) => (
+        <Box key={i} height={1}>
+          <Text color={UI.muted}>
+            {(i === 0 ? top : i === drawn.rows.length - 1 ? bottom : "").padStart(gutter - 1).padEnd(gutter)}
+          </Text>
+          <Text color={legColour(leg.config.chainId)}>{row}</Text>
+        </Box>
+      ))}
+      <Box height={1}>
+        <Text color={UI.muted}>{" ".repeat(gutter)}</Text>
+        <Text color={UI.muted}>{trunc(`${over} of publishes    ${points.length} of them`, plotWidth)}</Text>
+      </Box>
+    </Box>
+  );
 }

@@ -32,7 +32,7 @@ import { WalletPage } from "./pages/WalletPage.js";
 import { StatusBar, hints } from "./components/StatusBar.js";
 import { Segments } from "./components/Segments.js";
 import { type Pending, landed } from "./landed.js";
-import { chooseFit, pairPrice, tokenAmount } from "./format.js";
+import { chooseFit, pairPrice, signed, tokenAmount } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
 import { type Command, parseCommand } from "./command.js";
 import { resolve } from "./keymap.js";
@@ -513,11 +513,10 @@ export function App({
         setWindowChoice((current) => (current === null ? 0 : current + 1 >= WINDOWS.length ? null : current + 1));
         return;
       case "step": {
-        // The chart is the book's one market now, so the arrows choose the leg rather than turning a
-        // carousel: which card is picked out, which leg `enter` opens, and which one the numbers land
-        // on. A detail already open follows the choice, so stepping reads as moving along the book.
-        const count = Math.max(1, snapshot?.legs.length ?? 1);
-        setLegIndex((current) => (current + (key.leftArrow ? count - 1 : 1)) % count);
+        // The arrows drive the chart. They used to select a leg that nothing on the chart followed,
+        // which left the largest region on the screen with no control of its own but its window.
+        // The numbers own the detail; these own what the market section is showing.
+        const count = 1 + (snapshot?.legs.length ?? 0);
         setShown((current) => (current + (key.leftArrow ? count - 1 : 1)) % count);
         setStepped((n) => n + 1);
         return;
@@ -529,7 +528,8 @@ export function App({
       case "leg": {
         const picked = Number(input) - 1;
         setLegIndex(picked);
-        setShown(picked);
+        // The chart is not touched: the arrows own what it shows, and a number opening a detail
+        // used to drag the chart onto that leg as well, which is two things for one keystroke.
         // Pressing a leg's number twice returns to the rotation, so the same key that opened a
         // detail closes it and `esc` is a convenience rather than the only way out.
         setOverlay((current) => (current === "leg" && legIndex === picked ? "none" : "leg"));
@@ -597,7 +597,12 @@ export function App({
   ).filter((leg): leg is NonNullable<typeof leg> => leg !== undefined);
   const selected = ordered[Math.min(legIndex, ordered.length - 1)];
 
-  const rotating = ordered[shown % Math.max(1, ordered.length)] ?? ordered[0];
+  // What the chart is showing: view 0 is the book's market, and each one after it is a leg's own
+  // published shift, in the cards' order.
+  const views = 1 + ordered.length;
+  const view = ((shown % views) + views) % views;
+  const shiftLeg = view === 0 ? null : (ordered[view - 1] ?? null);
+  const rotating = shiftLeg ?? ordered[0];
   const lastFillAt = (chainId: number): number | null => {
     const fills = snapshot.feed.filter((row) => row.kind === "fill" && row.chainId === chainId);
     return fills.length === 0 ? null : Math.max(...fills.map((row) => Number(row.timestamp)));
@@ -625,6 +630,7 @@ export function App({
           <LegCard
             key={leg.config.chainId}
             leg={leg}
+            snapshot={snapshot}
             index={i}
             width={regions.legsWidth}
             height={regions.cardHeights[i] ?? 0}
@@ -712,6 +718,17 @@ export function App({
               // from and the volatility half of the spread — but never at the cost of the window
               // label, which is the one thing on this border a key changes.
               title={(() => {
+                if (shiftLeg !== null) {
+                  const now = shiftLeg.shift?.tiltBps ?? shiftLeg.ref?.tiltBps ?? null;
+                  return chooseFit(
+                    [
+                      `${shiftLeg.config.label} shift${now === null ? "" : ` · ${signed(now)} bps now`} · ←→`,
+                      `${shiftLeg.config.label} shift · ←→`,
+                      `${shiftLeg.config.label} shift`,
+                    ],
+                    Math.max(0, regions.rightWidth - marketWindowLabel.length - 8),
+                  );
+                }
                 const price = marketPrice(snapshot);
                 const source = snapshot.market?.source ?? null;
                 const lead = `market${price === null ? "" : ` · ${price}`}`;
@@ -722,13 +739,14 @@ export function App({
                   Math.max(0, regions.rightWidth - marketWindowLabel.length - 8),
                 );
               })()}
-              right={marketWindowLabel}
+              right={shiftLeg === null ? marketWindowLabel : "←→ view"}
               width={regions.rightWidth}
               height={regions.graphRows}
-              colour={UI.reference}
+              colour={shiftLeg === null ? UI.reference : legColour(shiftLeg.config.chainId)}
             >
               <Graphs
                 leg={rotating}
+                shift={shiftLeg !== null}
                 snapshot={snapshot}
                 {...graphInner}
                 windowSeconds={BigInt(marketWindow.seconds)}

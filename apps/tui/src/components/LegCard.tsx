@@ -1,8 +1,9 @@
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { BACKFILLING, BOOK, type LegSnapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
+import { BACKFILLING, BOOK, type LegSnapshot, type Snapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
 import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weightBar } from "../format.js";
 import { plot } from "../chart.js";
+import { plotSigned, shiftSeries } from "../shift-line.js";
 import { quoted } from "../quoted.js";
 import { Panel, panelInner } from "./Panel.js";
 import { spinnerAt } from "../spinner.js";
@@ -112,6 +113,7 @@ function sideVariants(leg: LegSnapshot, isAToB: boolean): Seg[][] | null {
 
 export function LegCard({
   leg,
+  snapshot,
   index,
   width,
   height,
@@ -119,6 +121,8 @@ export function LegCard({
   windowSeconds,
 }: {
   leg: LegSnapshot;
+  /** the whole snapshot, because a leg's shift history lives in the feed rather than on the leg */
+  snapshot: Snapshot;
   index: number;
   width: number;
   height: number;
@@ -287,10 +291,31 @@ export function LegCard({
     );
   }
 
-  // No venue price and no venue sparkline here. The book quotes from one mainnet mark, and a card
-  // reading "venue 1 WETH = 28,430 USDC" beside a market of 2,372 reads as a broken screen rather
-  // than as two different prices for two different purposes. The venue's address and the age of its
-  // last swap are in the leg's detail, where there is room to say what they are.
+  // The leg's own line: the shift it has been published at, over whatever the feed holds.
+  //
+  // Not a price. The book quotes from one mainnet mark, so a price line here would be the same line
+  // on all three cards; and the venue prices these cards used to draw were testnet pools an order of
+  // magnitude from the market, two of which have since been retired outright. The shift is the
+  // number the rest of the card is about, and it is the one thing that differs between the three.
+  const shifts = shiftSeries(snapshot, leg.config.chainId);
+  const lineRows = Math.min(4, innerRows - rows.length - 1);
+  if (shifts.length > 1 && lineRows >= 2) {
+    const drawn = plotSigned(shifts, inner, lineRows);
+    for (const [i, row] of drawn.rows.entries()) rows.push(<Text key={`spark${i}`} color={colour}>{row}</Text>);
+    const over = duration(Number(shifts[shifts.length - 1]!.timestamp - shifts[0]!.timestamp));
+    rows.push(
+      <Text color={UI.muted}>
+        {chooseFit(
+          [
+            `shift ${signed(drawn.low)} to ${signed(drawn.high)} over ${over}`,
+            `shift ${signed(drawn.low)} to ${signed(drawn.high)}`,
+            `${signed(drawn.low)} to ${signed(drawn.high)}`,
+          ],
+          inner,
+        )}
+      </Text>,
+    );
+  }
 
   return (
     <Panel
