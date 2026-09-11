@@ -34,6 +34,18 @@ export interface LegConfig {
   readonly rpcUrl: string;
   /** the slow workflow's per-leg override, or the book-wide default when it has none */
   readonly volatilityMultiplierBps: number;
+  /** what this generation was shipped with, from the deployment record; the base of every PnL */
+  readonly shipped: ShippedRecord;
+}
+
+export interface ShippedRecord {
+  readonly balanceA: bigint;
+  /** null on generations recorded before the B side was written down */
+  readonly balanceB: bigint | null;
+  /** the reference mid the ship was sized to, null when the record has only the seq */
+  readonly mid: bigint | null;
+  readonly seq: number | null;
+  readonly block: number | null;
 }
 
 export interface TokenConfig {
@@ -125,6 +137,13 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     fillsSubgraphUrl: slow.fillsSubgraphUrl,
     referencePoolSubgraphUrl: slow.referencePoolSubgraphUrl,
     rpcUrl: rpcUrl(deployment.name),
+shipped: {
+  balanceA: BigInt(deployment.position.shippedBalanceA),
+  balanceB: deployment.position.shippedBalanceB == null ? null : BigInt(deployment.position.shippedBalanceB),
+  mid: deployment.position.shippedAgainstRef?.mid == null ? null : BigInt(deployment.position.shippedAgainstRef.mid),
+  seq: deployment.position.shippedAgainstRef?.seq ?? null,
+  block: deployment.position.shipBlock ?? null,
+},
     volatilityMultiplierBps: slow.volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
   };
 });
