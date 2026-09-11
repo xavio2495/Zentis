@@ -338,3 +338,11 @@ test("without a project the repository still works, and without either the reaso
   expect(neither.command).toBeNull();
   expect(neither.disabledReason).toContain("ZENTIS_GCP_PROJECT");
 });
+
+test("the log filter quotes its term, because an unquoted = is a syntax error to gcloud", () => {
+  // Run live: `textPayload:rc=` was rejected with "Unparseable filter: syntax error … token '='".
+  // The term has to be quoted inside the filter, which means escaped inside the shell string.
+  const script = buildActions(null, null, "zentis-cg1-2026").find((a) => a.key === "r")!.command!.cmd.join(" ");
+  expect(script).toContain('textPayload:\\"rc=\\"');
+  expect(script).not.toMatch(/textPayload:rc=[^"]/);
+});
