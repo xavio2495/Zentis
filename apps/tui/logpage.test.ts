@@ -42,7 +42,10 @@ test("the key is offered where every other key is, so nobody has to find it in t
 test("a quote is an action, so the log has it with nothing in the transaction column", async () => {
   // Read-only actions belong in the log too: what the console was asked is the left column's
   // subject, and a quote that answered is as much a thing done as a fill that broadcast.
-  const frame = await drive(120, 40, { keys: [":", "q", "u", "o", "t", "e", " ", "s", "e", "p", " ", "0", ".", "1", "ENTER", "l"] });
+  // `esc` closes the command row first: while it is open it has the keyboard, so `l` typed there is
+  // a letter of a command and not a key.
+  const typed = [":", "q", "u", "o", "t", "e", " ", "s", "e", "p", " ", "0", ".", "1", "ENTER", "ESC", "l"];
+  const frame = await drive(120, 40, { keys: typed });
   const text = frame.lines.join("\n");
   expect(text).toContain("┌ log");
   expect(text).toMatch(/quote/);

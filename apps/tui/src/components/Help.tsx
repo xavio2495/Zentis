@@ -58,6 +58,11 @@ const PAGES: [string, string][] = [
       "is ahead and not what either is worth. Mean and worst are basis points of the opening book.",
   ],
   [
+    "log",
+    "What this console did, where the feed usually is: what was asked for, and what went on chain " +
+      "because of it. The feed is the book's side of the same story, and `l` swaps between them.",
+  ],
+  [
     "status",
     "Every source the console reads: whether it is answering, serving its last good value or down, " +
       "what it last said, how often it is asked, and what is left of its allowance.",

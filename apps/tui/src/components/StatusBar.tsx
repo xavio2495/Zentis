@@ -128,8 +128,8 @@ export function hints(actions: Action[], width: number): Seg[] {
   // The pages and the command line are keys like any other, and a key a reader is never told about
   // may as well not exist: the help page had them, the row a reader actually looks at did not. What
   // gives way as the row narrows is the words, never the keys themselves.
-  const pagesFull: Seg = { text: " · p positions · n pnl · w wallet · m sim · d status · : command", color: UI.muted };
-  const pagesShort: Seg = { text: " · p pos · n pnl · w wal · m sim · d status · : cmd", color: UI.muted };
+  const pagesFull: Seg = { text: " · p positions · n pnl · w wallet · m sim · d status · l log · : command", color: UI.muted };
+  const pagesShort: Seg = { text: " · p pos · n pnl · w wal · m sim · d status · l log · : cmd", color: UI.muted };
   const navFull: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
   const navShort: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
   // Titled to the last: a key without a word beside it is a key nobody presses on purpose.
@@ -137,8 +137,15 @@ export function hints(actions: Action[], width: number): Seg[] {
   const navTiny: Seg = { text: " · ? x", color: UI.muted };
   // The page words without the dots between them: two characters short of fitting at a hundred and
   // twenty columns, and the words are what the row is for.
-  const pagesTight: Seg = { text: " · p pos n pnl w wal m sim d status : cmd", color: UI.muted };
-  const bare: Seg = { text: " p n w m d : ←→ enter t ? x", color: UI.muted };
+  const pagesTight: Seg = { text: " · p pos n pnl w wal m sim d status l log : cmd", color: UI.muted };
+  // One rung tighter again, which is what the log's own key cost the row: "stat" for "status" is the
+  // one word here a reader can still finish, and every key keeps a word beside it.
+  const pagesTighter: Seg = { text: " · p pos n pnl w wal m sim d stat l log : cmd", color: UI.muted };
+  // And tighter once more, giving up the dot that separates the pages from the keys before it: two
+  // characters, which at a hundred and twenty columns is the difference between a row of words and a
+  // row of letters.
+  const pagesNarrow: Seg = { text: " p pos n pnl w wal m sim d stat l log : cmd", color: UI.muted };
+  const bare: Seg = { text: " p n w m d l : ←→ enter t ? x", color: UI.muted };
 
   return fitSegments(
     [
@@ -151,7 +158,10 @@ export function hints(actions: Action[], width: number): Seg[] {
       // and a console nobody can leave is worse than one whose pages are unlabelled.
       [...keys("short"), pagesShort, navTiny],
       [...keys("short"), pagesTight, navTiny],
+      [...keys("short"), pagesTighter, navTiny],
       [...keys("short"), pagesTight],
+      [...keys("short"), pagesTighter],
+      [...keys("short"), pagesNarrow],
       [...keys("short"), navBare],
       [...keys("bare"), bare],
     ],

@@ -1,5 +1,5 @@
 import { Box, Text, useApp, useInput } from "ink";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   BOOK,
   LEGS,
@@ -17,6 +17,8 @@ import { type PublisherMode, quoteAvailability } from "./actions.js";
 import { readQuote } from "./quote.js";
 import { roleOf } from "./role.js";
 import { Feed } from "./components/Feed.js";
+import { Log } from "./components/Log.js";
+import { type LogEntry, record, settle } from "./journal.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
 import { LegCard } from "./components/LegCard.js";
@@ -81,6 +83,16 @@ export interface Commands {
   push: (push: { leg: LegConfig; plan: PushPlan }) => Action;
   approve: (approve: { leg: LegConfig; amountRaw: bigint }) => Action;
 }
+
+/**
+ * Which card is picked out.
+ *
+ * The coloured border says a leg's detail is open, and nothing else on the screen says it. Left on
+ * after the detail closed, it marked a card as chosen with nothing to show for the choice — so it
+ * belongs to the overlay, not to the index the overlay happens to be pointing at.
+ */
+export const cardPicked = (overlay: "none" | "leg" | "help", legIndex: number, index: number): boolean =>
+  overlay === "leg" && index === legIndex;
 
 export function App({
   actions: actionsGiven,
@@ -164,6 +176,21 @@ export function App({
   const publisher = armedWith?.publisher ?? publisherGiven;
   const address = armedWith?.address ?? addressGiven;
   const [legIndex, setLegIndex] = useState(0);
+  // What the console has done, and whether the region is showing it instead of the feed. The feed is
+  // what the book did; the log is what this console did to it, and they answer the same question
+  // from opposite ends, so they share a region rather than competing for one.
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [showingLog, setShowingLog] = useState(false);
+  const nextEntry = useRef(0);
+  /** An action, written down as it is asked for; the id is how its answer finds it again. */
+  const noteAction = (action: string, source: "key" | "command" | "mcp"): number => {
+    const id = (nextEntry.current += 1);
+    setLog((current) => record(current, { id, atSeconds: Math.floor(Date.now() / 1000), source, action }));
+    return id;
+  };
+  const noteAnswer = (id: number, said: string, bad: boolean) => {
+    setLog((current) => settle(current, id, said, bad));
+  };
   // Which leg the chart region is showing while it rotates. Separate from `legIndex`, which is the
   // leg whose detail is pinned, so returning from a detail does not jerk the rotation somewhere else.
   const [shown, setShown] = useState(0);
@@ -277,6 +304,12 @@ export function App({
         }
         const sides = command.side === "both" ? [true, false] : [command.side === "AtoB"];
         setAnswer({ text: "asking the router…", bad: false });
+        // A read is an action taken: what the console was asked is the log's subject, and a quote
+        // that answered is as much a thing done as a fill that broadcast.
+        const noted = noteAction(
+          `quote ${command.leg.name} ${tokenAmount(command.amountRaw, command.leg.tokenA.decimals)} ${command.leg.tokenA.symbol}`,
+          "command",
+        );
         void Promise.all(
           sides.map(async (isAToB) => {
             const { amountIn, amountOut } = await readQuote(command.leg, { amountRaw: command.amountRaw, isAToB });
@@ -289,8 +322,14 @@ export function App({
             );
           }),
         )
-          .then((lines) => setAnswer({ text: lines.join("   ·   "), bad: false }))
-          .catch((cause: unknown) => setAnswer({ text: `the router did not answer: ${String(cause)}`, bad: true }));
+          .then((lines) => {
+            noteAnswer(noted, lines.join(" · "), false);
+            setAnswer({ text: lines.join("   ·   "), bad: false });
+          })
+          .catch((cause: unknown) => {
+            noteAnswer(noted, `the router did not answer: ${String(cause)}`, true);
+            setAnswer({ text: `the router did not answer: ${String(cause)}`, bad: true });
+          });
         return;
       }
       case "rebalance":
@@ -495,15 +534,25 @@ export function App({
       const action = confirming;
       setConfirming(null);
       if (binding?.id !== "confirm" || action.command === null || runAction === null) {
+        noteAnswer(noteAction(action.label, "key"), "cancelled at the prompt", false);
         say(`${action.label} cancelled`, true);
         return;
       }
       setRunning(action.label);
       say(`running ${action.label}…`);
       setAwaiting({ label: action.label, seqBefore: snapshot?.seq ?? null });
+      // Written down as it is asked for, not when it answers: an action that never comes back is
+      // exactly the one a reader will go looking for afterwards.
+      const noted = noteAction(action.label, typing === null ? "key" : "command");
       void runAction(action)
-        .then((line) => say(line))
-        .catch((cause: unknown) => say(`${action.label} could not start: ${String(cause)}`))
+        .then((line) => {
+          noteAnswer(noted, line, false);
+          say(line);
+        })
+        .catch((cause: unknown) => {
+          noteAnswer(noted, `could not start: ${String(cause)}`, true);
+          say(`${action.label} could not start: ${String(cause)}`);
+        })
         .finally(() => {
           setRunning(null);
           void store.refresh(true);
@@ -527,6 +576,12 @@ export function App({
         setHelpAt((current) => Math.max(0, current + (key.upArrow ? -step : step)));
         return;
       }
+      case "log":
+        // The key that opened it closes it, as every other region's key does.
+        setShowingLog((current) => !current);
+        setOverlay("none");
+        setPage("live");
+        return;
       case "back":
         setOverlay("none");
         return;
@@ -696,9 +751,9 @@ export function App({
             index={i}
             width={regions.legsWidth}
             height={regions.cardHeights[i] ?? 0}
-            // Picked out whether or not its detail is open: the arrows choose a leg, and a choice
-            // with nothing on screen to show for it is not a choice a reader can make.
-            selected={i === legIndex}
+            // Only while its detail is open: the border is what says the detail is open, and left
+            // on after it closed it marked a card as chosen with nothing to show for the choice.
+            selected={cardPicked(overlay, legIndex, i)}
             windowSeconds={BigInt(windowFor(leg.config.chainId).seconds)}
           />
         ))}
@@ -817,12 +872,26 @@ export function App({
           ))}
 
         {overlay !== "help" && page === "live" && (
-          <Panel title="feed" width={regions.rightWidth} height={feedRows}>
-            <Feed
-              snapshot={snapshot}
-              width={panelInner(regions.rightWidth, feedRows).width}
-              rows={panelInner(regions.rightWidth, feedRows).height}
-            />
+          <Panel
+            title={showingLog ? "log" : "feed"}
+            right={showingLog ? "l back to the feed" : undefined}
+            width={regions.rightWidth}
+            height={feedRows}
+          >
+            {showingLog ? (
+              <Log
+                log={log}
+                nowSeconds={now}
+                width={panelInner(regions.rightWidth, feedRows).width}
+                rows={panelInner(regions.rightWidth, feedRows).height}
+              />
+            ) : (
+              <Feed
+                snapshot={snapshot}
+                width={panelInner(regions.rightWidth, feedRows).width}
+                rows={panelInner(regions.rightWidth, feedRows).height}
+              />
+            )}
           </Panel>
         )}
 
