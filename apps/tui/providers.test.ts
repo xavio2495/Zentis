@@ -23,22 +23,54 @@ const panelOf = (lines: string[], title: string): string[] => {
   return rows;
 };
 
-test("the top panel names every source the console reads, and says which are answering", async () => {
+test("the top panel is three rows: the book, its state, and one dot per source", async () => {
+  // Eleven lines of sources took most of the panel at 190 columns, on a screen whose subject is the
+  // book. The dots say whether anything is wrong; the page behind `d` says what.
   const snapshot = fakeSnapshot("fresh");
-  const rows = panelOf((await drive(190, 50, { armed: true })).lines, "zentis").join("\n");
-  // Two per chain, plus the three services and the references' own freshness.
-  for (const name of ["rpc sepolia", "fills sepolia", "quote service", "mark", "market series", "references"]) {
-    expect(rows).toContain(name);
-  }
-  expect(rows).toContain("book ");
-  expect(rows).toContain(String(snapshot.seq));
-  expect(rows).toContain("armed");
+  const rows = panelOf((await drive(190, 50, { armed: true })).lines, "zentis").filter((r) => r.trim() !== "");
+  expect(rows.length).toBeLessThanOrEqual(4);
+  const joined = rows.join("\n");
+  expect(joined).toContain("book ");
+  expect(joined).toContain(String(snapshot.seq));
+  expect(joined).toContain("armed");
+  // One mark per source, in a fixed order, and no line-per-source list.
+  expect(joined).toMatch(/[●▲]{6,}|[●▲]( [a-z]+)?/);
+  expect(joined).not.toContain("rpc sepolia   ");
 }, 60_000);
 
-test("a source that is down says so there, in a few words rather than a paragraph", async () => {
+test("the dots are green, yellow and red: answering, last-good, and down", async () => {
+  // Colour is the whole content of a dot, so it is asserted as colour rather than as a shape.
+  const frame = (await drive(190, 50, { scenario: "partial" })).lines.join("\n");
+  expect(frame).toMatch(/\u001b\[38;2;[0-9;]+m[●▲]/);
+}, 60_000);
+
+test("the status page behind d says, for every source, what it answered and when", async () => {
+  const text = (await drive(190, 50, { keys: ["d"] })).lines.join("\n");
+  for (const name of ["rpc sepolia", "fills sepolia", "quote service", "mark", "market series", "references"]) {
+    expect(text).toContain(name);
+  }
+  // And more than the dots could carry: cadence, allowance, and the age of what it last said.
+  expect(text).toMatch(/every \d+s|each poll/);
+  expect(text).toMatch(/\d+ left|no allowance|—/);
+}, 60_000);
+
+test("a source that is down says why on the status page, with the time its window reopens", async () => {
+  const text = (await drive(190, 50, { keys: ["d"], scenario: "partial" })).lines.join("\n");
+  expect(text).toMatch(/429/);
+  expect(text).toMatch(/21:52Z|resets/);
+}, 60_000);
+
+test("the status page is offered where every other page is: the keys row and help", async () => {
+  const keys = (await drive(190, 50, { armed: true })).lines.join("\n");
+  expect(keys).toMatch(/d (status|sources)/);
+  const help = (await drive(190, 50, { keys: ["?", "DOWN", "DOWN"] })).lines.join("\n");
+  expect(help).toMatch(/status/);
+}, 60_000);
+
+test("the panel says how many sources are down without listing them all", async () => {
   const rows = panelOf((await drive(190, 50, { scenario: "partial" })).lines, "zentis").join("\n");
-  expect(rows).toMatch(/429/);
-  // The sentence that used to spread across the feed and the cards is not repeated here.
+  expect(rows).toMatch(/down|unread/);
+  // The endpoint's own words are on the status page, not repeated up here.
   expect(rows).not.toContain("showing what it last read");
 }, 60_000);
 
