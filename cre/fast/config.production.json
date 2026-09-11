@@ -3,6 +3,14 @@
   "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
   "kappaSecretId": "KAPPA_BPS",
   "kappaBookSecretId": "KAPPA_BOOK_BPS",
+  "apiKeySecretId": "ONEINCH_API_KEY",
+  "mainnet": {
+    "chainId": 1,
+    "tokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "tokenB": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "decimalsA": 6,
+    "decimalsB": 18
+  },
   "spreadBps": 10,
   "markoutBps": 0,
   "maxTiltBps": 5000,
@@ -11,7 +19,6 @@
   "legs": [
     {
       "chainSelector": "10344971235874465080",
-      "pool": "0x46880b404CD35c165EDdefF7421019F8dD25F4Ad",
       "aqua": "0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9",
       "app": "0xdd9752b377870bd9e41cd041f4a0e90770d0fb41",
       "strategyHash": "0x6c034027e9e42b1c0aa9a1d3aa21e5dc08cf94e0322ea539ea78e5ea707f18db",
@@ -21,7 +28,6 @@
     },
     {
       "chainSelector": "3478487238524512106",
-      "pool": "0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf",
       "aqua": "0x8F4f807C72a2BfAB4024e783f68Fc714d0Ce2bbe",
       "app": "0xfc603336a7b797f2d7eba03ed69734fad9ea521b",
       "strategyHash": "0xd37a493e8ba6bd3890c52520c0cfabb2e7a3026ee0eb57ecdc693e4830825190",
@@ -31,7 +37,6 @@
     },
     {
       "chainSelector": "16015286601757825753",
-      "pool": "0x6418eec70f50913ff0d756b48d32ce7c02b47c47",
       "aqua": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
       "app": "0x57706A10f41d4649fE65de6D38c3eCe429D2d147",
       "strategyHash": "0x212fec3f6b034be64fe532eab6585d962348c9d3900f828d10e493dd4407399b",

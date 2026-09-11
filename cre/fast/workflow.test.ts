@@ -251,7 +251,7 @@ describe('fast workflow', () => {
 
 		// Same everything except one leg's inventory: the reports must diverge, or the test above
 		// would pass for a handler that ignores its inputs entirely.
-		const moved = makeRuntime(withLeg(CHAIN, 0, { bal: [20_000_000n, 4137282795001288n] }))
+		const moved = makeRuntime(withLeg(CHAIN, 0, { bal: [20_000_000n, evenB(15_000_000n)] }))
 		onCronTrigger(moved.runtime)
 
 		expect(moved.reports).not.toEqual(base.reports)
@@ -269,7 +269,7 @@ describe('fast workflow', () => {
 		// price already sits below the mid, so the anchor makes tokenA dear there: a negative tilt.
 		// Leg B is even, but the book as a whole holds excess tokenA, so the book skew has it
 		// discount tokenA a little: a small positive tilt.
-		const { runtime, reports } = makeRuntime(withLeg(CHAIN, 0, { bal: [25_000_000n, 4137282795001288n] }))
+		const { runtime, reports } = makeRuntime(withLeg(CHAIN, 0, { bal: [25_000_000n, evenB(15_000_000n)] }))
 		onCronTrigger(runtime)
 
 		const refOf = (payload: string) => decodeRef(payload)[1]
@@ -326,7 +326,7 @@ describe('fast workflow', () => {
 		const stored = { mid: 1n, spreadBps: 22, markoutBps: 0, bandEdgeBps: 57 } // room = 57 - |-2|
 		// A mild excess, so the shift sits well inside the signed cap and the sum is not clamped.
 		const { runtime, reports } = makeRuntime(
-			withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal: [15_300_000n, 4137282795001288n] }),
+			withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal: [15_300_000n, evenB(15_000_000n)] }),
 		)
 		onCronTrigger(runtime)
 		const [, refA] = decodeRef(reports[0]!)

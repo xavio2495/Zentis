@@ -6,20 +6,25 @@ import {
 	hexToBase64,
 	LAST_FINALIZED_BLOCK_NUMBER,
 	LATEST_BLOCK_NUMBER,
+	ok,
 	prepareReportRequest,
 	protoBigIntToBigint,
+	text,
 	type Runtime,
 	type TeeRuntime,
 } from '@chainlink/cre-sdk'
 import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, parseAbiParameters, type Address, type Hex } from 'viem'
 import { z } from 'zod'
 
-import { legWeight, midFromSqrtPriceX96, recoverRoom, reservation, type LegWeight } from '@zentis/strategy-sdk'
+import { legWeight, recoverRoom, reservation, type LegWeight } from '@zentis/strategy-sdk'
+// The USD-pair conversion lives beside the slow workflow's own use of it rather than being copied:
+// two implementations of the same price arithmetic are two prices, and the difference would be a
+// mid that disagrees with the one crowding is valued at.
+import { midFromUsdPrices } from '../slow/policy'
 
 // ─── Config ─────────────────────────────────────────────────
 const legSchema = z.object({
 	chainSelector: z.string(), // bigint as a decimal string; JSON has no bigint
-	pool: z.string(), // the Uniswap v3 pool this leg prices against
 	aqua: z.string(),
 	app: z.string(), // ZentisRouter, the Aqua "app" holding the strategy
 	strategyHash: z.string(),
@@ -33,6 +38,22 @@ export const configSchema = z.object({
 	positionId: z.string(),
 	kappaSecretId: z.string(),
 	kappaBookSecretId: z.string(),
+	apiKeySecretId: z.string(),
+	/**
+	 * The real market the mid is read from: a mainnet pair, with `tokenA` naming the one that plays
+	 * the role of every leg's tokenA. Not a testnet venue, and not one venue per leg — the legs run
+	 * on testnets whose pools are not arbitraged, so each one quotes this pair at its own unrelated
+	 * price, and a weight measured against one of those is not comparable with a weight measured
+	 * against another. The decimals are the mainnet tokens' own, because the spot API answers in USD
+	 * per whole token and `mid` is raw-per-raw.
+	 */
+	mainnet: z.object({
+		chainId: z.number(),
+		tokenA: z.string(),
+		tokenB: z.string(),
+		decimalsA: z.number(),
+		decimalsB: z.number(),
+	}),
 	/** Bootstrap base half-spread, used only until the slow workflow has published a measured one. */
 	spreadBps: z.number(),
 	markoutBps: z.number(),
@@ -108,24 +129,6 @@ const boundaryFor = (tiltBps: bigint, room: bigint | null, storedBoundary: numbe
 }
 type Leg = z.infer<typeof legSchema>
 
-const SLOT0_ABI = [
-	{
-		name: 'slot0',
-		type: 'function',
-		stateMutability: 'view',
-		inputs: [],
-		outputs: [
-			{ name: 'sqrtPriceX96', type: 'uint160' },
-			{ name: 'tick', type: 'int24' },
-			{ name: 'observationIndex', type: 'uint16' },
-			{ name: 'observationCardinality', type: 'uint16' },
-			{ name: 'observationCardinalityNext', type: 'uint16' },
-			{ name: 'feeProtocol', type: 'uint8' },
-			{ name: 'unlocked', type: 'bool' },
-		],
-	},
-] as const
-
 const SAFE_BALANCES_ABI = [
 	{
 		name: 'safeBalances',
@@ -150,6 +153,46 @@ const REF_ABI = parseAbiParameters(
 	'bytes32 positionId, (uint128 mid, uint16 spreadBps, int16 tiltBps, uint40 updatedAt, uint32 seq, uint128 refBalanceA, int64 dTiltPerA, uint32 maxExtrapBps, uint16 markoutBps, uint16 bandEdgeBps) ref',
 )
 
+/**
+ * The one mid the whole position quotes from: raw tokenB per 1e18 raw tokenA, from the real market
+ * for this pair on mainnet.
+ *
+ * It throws on anything it cannot trust, and in particular it never falls back to a venue price.
+ * A leg that priced itself off its own pool when this read failed would silently reinstate three
+ * incomparable mids at the one moment nobody is watching. Publishing nothing is the honest failure:
+ * the registry keeps its last reference, the spread widens as that reference goes stale, and at an
+ * hour the position goes dark — all of it already built, and all of it visible.
+ *
+ * The API key is decrypted into the enclave and this call is made from the enclave runtime, so the
+ * key never crosses out to the DON.
+ */
+const readMarketMid = (runtime: TeeRuntime<Config>, apiKey: string): bigint => {
+	const { chainId, tokenA, tokenB, decimalsA, decimalsB } = runtime.config.mainnet
+	const a = tokenA.toLowerCase()
+	const b = tokenB.toLowerCase()
+	const response = new cre.capabilities.HTTPClient()
+		.sendRequest(runtime, {
+			url: `https://api.1inch.dev/price/v1.1/${chainId}/${a},${b}?currency=USD`,
+			method: 'GET',
+			multiHeaders: { Authorization: { values: [`Bearer ${apiKey}`] } },
+		})
+		.result()
+	if (!ok(response)) throw new Error(`market price read failed with status ${response.statusCode}`)
+
+	const prices = JSON.parse(text(response)) as Record<string, string>
+	const priceA = prices[a]
+	const priceB = prices[b]
+	if (priceA === undefined || priceB === undefined) {
+		throw new Error('market price read returned only one side of the pair')
+	}
+	// A malformed or zero price converts to zero, and the registry rejects a zero mid — but a zero
+	// must never reach the report in the first place, or a rejected write is the only thing standing
+	// between a broken feed and an unpriced position.
+	const mid = midFromUsdPrices(priceA, priceB, decimalsA, decimalsB)
+	if (mid <= 0n) throw new Error('market price read produced a non-positive mid')
+	return mid
+}
+
 type Observation = {
 	leg: Leg
 	name: string
@@ -161,7 +204,8 @@ type Observation = {
 }
 
 /**
- * One leg's state, every read pinned to the same block.
+ * One leg's state, every read pinned to the same block, priced at the mid the caller read once for
+ * the whole book.
  *
  * Determinism is the load-bearing property of this whole workflow: with no attestation to check us
  * during simulation, "two runs over the same pinned block produce identical bytes" is the only
@@ -175,6 +219,7 @@ const observeLeg = (
 	maker: Address,
 	positionId: Hex,
 	name: string,
+	mid: bigint,
 ): Observation => {
 	const client = new cre.capabilities.EVMClient(BigInt(leg.chainSelector))
 
@@ -185,21 +230,6 @@ const observeLeg = (
 
 	const pinnedBlock = protoBigIntToBigint(header.blockNumber)
 	const at = bigintToProtoBigInt(pinnedBlock)
-
-	const slot0 = client
-		.callContract(don, {
-			call: encodeCallMsg({
-				from: maker,
-				to: leg.pool as Address,
-				data: encodeFunctionData({ abi: SLOT0_ABI, functionName: 'slot0' }),
-			}),
-			blockNumber: at,
-		})
-		.result()
-	const [sqrtPriceX96] = decodeAbiParameters(
-		parseAbiParameters('uint160, int24, uint16, uint16, uint16, uint8, bool'),
-		bytesToHex(slot0.data),
-	)
 
 	const balances = client
 		.callContract(don, {
@@ -225,8 +255,6 @@ const observeLeg = (
 		parseAbiParameters('uint256, uint256'),
 		bytesToHex(balances.data),
 	)
-
-	const mid = midFromSqrtPriceX96(sqrtPriceX96 as bigint)
 
 	// The one read that is NOT pinned. Finality lags the head by around twenty minutes on every
 	// chain this position lives on, and the slow workflow writes into the same slot at the head. A
@@ -272,11 +300,18 @@ const observeLeg = (
 /**
  * The fast reference: mid, tilt and slope for every leg of one cross-chain position.
  *
+ * The mid is read once, from the real mainnet market for this pair, and every leg is priced and
+ * published against that one number. That is what makes the book weight an average of comparable
+ * things: `legWeight` values a leg's tokenB side at the mid, so weights measured against different
+ * mids cannot be averaged, and the book concession is the cross-chain signal the whole position
+ * rests on.
+ *
  * What the enclave actually keeps confidential is the pair of gains that turn inventory into a quote
  * concession: one on the leg's own weight, one on the whole book's. Those numbers are the maker's
  * aggression — how far they will move price to shed inventory — and a node operator who could read
- * them could position against every rebalance before it happens. The pool prices and Aqua balances this workflow reads are public on-chain data
- * and are deliberately NOT treated as secret; claiming otherwise would be theatre.
+ * them could position against every rebalance before it happens. The market price and the Aqua
+ * balances this workflow reads are public data and are deliberately NOT treated as secret; claiming
+ * otherwise would be theatre.
  */
 export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const config = runtime.config
@@ -284,6 +319,10 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	// Released by the Vault DON directly into the attested enclave, decrypted at this call.
 	const kappaOwnBps = BigInt(runtime.getSecret({ id: config.kappaSecretId }).result().value)
 	const kappaBookBps = BigInt(runtime.getSecret({ id: config.kappaBookSecretId }).result().value)
+	const apiKey = runtime.getSecret({ id: config.apiKeySecretId }).result().value
+
+	// Once per run, before any leg is observed and before anything is written: one mid for the book.
+	const mid = readMarketMid(runtime, apiKey)
 
 	// EVM capabilities take a DON runtime, so chain reads and writes cross back out of the enclave.
 	// That is correct here: they carry no secret, and they are the part that needs consensus.
@@ -291,7 +330,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 
 	const maker = config.maker as Address
 	const observed = config.legs.map((leg, i) =>
-		observeLeg(don, leg, maker, config.positionId as Hex, `leg${i}`),
+		observeLeg(don, leg, maker, config.positionId as Hex, `leg${i}`, mid),
 	)
 	// The room the slow workflow granted each leg, recovered from the boundary it published: that
 	// boundary is the shift it saw plus the allocated room, and every writer keeps that difference.
@@ -378,18 +417,22 @@ export function initWorkflow(config: Config) {
 }
 
 /**
- * Capability budget, sized for the WORST single execution rather than the average: per leg one
- * finalized-header read, two pinned contract reads and one report write. The published budgets are
- * doubled so that one retry, or one added read, does not take the workflow down — the audit-firewall
- * template ships a budget of exactly 8 against exactly 8 calls, which is a bug to learn from.
+ * Capability budget, sized for the WORST single execution rather than the average: one market read
+ * for the whole run, and per leg one finalized-header read, two contract reads and one report write.
+ * The published budgets are doubled so that one retry, or one added read, does not take the workflow
+ * down — the audit-firewall template ships a budget of exactly 8 against exactly 8 calls, which is a
+ * bug to learn from.
  */
 export const restrictions = (config: Config) => ({
 	capabilities: {
 		type: 'CAPABILITY_RESTRICTION_TYPE_OPEN' as const,
 		maxTotalCalls: 10 * config.legs.length,
-		restrictions: config.legs.flatMap((leg) => {
-			const r = new cre.restrictors.EVMRestrictor(BigInt(leg.chainSelector))
-			return [r.limitHeaderByNumber(2), r.limitCallContract(6), r.limitWriteReport(2)]
-		}),
+		restrictions: [
+			new cre.restrictors.HTTPClientRestrictor().limitSendRequest(2),
+			...config.legs.flatMap((leg) => {
+				const r = new cre.restrictors.EVMRestrictor(BigInt(leg.chainSelector))
+				return [r.limitHeaderByNumber(2), r.limitCallContract(4), r.limitWriteReport(2)]
+			}),
+		],
 	},
 })
