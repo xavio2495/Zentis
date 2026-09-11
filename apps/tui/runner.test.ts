@@ -32,12 +32,13 @@ test("the extra environment reaches the child, and the parent's PATH still does"
 });
 
 test("the env file is sourced in the child and skips the name a shell cannot take", async () => {
-  // The real fill command's shell, with forge swapped for an echo: this asserts the sourcing
-  // mechanism without broadcasting anything. `1INCH_API_KEY` must be skipped rather than fatal.
+  // The real fill command's shell, with everything after the sourcing prologue swapped for an echo:
+  // this asserts the sourcing mechanism without sending anything. `1INCH_API_KEY` must be skipped
+  // rather than fatal.
   const fill = buildActions(envPath).find((a) => a.key === "f")!.command!;
   // Plain `$VAR`, not a bash substring: `sh` is dash here, and the real command's shell has to be
   // POSIX for the same reason.
-  const shell = fill.cmd[2]!.replace(/forge script.*$/, 'echo "sourced=$TAKER_PRIVATE_KEY"');
+  const shell = fill.cmd[2]!.replace(/set -e;.*$/, 'echo "sourced=$TAKER_PRIVATE_KEY"');
   const result = await run({ cmd: ["sh", "-c", shell, "sh", envPath], cwd: dir });
 
   expect(result.exitCode).toBe(0);

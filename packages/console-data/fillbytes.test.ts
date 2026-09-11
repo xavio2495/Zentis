@@ -27,7 +27,7 @@ test("the recorded order is this generation's, not a superseded one", () => {
   // generation would quote against a position that no longer exists.
   const leg = LEGS.find((l) => l.name === "sepolia")!;
   expect(leg.fill!.orderHash).toBe(leg.strategyHash);
-  expect(leg.fill!.orderHash).toBe((sepolia as { position: { strategyHash: string } }).position.strategyHash);
+  expect(leg.fill!.orderHash as string).toBe((sepolia as { position: { strategyHash: string } }).position.strategyHash);
 });
 
 test("the taker the traits embed is carried with them, since it is who the fill is for", () => {

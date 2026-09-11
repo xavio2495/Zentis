@@ -42,6 +42,16 @@ export interface LegConfig {
   readonly rpcUrl: string;
   /** the slow workflow's per-leg override, or the book-wide default when it has none */
   readonly volatilityMultiplierBps: number;
+  /**
+   * The bytes a fill needs, recorded from the Solidity builders themselves.
+   *
+   * Null for a leg whose record predates them. The console passes these through to the router and
+   * never rebuilds them: an order and its taker traits are the contract's own encoding, and a second
+   * implementation here would be the guess the project's first rule forbids. They were written only
+   * after the router's hash of the rebuilt order matched the shipped strategy on chain, and
+   * `orderHash` is kept so a reader — and a test — can see that it still does.
+   */
+  readonly fill: FillBytes | null;
   /** how many times this leg has been shipped: the live generation and every record it superseded */
   readonly generations: number;
   /** what this generation was shipped with, from the deployment record; the base of every PnL */
@@ -75,6 +85,20 @@ export interface ShippedRecord {
   readonly markAtShip: bigint | null;
   readonly seq: number | null;
   readonly block: number | null;
+}
+
+export interface FillBytes {
+  readonly router: `0x${string}`;
+  /** the router's own signature string, so `cast` encodes the call the way the contract declares it */
+  readonly swapSignature: string;
+  /** the order as a cast tuple, already formatted: maker, traits, data */
+  readonly orderTuple: string;
+  /** the taker the traits embed; a fill is for that address and no other */
+  readonly taker: `0x${string}`;
+  readonly takerDataAToB: `0x${string}`;
+  readonly takerDataBToA: `0x${string}`;
+  /** the router's hash of this order, which is the strategy the leg is shipped as */
+  readonly orderHash: `0x${string}`;
 }
 
 export interface TokenConfig {
@@ -200,6 +224,7 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     // Counted from the record rather than configured: a re-ship appends the old position to
     // `supersededPositions`, so the count is a fact about the file and never drifts from it.
     generations: ((deployment as { supersededPositions?: unknown[] }).supersededPositions?.length ?? 0) + 1,
+    fill: ((deployment as { fill?: FillBytes }).fill ?? null) as FillBytes | null,
     shipped: shippedOf(deployment.position as RawShipped),
     // The per-leg override went with the one-mid change; the book-wide figure is what the workflow
     // now applies to every leg, so it is what the console recomputes against.

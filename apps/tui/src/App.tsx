@@ -12,6 +12,7 @@ import {
   pushPlan,
 } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
+import { buildQuoteAction } from "./actions.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
@@ -160,24 +161,6 @@ export function App({
     setAwaiting(null);
   }, [landing]);
 
-  /** What a quote reads as on the command row: what went in, what came back, and how far off the mid. */
-  const quoteLine = (leg: LegConfig, side: "AtoB" | "BtoA", amountRaw: bigint): Promise<string> =>
-    fetchQuotes(BOOK.positionId, amountRaw, side).then((read) => {
-      const quote = read.value?.quotes.find((q) => q.chainId === leg.chainId);
-      if (quote === undefined) return `${leg.name}: ${read.error ?? "the quote service said nothing about this leg"}`;
-      const [from, to] = side === "AtoB" ? [leg.tokenA, leg.tokenB] : [leg.tokenB, leg.tokenA];
-      if (quote.amountOut === null) {
-        const why = quote.refusal?.sentence ?? quote.caveats[0] ?? "the router refused it";
-        return `${leg.name} ${from.symbol} → ${to.symbol}: ${why}`;
-      }
-      const off = offMidBps(quote, side === "AtoB");
-      return (
-        `${leg.name} ${tokenAmount(amountRaw, from.decimals)} ${from.symbol} → ` +
-        `${tokenAmount(quote.amountOut, to.decimals)} ${to.symbol}` +
-        (off === null ? "" : ` · ${off > 0 ? "+" : ""}${off} bps`)
-      );
-    });
-
   /**
    * Carry out a typed command.
    *
@@ -197,11 +180,26 @@ export function App({
         setAnswer({ text: `chart window ${command.index === null ? "automatic" : WINDOWS[command.index]!.label}`, bad: false });
         return;
       case "quote": {
-        const sides: ("AtoB" | "BtoA")[] = command.side === "both" ? ["AtoB", "BtoA"] : [command.side];
+        // Asked of the router directly, as a static call. It needs no key, so it answers watch-only,
+        // and no quote service, so it still answers when that service is what is down. The two-sided
+        // quotes on the cards still come from the service, which decodes a refusal into a sentence.
+        const sides = command.side === "both" ? [true, false] : [command.side === "AtoB"];
+        const asked = sides.map((isAToB) =>
+          buildQuoteAction({ leg: command.leg, amountRaw: command.amountRaw, isAToB }),
+        );
+        const refused = asked.find((a) => a.disabledReason !== null);
+        if (refused !== undefined) {
+          setAnswer({ text: refused.disabledReason!, bad: true });
+          return;
+        }
+        if (runAction === null) {
+          setAnswer({ text: asked.map((a) => a.label).join("  ·  "), bad: false });
+          return;
+        }
         setAnswer({ text: "asking the router…", bad: false });
-        void Promise.all(sides.map((side) => quoteLine(command.leg, side, command.amountRaw)))
+        void Promise.all(asked.map((action) => runAction(action)))
           .then((lines) => setAnswer({ text: lines.join("   ·   "), bad: false }))
-          .catch((cause: unknown) => setAnswer({ text: `the quote service could not be reached: ${String(cause)}`, bad: true }));
+          .catch((cause: unknown) => setAnswer({ text: `the router could not be asked: ${String(cause)}`, bad: true }));
         return;
       }
       case "rebalance":
