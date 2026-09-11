@@ -188,3 +188,10 @@ test("the pnl page fills its lower half with the fills the totals are made of", 
   expect(text).toMatch(/\d+[dhm] ago|\d+[dhm]\b/);
   expect(text).toContain("markout");
 }, 60_000);
+
+test("the rebalance panel offers the console's own command, which a compiled binary can run", async () => {
+  // "python3 scripts/rebalance.py" cannot work from a console handed to someone with no checkout.
+  const text = (await drive(190, 50, { keys: ["p"], scenario: "pinned" })).lines.join("\n");
+  expect(text).not.toContain("rebalance.py");
+  expect(text).toMatch(/: ?push sepolia weth/);
+}, 60_000);

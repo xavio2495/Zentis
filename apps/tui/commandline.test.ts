@@ -82,3 +82,16 @@ test("push names the script that performs it rather than claiming nothing can", 
   expect(text).toContain("scripts/rebalance.py");
   expect(text).not.toContain("Push.s.sol");
 }, 60_000);
+
+test("push runs through the console's own confirmation, not a script in a checkout", async () => {
+  const frame = await drive(150, 44, { keys: [":", ...typed("push sepolia weth 0.0002"), "ENTER"], armed: true, scenario: "pinned" });
+  const text = frame.lines.join("\n");
+  expect(text).toContain("press y");
+  expect(text).not.toContain("rebalance.py");
+}, 60_000);
+
+test("watch-only refuses a push with the reason, and runs nothing", async () => {
+  const text = (await drive(150, 44, { keys: [":", ...typed("push sepolia weth 0.0002"), "ENTER"] })).lines.join("\n");
+  expect(text).toMatch(/ZENTIS_ENV|watch-only/);
+  expect(text).not.toContain("press y");
+}, 60_000);
