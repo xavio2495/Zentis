@@ -1,0 +1,25 @@
+# Cloud Build context for deploy/cloudrun/Dockerfile: only what the image COPYs, nothing secret.
+.git
+.gitignore
+.env
+.env.*
+**/node_modules
+**/.turbo
+**/dist
+**/out
+**/cache
+contracts/lib
+contracts/out
+contracts/cache
+contracts/broadcast
+apps
+services
+subgraphs
+packages/reference-model
+packages/sim-report
+packages/seam
+packages/console-data
+docs
+cg1
+claude-docs
+*.md
