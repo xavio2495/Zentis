@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { drive } from "./sandbox/drive.js";
 
 const chartPanel = (lines: string[]) => {
-  const top = lines.findIndex((l) => l.includes("market price ·"));
+  const top = lines.findIndex((l) => l.includes("┌ market"));
   const column = [...lines[top]!].indexOf("┌");
   const rows: string[] = [lines[top]!];
   for (const line of lines.slice(top + 1)) {

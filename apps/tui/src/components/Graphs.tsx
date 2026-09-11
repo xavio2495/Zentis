@@ -1,55 +1,48 @@
 import { Box, Text } from "ink";
 import { BACKFILLING, type LegSnapshot, type Snapshot, invertMid } from "@zentis/console-data";
 import { axisMarks, plot } from "../chart.js";
-import { chooseFit, duration, priceFigure } from "../format.js";
+import { chooseFit, duration, pairPrice, priceFigure } from "../format.js";
 import { quoted } from "../quoted.js";
 import { trunc } from "../layout.js";
 import { UI, legColour } from "../theme.js";
 
 /**
- * The reference pools, one line per leg, over the window the volatility term measures.
+ * The one market the book prices from, with the beat ticked against it.
  *
- * This is what makes the beat visible. A fill lands on one leg; a reference publishes across all
- * three; the other two lines do not move. Said in prose that is a claim, and on the feed it is a
- * sequence of rows a reader has to hold in their head — here it is a picture.
+ * It used to be three lines, one per leg's reference pool, because each leg quoted from its own.
+ * The book prices off a single mainnet mid now and the slow workflow measures the volatility half of
+ * its spread on this same series, so three lines would be three drawings of a price nothing quotes
+ * from — and two of those pools have been retired outright.
  *
- * Each line is drawn as its own layer rather than merged into one grid, because a merged grid can
- * carry one colour and the whole point is telling the legs apart.
+ * What the picture is for has not changed: a fill lands on one leg, a reference publishes across all
+ * three, and the market goes on doing whatever it was doing. Ticked on the same clock as the line,
+ * that reads as a beat against the market rather than against itself.
  */
 export function Graphs({
-  leg,
   snapshot,
+  leg,
   width,
   height,
   windowSeconds,
 }: {
-  /** the one leg being shown; the region rotates through them rather than stacking all three */
-  leg: LegSnapshot;
   snapshot: Snapshot;
+  /** the leg whose fills are marked; the line itself belongs to the whole book */
+  leg: LegSnapshot;
   width: number;
   height: number;
   windowSeconds: bigint;
 }) {
-  const colour = legColour(leg.config.chainId);
+  const market = snapshot.market;
+  const tokenA = leg.config.tokenA;
+  const tokenB = leg.config.tokenB;
 
-  // A blank chart region asserts that the price did not move. Nothing established that — the
-  // subgraph that would say so refused, and saying which one and until when is the difference
-  // between a console that is broken and one that is waiting.
-  if (leg.series === null) {
-    // Reading a week of swaps on first start is not a failure, and colouring it like one would make
-    // every launch look broken for its first fifteen seconds.
-    const reading = leg.sources.pool === BACKFILLING;
+  // A blank chart asserts the market did not move, and nothing read says that.
+  if (market === null) {
+    const why = snapshot.caveats.find((c) => c.startsWith("the market series")) ?? null;
     return (
       <Box flexDirection="column" width={width} height={height} overflow="hidden">
-        <Text color={reading ? UI.muted : UI.caveat}>
-          {trunc(
-            leg.sources.pool === null
-              ? `no price history for ${leg.config.label} yet`
-              : reading
-                ? `price history: ${leg.sources.pool}`
-                : `price history unavailable: ${leg.sources.pool}`,
-            width,
-          )}
+        <Text color={UI.caveat}>
+          {trunc(why ?? "the market series is unavailable, so there is no price history to draw", width)}
         </Text>
       </Box>
     );
@@ -57,11 +50,11 @@ export function Graphs({
 
   // Plotted as quoted — one whole tokenB in tokenA — so the line rises when the price in the title
   // rises. The plot is drawn to the right of a gutter holding the prices at the axis's two ends.
-  const samples = quoted(leg.series.samples);
+  const samples = quoted(market.points.map((p) => ({ timestamp: p.timestamp, mid: p.mid })));
   const probe = plot([{ key: "s", samples }], Math.max(1, width - 10), Math.max(1, height - 2), windowSeconds).byKey.get("s")!;
   // The band's ends are in quoted units, so they are turned back into mids before being named.
-  const top = priceFigure(invertMid(probe.highMid), leg.config.tokenA, leg.config.tokenB);
-  const bottom = priceFigure(invertMid(probe.lowMid), leg.config.tokenA, leg.config.tokenB);
+  const top = priceFigure(invertMid(probe.highMid), tokenA, tokenB);
+  const bottom = priceFigure(invertMid(probe.lowMid), tokenA, tokenB);
   const gutter = Math.max(top.length, bottom.length) + 1;
   const plotWidth = Math.max(1, width - gutter);
   const p = plot([{ key: "s", samples }], plotWidth, Math.max(1, height - 2), windowSeconds).byKey.get("s")!;
@@ -72,7 +65,7 @@ export function Graphs({
   const events = snapshot.feed.flatMap((row): Mark[] =>
     row.kind === "round"
       ? [{ at: row.timestamp, glyph: "│", kind: "publish" }]
-      : row.kind === "fill" && row.chainId === leg.config.chainId
+      : row.kind === "fill"
         ? [{ at: row.timestamp, glyph: "▲", kind: "fill" }]
         : [],
   );
@@ -99,7 +92,7 @@ export function Graphs({
           <Text color={UI.muted}>
             {(i === 0 ? top : i === p.rows.length - 1 ? bottom : "").padStart(gutter - 1).padEnd(gutter)}
           </Text>
-          <Text color={colour}>{row}</Text>
+          <Text color={UI.reference}>{row}</Text>
         </Box>
       ))}
       <Box height={1}>
@@ -116,12 +109,10 @@ export function Graphs({
   );
 }
 
-/** The band a leg's line is drawn in, for the panel title, so the scale is never implied. */
-export function extentOf(leg: LegSnapshot, width: number, height: number, windowSeconds: bigint): string {
-  if (leg.series === null) return "";
-  const p = plot([{ key: "s", samples: leg.series.samples }], width, height, windowSeconds).byKey.get("s")!;
-  return (
-    `×${p.minRatio.toFixed(3)}–×${p.maxRatio.toFixed(3)} of its own start` +
-    (p.clipped > 0 ? `  (${p.clipped} beyond)` : "")
-  );
+/** The title's price: what one tokenB costs in tokenA, at the newest point of the series. */
+export function marketPrice(snapshot: Snapshot): string | null {
+  const newest = snapshot.market?.points.at(-1) ?? null;
+  const leg = snapshot.legs[0];
+  if (newest === null || leg === undefined) return null;
+  return pairPrice(newest.mid, leg.config.tokenA, leg.config.tokenB);
 }

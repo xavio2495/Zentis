@@ -148,6 +148,24 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
    * what it committed, which is the ordinary case; the shortfall and short-allowance cases are what
    * `walletCaveats` exists to say, and they are constructed in the tests that are about them.
    */
+  /**
+   * A week of the book's market, hourly, walked deterministically around the mark the legs are
+   * valued at. Constructed rather than recorded: the shape of the line is what the chart's layout is
+   * tested against, and a recorded week would make every re-record a rendering change.
+   */
+  const market = {
+    points: Array.from({ length: 168 }, (_, i) => {
+      const step = BigInt(Math.round(Math.sin(i / 12) * 40) + 1000);
+      return {
+        timestamp: BigInt(now - (167 - i) * 3600),
+        mid: (405_837_064_044_766_950_299_015_618n * step) / 1000n,
+      };
+    }),
+    source: "Uniswap v3 mainnet USDC/WETH, via The Graph",
+    hours: 168,
+    error: null,
+  };
+
   const wallet = {
     maker: BOOK.maker,
     chains: legs.map((leg) => {
@@ -257,6 +275,7 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
       // not add up to would let the overall view pass a test the real one fails.
       book: bookTotals(unreadLegs as LegSnapshot[]),
       wallet: null,
+      market,
       caveats: [],
     } as unknown as Snapshot;
   }
@@ -292,6 +311,8 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
       sim: loadSimReport(),
       book: bookTotals([]),
       wallet: null,
+      // The outage takes the market with it: the same service answers for both.
+      market: null,
       caveats: [],
     } as unknown as Snapshot;
   }
@@ -310,6 +331,7 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     // a scenario would assert against a total no arrangement of its own legs could produce.
     book: bookTotals(legs as LegSnapshot[]),
     wallet,
+    market,
     caveats: [],
   } as Snapshot;
 }

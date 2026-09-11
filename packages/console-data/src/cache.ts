@@ -130,6 +130,10 @@ export const CADENCE_MS = {
   registry: 0,
   finality: 0,
   quotes: 0,
+  // The book's market series: hourly points, cached ten minutes at the service, and its gateway call
+  // is billed against the maker's own key. Polling it on the console's cadence would spend that
+  // allowance on a line that cannot have moved.
+  market: 600_000,
 } as const;
 
 /** The sources a manual refresh forces: the cheap ones that carry what an action changed. */

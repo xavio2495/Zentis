@@ -4,30 +4,36 @@ import { drive } from "./sandbox/drive.js";
 
 const text = async (keys: string[]) => (await drive(120, 40, { keys, armed: true })).lines.join("\n");
 
-test("the price chart shows one leg at a time and turns every fifteen seconds", async () => {
+test("the chart is the book's one market, so there is nothing left to rotate between", async () => {
+  // Three charts rotated because each leg quoted from its own reference pool. One mid for the book
+  // means one line, and a carousel over three copies of it would be motion without information.
   expect(ROTATE_MS).toBe(15_000);
   const frame = await text([]);
-  expect(frame).toContain("market price · Sepolia");
-  expect(frame).not.toContain("market price · Base");
+  expect(frame).toContain("market");
+  for (const title of ["market price · Sepolia", "market price · Base", "market price · Arbitrum"]) {
+    expect(frame).not.toContain(title);
+  }
 });
 
-test("the arrow keys step the chart by hand, both ways", async () => {
-  expect(await text(["RIGHT"])).toContain("market price · Base");
-  expect(await text(["RIGHT", "RIGHT"])).toContain("market price · Arbitrum");
-  // Left from the first wraps to the last rather than stopping.
-  expect(await text(["LEFT"])).toContain("market price · Arbitrum");
+test("the arrow keys step which leg the numbers and the detail act on, both ways", async () => {
+  // The chart no longer moves with them; what they choose is the leg, and the detail is where that
+  // choice becomes visible.
+  const detailTitle = (frame: string) => frame.split("\n").find((line) => line.includes("esc to close")) ?? "";
+  expect(detailTitle(await text(["RIGHT", "ENTER"]))).toContain("Base Sepolia");
+  expect(detailTitle(await text(["RIGHT", "RIGHT", "ENTER"]))).toContain("Arbitrum Sepolia");
+  expect(detailTitle(await text(["LEFT", "ENTER"]))).toContain("Arbitrum Sepolia");
 });
 
 test("a leg's number opens its detail where the chart was, and the same number closes it", async () => {
   const open = await text(["2"]);
   expect(open).toContain("2 Base Sepolia");
   expect(open).toContain("esc to close");
-  expect(open).not.toContain("market price ·");
+  expect(open).not.toContain("┌ market");
 
   // Inside a detail the numbers have to keep working: closing with the key that opened it, and
   // jumping to another leg without going back through the chart first.
   const closed = await text(["2", "2"]);
-  expect(closed).toContain("market price ·");
+  expect(closed).toContain("┌ market");
 
   // The detail panel is the one whose title carries "esc to close"; the cards carry the same leg
   // names, so the leg shown in detail has to be read off that line specifically.

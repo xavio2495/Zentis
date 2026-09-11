@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { BOOK, LEGS, type LegConfig, type Store, createStore, fetchQuotes, offMidBps } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
 import { Feed } from "./components/Feed.js";
-import { Graphs } from "./components/Graphs.js";
+import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
 import { LegCard } from "./components/LegCard.js";
 import { LegDetail } from "./components/LegDetail.js";
@@ -15,7 +15,7 @@ import { Simulation } from "./pages/Simulation.js";
 import { WalletPage } from "./pages/WalletPage.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { type Pending, landed } from "./landed.js";
-import { pairPrice, tokenAmount } from "./format.js";
+import { chooseFit, pairPrice, tokenAmount } from "./format.js";
 import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
 import { type Command, parseCommand } from "./command.js";
 import { resolve } from "./keymap.js";
@@ -303,9 +303,17 @@ export function App({
         setWindowChoice((current) => (current === null ? 0 : current + 1 >= WINDOWS.length ? null : current + 1));
         return;
       case "step": {
+        // The chart is the book's one market now, so the arrows choose the leg rather than turning a
+        // carousel: which card is picked out, which leg `enter` opens, and which one the numbers land
+        // on. A detail already open follows the choice, so stepping reads as moving along the book.
         const count = Math.max(1, snapshot?.legs.length ?? 1);
+        setLegIndex((current) => (current + (key.leftArrow ? count - 1 : 1)) % count);
         setShown((current) => (current + (key.leftArrow ? count - 1 : 1)) % count);
         setStepped((n) => n + 1);
+        return;
+      }
+      case "open": {
+        setOverlay((current) => (current === "leg" ? "none" : "leg"));
         return;
       }
       case "leg": {
@@ -371,6 +379,7 @@ export function App({
   const windowFor = (chainId: number) =>
     windowChoice === null ? autoWindow(lastFillAt(chainId), snapshot.takenAtSeconds) : WINDOWS[windowChoice]!;
   const graphInner = panelInner(regions.rightWidth, regions.graphRows);
+  const marketWindowLabel = `${windowFor(LEG_ORDER[0] ?? 0).label} window${windowChoice === null ? " · auto" : ""} · t`;
   // The command row is a row of the screen, taken from the region below the charts rather than added
   // to the frame: a frame that grew by a row when the colon was pressed would reach `stdout.rows`
   // and make Ink clear the terminal on every repaint.
@@ -388,7 +397,9 @@ export function App({
             index={i}
             width={regions.legsWidth}
             height={regions.cardHeights[i] ?? 0}
-            selected={overlay === "leg" && i === legIndex}
+            // Picked out whether or not its detail is open: the arrows choose a leg, and a choice
+            // with nothing on screen to show for it is not a choice a reader can make.
+            selected={i === legIndex}
             windowSeconds={BigInt(windowFor(leg.config.chainId).seconds)}
           />
         ))}
@@ -458,16 +469,24 @@ export function App({
             </Panel>
           ) : rotating === undefined ? null : (
             <Panel
-              title={
-                `market price · ${rotating.config.label.split(" ")[0]}` +
-                (rotating.series === null
-                  ? ""
-                  : ` · ${pairPrice(rotating.series.mid, rotating.config.tokenA, rotating.config.tokenB)}`)
-              }
-              right={`${windowFor(rotating.config.chainId).label} window${windowChoice === null ? " · auto" : ""} · t`}
+              // The source is worth naming — one series feeds the chart, the mid every leg quotes
+              // from and the volatility half of the spread — but never at the cost of the window
+              // label, which is the one thing on this border a key changes.
+              title={(() => {
+                const price = marketPrice(snapshot);
+                const source = snapshot.market?.source ?? null;
+                const lead = `market${price === null ? "" : ` · ${price}`}`;
+                return chooseFit(
+                  source === null
+                    ? [lead, "market"]
+                    : [`${lead} · ${source}`, `${lead} · ${source.split(",")[0]}`, lead, "market"],
+                  Math.max(0, regions.rightWidth - marketWindowLabel.length - 8),
+                );
+              })()}
+              right={marketWindowLabel}
               width={regions.rightWidth}
               height={regions.graphRows}
-              colour={legColour(rotating.config.chainId)}
+              colour={UI.reference}
             >
               <Graphs
                 leg={rotating}

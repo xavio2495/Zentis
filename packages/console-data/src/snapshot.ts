@@ -11,6 +11,7 @@ import { type SimReport, loadSimReport } from "./sim.js";
 import { ok } from "./graphql.js";
 import { humanDuration } from "./duration.js";
 import { type Mark, fetchMarks } from "./mark.js";
+import { type MarkHistory, fetchMarkHistory } from "./market.js";
 import { type LegPnl, legPnl } from "./pnl.js";
 import { type Wallet, fetchWallet } from "./wallet.js";
 import { type BookTotals, bookTotals } from "./book.js";
@@ -61,6 +62,8 @@ export interface Snapshot {
   readonly book: BookTotals;
   /** the maker's own side; null when no chain answered */
   readonly wallet: Wallet | null;
+  /** the one series every leg prices from, and what the market chart is drawn from */
+  readonly market: MarkHistory | null;
   readonly caveats: string[];
 }
 
@@ -114,15 +117,17 @@ export async function takeSnapshot(
 
   // The mark and the wallet are read on the fills cadence: neither moves faster than a minute in
   // any way a reader acts on, and both cost a round trip per leg.
-  const [marks, wallet] = await Promise.all([
+  const [marks, wallet, market] = await Promise.all([
     cache.get("mark", CADENCE_MS.fills, () => fetchMarks()),
     cache.get<Wallet>("wallet", CADENCE_MS.fills, async () => ok(await fetchWallet(LEGS, BOOK.maker))),
+    cache.get<MarkHistory>("market", CADENCE_MS.market, () => fetchMarkHistory()),
   ]);
 
   const caveats: string[] = [];
   if (aToB.error !== null) caveats.push(`quotes unavailable: ${aToB.error}`);
   if (marks.error !== null) caveats.push(`the mainnet mark: ${marks.error}`);
   if (wallet.error !== null) caveats.push(`the maker's wallet: ${wallet.error}`);
+  if (market.error !== null) caveats.push(`the market series: ${market.error}`);
 
   // The decomposition is a property of the whole book — the book term reads every leg's weight — so
   // it is computed once over the legs that answered, or not at all. A decomposition over two of
@@ -242,6 +247,7 @@ export async function takeSnapshot(
     sim: loadSimReport(),
     book: bookTotals(legs),
     wallet: wallet.value,
+    market: market.value,
     caveats,
   };
 }
