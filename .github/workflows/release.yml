@@ -1,0 +1,99 @@
+name: Release
+
+# One compiled console per platform, on every tag. This is what install.sh downloads: nothing is
+# built by hand, and the checksums the installer verifies are produced in the same job as the
+# binaries. Plan 11 §3.
+#
+# Bun cross-compiles from one runner, so the matrix is over targets, not machines. The version is
+# inlined at build time through --define, so `zentis --version` answers with the tag and the commit
+# without reading anything at run time.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  # Every endpoint the console could reach, pointed at a closed port, exactly as in ci.yml: the
+  # build runs the compile test's neighbours, and a console started by mistake must have nowhere
+  # real to poll.
+  ZENTIS_QUOTE_API: http://127.0.0.1:1
+  ZENTIS_FILLS_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_FILLS_ARBITRUM_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_FILLS_BASE_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_RPC_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_RPC_ARBITRUM_SEPOLIA: http://127.0.0.1:1
+  ZENTIS_RPC_BASE_SEPOLIA: http://127.0.0.1:1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: bun-linux-x64
+            asset: zentis-linux-x64
+          - target: bun-linux-arm64
+            asset: zentis-linux-arm64
+          - target: bun-darwin-arm64
+            asset: zentis-darwin-arm64
+          - target: bun-darwin-x64
+            asset: zentis-darwin-x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # ORDER MATTERS, as in ci.yml: apps/tui resolves @zentis/console-data straight into that
+      # package's source, so console-data's own dependencies must exist first. There is no root
+      # package.json; everything is per package.
+      - name: Install packages/console-data
+        working-directory: packages/console-data
+        run: bun install --frozen-lockfile
+      - name: Install apps/tui
+        working-directory: apps/tui
+        run: bun install --frozen-lockfile
+
+      - name: Compile ${{ matrix.asset }}
+        working-directory: apps/tui
+        run: |
+          bun build --compile --target=${{ matrix.target }} src/main.tsx \
+            --define "process.env.ZENTIS_VERSION=\"${GITHUB_REF_NAME} (${GITHUB_SHA::7})\"" \
+            --outfile "dist/release/${{ matrix.asset }}"
+          ls -la dist/release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: apps/tui/dist/release/${{ matrix.asset }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      # The checksums are computed here, over the exact files that are uploaded, and install.sh
+      # verifies against this file before it moves anything into place.
+      - name: Checksums
+        working-directory: assets
+        run: |
+          chmod +x zentis-*
+          sha256sum zentis-* > checksums.txt
+          cat checksums.txt
+
+      - name: Release
+        working-directory: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" zentis-* checksums.txt \
+            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
