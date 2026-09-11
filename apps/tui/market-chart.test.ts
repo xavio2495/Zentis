@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { drive } from "./sandbox/drive.js";
 import { fakeSnapshot } from "./sandbox/world.js";
-
 /**
  * One chart, for the book.
  *
@@ -36,4 +35,10 @@ test("publishes and fills are ticked against the market, which is what makes the
 test("with no market series the region says why rather than drawing a flat line", async () => {
   const text = (await drive(190, 50, { scenario: "outage" })).lines.join("\n");
   expect(text).toMatch(/market series|price history/);
+}, 60_000);
+
+test("the chart says how the series was drawn, since an hour of hourly closes is not what the market did", async () => {
+  const text = (await drive(190, 50, {})).lines.join("\n");
+  // The sandbox's series is hourly, and the chart says so rather than implying every point is a trade.
+  expect(text).toMatch(/hourly|per swap/);
 }, 60_000);
