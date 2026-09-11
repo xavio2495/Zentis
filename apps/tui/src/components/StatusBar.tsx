@@ -118,12 +118,24 @@ function hints(actions: Action[], width: number): Seg[] {
       ...(i === 0 ? [] : [{ text: long ? " · " : " ", color: UI.muted }]),
       { text: long ? `${a.key} ${a.label}` : a.key, color: tone(a) },
     ]);
+
+  // The pages and the command line are keys like any other, and a key a reader is never told about
+  // may as well not exist: the help page had them, the row a reader actually looks at did not. What
+  // gives way as the row narrows is the words, never the keys themselves.
+  const rest = (long: boolean): Seg[] =>
+    long
+      ? [
+          { text: " · p positions · n pnl · w wallet · m sim · : command", color: UI.muted },
+          { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted },
+        ]
+      : [{ text: " p n w m : ←→ enter t ? x", color: UI.muted }];
+
   return fitSegments(
     [
-      [...keys(true), { text: " · ←→ price · 1-3 detail · t window · ? help · x quit", color: UI.muted }],
-      [...keys(true), { text: " · ? help · x quit", color: UI.muted }],
-      [...keys(false), { text: " ←→ 1-3 t ? x", color: UI.muted }],
-      [...keys(false), { text: " ? x", color: UI.muted }],
+      [...keys(true), ...rest(true)],
+      [...keys(true), rest(true)[0]!, { text: " · ? help · x quit", color: UI.muted }],
+      [...keys(true), ...rest(false)],
+      [...keys(false), ...rest(false)],
     ],
     width,
   );
