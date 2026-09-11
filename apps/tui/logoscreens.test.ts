@@ -8,7 +8,13 @@ import { drive } from "./sandbox/drive.js";
  * terminal is too small, and the one asking a stranger what kind of console they want. The logo goes
  * in the same place on each so that moving between them does not move it.
  */
-const marked = (lines: string[]) => lines.filter((l) => /█/.test(l)).length;
+/**
+ * Rows of the mark, told apart from the inventory bar.
+ *
+ * That bar is blocks too, but it is always drawn with its empty half and its end caps beside it, so
+ * a row with a block and none of those is the logo's.
+ */
+const marked = (lines: string[]) => lines.filter((l) => /█/.test(l) && !/[░▕▏]/.test(l)).length;
 
 test("the first frame is the mark, with what it is waiting for underneath", async () => {
   const frame = await drive(120, 40, { scenario: "loading" });
@@ -45,4 +51,15 @@ test("onboarding keeps the mark where the loading screen had it, and asks undern
 test("the live view has no mark on it, because it has the book to show instead", async () => {
   const frame = await drive(120, 40, {});
   expect(marked(frame.lines)).toBe(0);
+}, 60_000);
+
+test("where the screen is short the choices win, because a choice nobody can see is not offered", async () => {
+  // At eighty by twenty-four the mark and three choices do not both fit. The mark is the part that
+  // can be spared: it says whose console this is, and they are already looking at it.
+  const frame = await drive(80, 24, { onboarding: true });
+  const text = frame.lines.join("\n");
+  for (const choice of ["make one here", "use a key you already have", "watch only"]) {
+    expect(text).toContain(choice);
+  }
+  expect(frame.overflows).toBe(false);
 }, 60_000);
