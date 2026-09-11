@@ -1,0 +1,81 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const css = readFileSync(join(import.meta.dir, "..", "src", "app", "globals.css"), "utf8");
+
+const ACCENT = "#00ED64";
+
+/** Every `prop: value` pair in the sheet, paired with the selector whose block holds it. */
+function declarations(): { selector: string; prop: string; value: string }[] {
+  const out: { selector: string; prop: string; value: string }[] = [];
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const blocks = stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g);
+  for (const [, rawSelector, body] of blocks) {
+    const selector = rawSelector.trim().split("\n").pop()!.trim();
+    for (const decl of body.split(";")) {
+      const at = decl.indexOf(":");
+      if (at === -1) continue;
+      out.push({
+        selector,
+        prop: decl.slice(0, at).trim(),
+        value: decl.slice(at + 1).trim(),
+      });
+    }
+  }
+  return out;
+}
+
+describe("palette", () => {
+  const expected: [string, string][] = [
+    ["--color-bg", "#0a0a0a"],
+    ["--color-stroke", "#1f1f1f"],
+    ["--color-ink", "#f5f5f5"],
+    ["--color-ink-soft", "#c5c5c5"],
+    ["--color-ink-faint", "#8a8a8a"],
+    ["--color-em", ACCENT],
+    ["--color-em-soft", "#7DF7AF"],
+    ["--color-em-deep", "#00803A"],
+  ];
+
+  for (const [token, value] of expected) {
+    test(`${token} is ${value}`, () => {
+      const decl = declarations().find((d) => d.prop === token);
+      expect(decl?.value).toBe(value);
+    });
+  }
+});
+
+describe("the accent budget", () => {
+  // The reference spends its highlight in eight places. Nine is the ceiling here:
+  // the token definition itself, plus the eight surfaces allowed to wear it.
+  test("the accent is used in under ten declarations", () => {
+    const uses = declarations().filter((d) => d.value.toUpperCase().includes(ACCENT));
+    expect(uses.length).toBeLessThan(10);
+  });
+
+  test("no body copy is accented", () => {
+    const copy = /(^|,\s*)(body|p|li|h[1-6]|blockquote)(\s|,|$)/i;
+    const offenders = declarations().filter(
+      (d) => copy.test(d.selector) && d.value.toUpperCase().includes(ACCENT),
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("scale and motion", () => {
+  test("all eight type steps are defined", () => {
+    const steps = ["0.9rem", "1.12rem", "1.4rem", "1.75rem", "2.19rem", "2.73rem", "3.42rem", "4.27rem"];
+    const defined = declarations().filter((d) => /^--text-fs-\d$/.test(d.prop));
+    expect(defined.map((d) => d.value)).toEqual(steps);
+  });
+
+  test("one easing curve is shared by everything", () => {
+    const ease = declarations().find((d) => d.prop === "--ease-out");
+    expect(ease?.value).toBe("cubic-bezier(0.22, 1, 0.36, 1)");
+  });
+
+  test("motion is answerable to prefers-reduced-motion", () => {
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+});
