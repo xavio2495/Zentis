@@ -4,7 +4,7 @@
   "apiKeySecretId": "ONEINCH_API_KEY",
   "quoteUrl": "https://api.1inch.dev/fusion-plus/quoter/v1.0/quote/receive",
   "minBandEdgeBps": 25,
-  "maxBandEdgeBps": 500,
+  "maxBandEdgeBps": 5000,
   "quote": {
     "srcChainId": 8453,
     "dstChainId": 42161,

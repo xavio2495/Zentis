@@ -5,7 +5,7 @@
   "kappaBookSecretId": "KAPPA_BOOK_BPS",
   "spreadBps": 10,
   "markoutBps": 0,
-  "maxTiltBps": 500,
+  "maxTiltBps": 5000,
   "maxExtrapBps": 100,
   "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
   "legs": [

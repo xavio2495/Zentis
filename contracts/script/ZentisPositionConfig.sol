@@ -27,7 +27,11 @@ library ZentisPositionConfig {
     uint16 internal constant WIDEN_BPS_PER_MINUTE = 2;
     uint16 internal constant SKEW_MAX_WIDEN_BPS = 200;
 
-    uint16 internal constant MAX_TILT_BPS = 500;
+    // 500 is the number to sign on mainnet, where arbitrage keeps a reference pool within a few
+    // percent of the market. The testnet pools these legs price from are not arbitraged and moved
+    // 7-30% in a day (2026-09-10), which pinned every leg at a 500 cap within hours of shipping and
+    // hid the whole decomposition. On the testnets the cap is 5000 so drift shows as correction.
+    uint16 internal constant MAX_TILT_BPS = 5000;
 
     /// @dev `deadline` and `chainSalt` come from the environment rather than the clock: a script
     ///      that derived the deadline from `block.timestamp` would build a different program on
