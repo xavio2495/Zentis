@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-09-10T14:25:57+00:00",
+  "modelCommit": "a6474bae08e4fb1f0719f52b95ab62f2b3cd0a91",
+  "unit": "raw tokenA (6dp), trading PnL with the hold removed, reservation policy minus static",
+  "bookInA": 60000000,
+  "signal": "anchor_own_book",
+  "kappaBps": 10000,
+  "kappaBookBps": 5000,
+  "ticks": 2000,
+  "regimes": [
+    {
+      "regime": "trend",
+      "seeds": 24,
+      "seedsAhead": 24,
+      "meanBpsOfBook": 26.9,
+      "worstBpsOfBook": 23.8
+    },
+    {
+      "regime": "flat",
+      "seeds": 24,
+      "seedsAhead": 24,
+      "meanBpsOfBook": 27.1,
+      "worstBpsOfBook": 23.9
+    },
+    {
+      "regime": "reversed",
+      "seeds": 24,
+      "seedsAhead": 24,
+      "meanBpsOfBook": 27.1,
+      "worstBpsOfBook": 23.3
+    },
+    {
+      "regime": "calm",
+      "seeds": 24,
+      "seedsAhead": 24,
+      "meanBpsOfBook": 16.3,
+      "worstBpsOfBook": 14.3
+    },
+    {
+      "regime": "volatile",
+      "seeds": 24,
+      "seedsAhead": 24,
+      "meanBpsOfBook": 55.6,
+      "worstBpsOfBook": 42.6
+    }
+  ],
+  "caveat": "The harness is uncalibrated: this ranks the policy against static over shared seeds and says which is ahead, not what either is worth.",
+  "source": "packages/sim-report/results/latest.json"
+}
