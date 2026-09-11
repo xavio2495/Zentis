@@ -8,6 +8,10 @@ import { Help } from "./components/Help.js";
 import { LegCard } from "./components/LegCard.js";
 import { LegDetail } from "./components/LegDetail.js";
 import { Panel, panelInner } from "./components/Panel.js";
+import { Pnl } from "./pages/Pnl.js";
+import { Positions } from "./pages/Positions.js";
+import { Simulation } from "./pages/Simulation.js";
+import { WalletPage } from "./pages/WalletPage.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { type Pending, landed } from "./landed.js";
 import { pairPrice } from "./format.js";
@@ -31,6 +35,10 @@ import { WINDOWS, autoWindow } from "./window.js";
 /** Fifteen seconds a leg, as asked: long enough to read a line, short enough to see all three. */
 export const ROTATE_MS = 15_000;
 
+/** The pages, and the word the status bar names each one by. */
+export type Page = "live" | "positions" | "pnl" | "wallet" | "simulation";
+const PAGE_OF: Record<string, Page> = { positions: "positions", pnl: "pnl", wallet: "wallet", sim: "simulation" };
+
 export function App({
   actions,
   runAction,
@@ -53,6 +61,9 @@ export function App({
   const [, setTick] = useState(0);
 
   const [overlay, setOverlay] = useState<"none" | "leg" | "help">("none");
+  // Which page the right-hand column is on. The cards and the overall view are on every one of them,
+  // so a reader who walks away from the live view still sees the book move.
+  const [page, setPage] = useState<Page>("live");
   const [legIndex, setLegIndex] = useState(0);
   // Which leg the chart region is showing while it rotates. Separate from `legIndex`, which is the
   // leg whose detail is pinned, so returning from a detail does not jerk the rotation somewhere else.
@@ -137,6 +148,20 @@ export function App({
       case "back":
         setOverlay("none");
         return;
+      case "live":
+        setPage("live");
+        return;
+      case "positions":
+      case "pnl":
+      case "wallet":
+      case "sim": {
+        const wanted = PAGE_OF[binding.id]!;
+        // The key that opened a page closes it, like a leg's number does, so no reader is ever stuck
+        // on a page hunting for the way back.
+        setPage((current) => (current === wanted ? "live" : wanted));
+        setOverlay("none");
+        return;
+      }
       case "quote":
         void store.refresh(true);
         return;
@@ -230,7 +255,12 @@ export function App({
       </Box>
 
       <Box flexDirection="column" width={regions.rightWidth} height={regions.draw} overflow="hidden">
-        <Panel title="zentis" width={regions.rightWidth} height={regions.statusRows + 2}>
+        <Panel
+          title={page === "live" ? "zentis" : `zentis · ${page}`}
+          right={page === "live" ? undefined : "esc to the live view"}
+          width={regions.rightWidth}
+          height={regions.statusRows + 2}
+        >
           <StatusBar
             snapshot={snapshot}
             actions={actions}
@@ -256,6 +286,29 @@ export function App({
                 actions={actions}
                 {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)}
               />
+            </Panel>
+          ) : page !== "live" ? (
+            // A page takes the chart and the feed together: these are tables, and a table given half
+            // the column and then clipped is a worse answer than the live view it replaced.
+            <Panel
+              title={page}
+              right="esc to the live view"
+              width={regions.rightWidth}
+              height={regions.graphRows + regions.feedRows}
+            >
+              {page === "positions" ? (
+                <Positions snapshot={snapshot} {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)} />
+              ) : page === "pnl" ? (
+                <Pnl snapshot={snapshot} {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)} />
+              ) : page === "wallet" ? (
+                <WalletPage
+                  snapshot={snapshot}
+                  armed={armed}
+                  {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)}
+                />
+              ) : (
+                <Simulation report={snapshot.sim} {...panelInner(regions.rightWidth, regions.graphRows + regions.feedRows)} />
+              )}
             </Panel>
           ) : overlay === "leg" && selected !== undefined ? (
             <Panel
@@ -293,7 +346,7 @@ export function App({
             </Panel>
           ))}
 
-        {overlay !== "help" && (
+        {overlay !== "help" && page === "live" && (
           <Panel title="feed" width={regions.rightWidth} height={regions.feedRows}>
             <Feed
               snapshot={snapshot}

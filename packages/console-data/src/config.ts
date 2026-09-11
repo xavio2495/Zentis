@@ -34,6 +34,8 @@ export interface LegConfig {
   readonly rpcUrl: string;
   /** the slow workflow's per-leg override, or the book-wide default when it has none */
   readonly volatilityMultiplierBps: number;
+  /** how many times this leg has been shipped: the live generation and every record it superseded */
+  readonly generations: number;
   /** what this generation was shipped with, from the deployment record; the base of every PnL */
   readonly shipped: ShippedRecord;
 }
@@ -159,6 +161,9 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     // Read through a widened type: `markAtShip` is written by `scripts/reship.py` from 2026-09-11
     // and is simply absent on every generation shipped before it, which is what leaves the hold
     // effect unknown on those. The rest is present on every record.
+    // Counted from the record rather than configured: a re-ship appends the old position to
+    // `supersededPositions`, so the count is a fact about the file and never drifts from it.
+    generations: ((deployment as { supersededPositions?: unknown[] }).supersededPositions?.length ?? 0) + 1,
     shipped: shippedOf(deployment.position as RawShipped),
     volatilityMultiplierBps: slow.volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
   };

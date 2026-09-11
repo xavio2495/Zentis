@@ -1,5 +1,5 @@
 import type { Snapshot } from "@zentis/console-data";
-import { ASSUMED_GAINS, BOOK, LEGS, PAIR, bookTotals, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
+import { ASSUMED_GAINS, BOOK, LEGS, PAIR, bookTotals, holdingOf, walletCaveats, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
 import historySepolia from "../../../packages/console-data/fixtures/history-sepolia.json" with { type: "json" };
 import historyArbitrum from "../../../packages/console-data/fixtures/history-arbitrum-sepolia.json" with { type: "json" };
 import historyBase from "../../../packages/console-data/fixtures/history-base-sepolia.json" with { type: "json" };
@@ -131,6 +131,30 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     };
   });
 
+  /**
+   * The maker's wallet, built from the same positions the legs above carry.
+   *
+   * Aqua records a balance against the strategy and pulls from the wallet at settlement, so the
+   * committed inventory is still in the wallet's own balance. The fake world holds a multiple of
+   * what it committed, which is the ordinary case; the shortfall and short-allowance cases are what
+   * `walletCaveats` exists to say, and they are constructed in the tests that are about them.
+   */
+  const wallet = {
+    maker: BOOK.maker,
+    chains: legs.map((leg) => {
+      const committedA = leg.position?.balanceA ?? 0n;
+      const committedB = leg.position?.balanceB ?? 0n;
+      return {
+        chainId: leg.config.chainId,
+        chain: leg.config.name,
+        gas: 10n ** 17n,
+        tokenA: holdingOf(leg.config.tokenA, committedA * 3n, committedA, committedA * 10n),
+        tokenB: holdingOf(leg.config.tokenB, committedB * 3n, committedB, committedB * 10n),
+      };
+    }),
+    caveats: walletCaveats([]),
+  };
+
   if (scenario === "refused") {
     // Seen live: the router answers USDC → WETH on Sepolia and reverts WETH → USDC. The quote service
     // reports the revert as a caveat with no amount.
@@ -248,7 +272,7 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     // Derived, not written down: the sandbox's book has to be the one the legs above add up to, or
     // a scenario would assert against a total no arrangement of its own legs could produce.
     book: bookTotals(legs as LegSnapshot[]),
-    wallet: null,
+    wallet,
     caveats: [],
   } as Snapshot;
 }

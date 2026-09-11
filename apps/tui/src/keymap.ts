@@ -26,7 +26,14 @@ export const BINDINGS: Binding[] = [
   { scope: "main", keys: ["left", "right"], label: "step the price chart to the previous or next leg", id: "step" },
   { scope: "main", keys: ["1", "2", "3"], label: "open a leg's detail; the same number closes it", id: "leg" },
   { scope: "main", keys: ["t"], label: "chart window: 1h, 24h, 7d, then back to automatic", id: "window" },
+  { scope: "main", keys: ["p"], label: "positions: the legs as objects, and what they were shipped as", id: "positions" },
+  { scope: "main", keys: ["n"], label: "profit and loss, per leg and for the book", id: "pnl" },
+  { scope: "main", keys: ["w"], label: "the maker's wallet on each chain", id: "wallet" },
+  { scope: "main", keys: ["m"], label: "the committed simulation run", id: "sim" },
   { scope: "overlay", keys: ["esc"], label: "back to the charts", id: "back" },
+  // `esc` leaves a page for the live view, in `main` rather than `overlay`: a page is where the
+  // reader is, not something drawn over where they were, and the keys stay live on it.
+  { scope: "main", keys: ["esc"], label: "back to the live view", id: "live" },
   { scope: "global", keys: ["q"], label: "re-quote every leg now", id: "quote" },
   { scope: "main", keys: ["r"], label: "republish the fast workflow", id: "fast" },
   { scope: "main", keys: ["s"], label: "republish the slow workflow", id: "slow" },
