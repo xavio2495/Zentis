@@ -74,14 +74,21 @@ export function readKey(path: string, variable: string): string {
 }
 
 /** Anything that looks like a private key, gone — whoever it belongs to. */
-export function redact(text: string, key?: string): string {
+export function redact(text: string, key?: string, allow: Iterable<string> = []): string {
   let out = text;
   if (key !== undefined && key !== "") {
     out = out.split(key).join("[redacted]");
     const bare = key.startsWith("0x") ? key.slice(2) : key;
     out = out.split(bare).join("[redacted]");
   }
-  return out.replace(/0x[0-9a-fA-F]{64}\b/g, (match) => (match.length === 66 ? "[redacted]" : match));
+  // A key and a transaction hash are both thirty-two bytes, so nothing about their shape tells them
+  // apart. What does is provenance: the allowance holds the hashes this process was handed back by
+  // `sendTransaction`, and every other 32-byte value is treated as a key — which is what an unknown
+  // one is. Without this the console could never show a hash, because the funnel ate every one.
+  const sent = new Set([...allow].map((hash) => hash.toLowerCase()));
+  return out.replace(/0x[0-9a-fA-F]{64}\b/g, (match) =>
+    match.length !== 66 || sent.has(match.toLowerCase()) ? match : "[redacted]",
+  );
 }
 
 const legOf = (chainId: number): LegConfig => {
@@ -112,6 +119,11 @@ export async function runIntent(
   log: (line: string) => void,
   /** injected by the tests, which pin the sequence rather than the chain */
   transport?: Transport,
+  /**
+   * Filled in with every hash this run sent, so the caller's redactor can let those through and no
+   * other 32-byte value. Owned by the caller because the redactor is the caller's.
+   */
+  sent?: Set<string>,
 ): Promise<void> {
   if (intent.kind === "wallet-new") {
     newWallet(log);
@@ -140,6 +152,8 @@ export async function runIntent(
   const send = async (what: string, request: Request): Promise<void> => {
     nonce ??= await reader.getTransactionCount({ address: account.address, blockTag: "pending" });
     const hash = await wallet.sendTransaction({ ...request, chain: null, account, nonce });
+    // Written down before the line carrying it is printed, so the funnel knows this one is a hash.
+    sent?.add(hash);
     nonce += 1;
     const receipt = await reader.waitForTransactionReceipt({ hash });
     log(`${what} ${hash} ${receipt.status}`);
@@ -205,16 +219,18 @@ export async function runIntent(
 /** The entry point `zentis sign` runs: intent on stdin, one line per step on stdout. */
 export async function signMain(stdin: string, envPath: string | null): Promise<number> {
   let key: string | undefined;
+  const sent = new Set<string>();
   try {
     const intent = parseIntent(stdin);
     // Making a wallet is the one intent that needs no key, because it is where one comes from.
     if (intent.kind !== "wallet-new" && envPath === null) {
       throw new Error("no env file: set ZENTIS_ENV or run the console's onboarding");
     }
-    await runIntent(intent, envPath ?? "", (line) => process.stdout.write(`${redact(line, key)}\n`));
+    // The hashes this run sent, gathered as it sends them: the only 32-byte values allowed out.
+    await runIntent(intent, envPath ?? "", (line) => process.stdout.write(`${redact(line, key, sent)}\n`), undefined, sent);
     return 0;
   } catch (cause) {
-    process.stderr.write(`${redact(String(cause instanceof Error ? cause.message : cause), key)}\n`);
+    process.stderr.write(`${redact(String(cause instanceof Error ? cause.message : cause), key, sent)}\n`);
     return 1;
   }
 }

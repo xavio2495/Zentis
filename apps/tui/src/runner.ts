@@ -1,4 +1,5 @@
 import type { Action, ActionCommand } from "./action-types.js";
+import { hashesIn } from "./journal.js";
 
 export interface RunResult {
   readonly exitCode: number;
@@ -60,7 +61,12 @@ export async function run(command: ActionCommand): Promise<RunResult> {
  * something it has not checked. What it can vouch for is the next poll, where a write that landed
  * shows up as a new seq.
  */
-export const summarise = (action: Action, result: RunResult): string =>
-  result.exitCode === 0
-    ? `${action.label} finished — watch the feed for the write to land`
-    : `${action.label} exited ${result.exitCode}: ${result.tail}`;
+export const summarise = (action: Action, result: RunResult): string => {
+  if (result.exitCode !== 0) return `${action.label} exited ${result.exitCode}: ${result.tail}`;
+  // The hashes it sent, said here rather than only in the tail: they are what the log's transaction
+  // column is made of, and an operator wanting to look one up on an explorer should not have to run
+  // the action again to see it.
+  const sent = hashesIn(result.tail);
+  const named = sent.length === 0 ? "" : ` ${sent.join(" ")}`;
+  return `${action.label} finished${named} — watch the feed for the write to land`;
+};
