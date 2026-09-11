@@ -22,6 +22,7 @@ import { CommandLine } from "./components/CommandLine.js";
 import { Panel, panelInner } from "./components/Panel.js";
 import { Pnl } from "./pages/Pnl.js";
 import { Positions } from "./pages/Positions.js";
+import { Status } from "./pages/Status.js";
 import { Simulation } from "./pages/Simulation.js";
 import { WalletPage } from "./pages/WalletPage.js";
 import { StatusBar, hints } from "./components/StatusBar.js";
@@ -52,8 +53,14 @@ export const ROTATE_MS = 15_000;
 
 
 /** The pages, and the word the status bar names each one by. */
-export type Page = "live" | "positions" | "pnl" | "wallet" | "simulation";
-const PAGE_OF: Record<string, Page> = { positions: "positions", pnl: "pnl", wallet: "wallet", sim: "simulation" };
+export type Page = "live" | "positions" | "pnl" | "wallet" | "simulation" | "status";
+const PAGE_OF: Record<string, Page> = {
+  positions: "positions",
+  pnl: "pnl",
+  wallet: "wallet",
+  sim: "simulation",
+  status: "status",
+};
 
 export function App({
   actions,
@@ -356,6 +363,7 @@ export function App({
       case "positions":
       case "pnl":
       case "wallet":
+      case "status":
       case "sim": {
         const wanted = PAGE_OF[binding.id]!;
         // The key that opened a page closes it, like a leg's number does, so no reader is ever stuck
@@ -529,6 +537,8 @@ export function App({
                 <Pnl snapshot={snapshot} {...panelInner(regions.rightWidth, pageRows)} />
               ) : page === "wallet" ? (
                 <WalletPage snapshot={snapshot} armed={armed} {...panelInner(regions.rightWidth, pageRows)} />
+              ) : page === "status" ? (
+                <Status snapshot={snapshot} {...panelInner(regions.rightWidth, pageRows)} />
               ) : (
                 <Simulation report={snapshot.sim} {...panelInner(regions.rightWidth, pageRows)} />
               )}

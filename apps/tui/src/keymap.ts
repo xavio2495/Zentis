@@ -31,6 +31,7 @@ export const BINDINGS: Binding[] = [
   { scope: "main", keys: ["n"], label: "profit and loss, per leg and for the book", id: "pnl" },
   { scope: "main", keys: ["w"], label: "the maker's wallet on each chain", id: "wallet" },
   { scope: "main", keys: ["m"], label: "the committed simulation run", id: "sim" },
+  { scope: "main", keys: ["d"], label: "status: every source, what it last answered and when", id: "status" },
   { scope: "overlay", keys: ["up", "down"], label: "scroll the help page", id: "scroll" },
   { scope: "overlay", keys: ["esc"], label: "back to the charts", id: "back" },
   // `esc` leaves a page for the live view, in `main` rather than `overlay`: a page is where the

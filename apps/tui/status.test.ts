@@ -61,7 +61,8 @@ test("the hints name the pages and the command line, since a key nobody is told 
   for (const key of ["p", "n", "w", "m", ":"]) {
     expect(hints).toContain(key);
   }
-  expect(hints).toMatch(/pages|positions/);
+  // "p pos" once the status page joined the row: the word is shortened, never the key.
+  expect(hints).toMatch(/p pos|positions/);
 }, 60_000);
 
 test("the narrow hint row keeps every key, dropping only the words around them", async () => {

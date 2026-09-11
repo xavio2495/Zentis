@@ -58,6 +58,11 @@ const PAGES: [string, string][] = [
       "is ahead and not what either is worth. Mean and worst are basis points of the opening book.",
   ],
   [
+    "status",
+    "Every source the console reads: whether it is answering, serving its last good value or down, " +
+      "what it last said, how often it is asked, and what is left of its allowance.",
+  ],
+  [
     "leg detail",
     "The shift is one signed number on-chain, rebuilt as its correction and its concessions. A venue " +
       "is where a leg's trades settle, not what it quotes from.",

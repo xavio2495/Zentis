@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
 import { drive } from "./sandbox/drive.js";
+import { providersOf } from "@zentis/console-data";
+import { DOT, dotColour, providerDots } from "./src/components/Providers.js";
+import { UI } from "./src/theme.js";
 import { fakeSnapshot } from "./sandbox/world.js";
 
 /**
@@ -34,15 +37,27 @@ test("the top panel is three rows: the book, its state, and one dot per source",
   expect(joined).toContain(String(snapshot.seq));
   expect(joined).toContain("armed");
   // One mark per source, in a fixed order, and no line-per-source list.
-  expect(joined).toMatch(/[●▲]{6,}|[●▲]( [a-z]+)?/);
+  expect(joined).toMatch(/rpc [●▲◐]{3}/);
   expect(joined).not.toContain("rpc sepolia   ");
 }, 60_000);
 
-test("the dots are green, yellow and red: answering, last-good, and down", async () => {
-  // Colour is the whole content of a dot, so it is asserted as colour rather than as a shape.
-  const frame = (await drive(190, 50, { scenario: "partial" })).lines.join("\n");
-  expect(frame).toMatch(/\u001b\[38;2;[0-9;]+m[●▲]/);
-}, 60_000);
+test("the dots are green, yellow and red: answering, last-good, and down", () => {
+  // Colour is the whole content of a dot, and the sandbox strips colour out of a frame, so this is
+  // asserted where the colour is decided rather than through a rendered screen.
+  expect(dotColour("up")).toBe(UI.fill);
+  expect(dotColour("stale")).toBe(UI.caveat);
+  expect(dotColour("down")).toBe(UI.rejection);
+
+  const providers = providersOf(fakeSnapshot("partial"));
+  const segs = providerDots(providers, 190);
+  const coloured = segs.filter((seg) => /[●◐▲]/.test(seg.text));
+  expect(coloured.length).toBe(providers.length);
+  for (const seg of coloured) {
+    expect([UI.fill, UI.caveat, UI.rejection] as string[]).toContain(seg.color!);
+  }
+  // The outage leaves marks of more than one colour, which is the point of having three.
+  expect(new Set(coloured.map((seg) => seg.color)).size).toBeGreaterThan(1);
+});
 
 test("the status page behind d says, for every source, what it answered and when", async () => {
   const text = (await drive(190, 50, { keys: ["d"] })).lines.join("\n");

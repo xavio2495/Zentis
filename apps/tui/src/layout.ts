@@ -93,10 +93,10 @@ export function fit(cols: number, rows: number): Regions {
   // is one or two lines inside that.
   // Three when there is room — the state, the keys, and what the last action said — so a note never
   // has to displace the keys. Two on a short terminal, one on the smallest.
-  // The top panel is the critical information: the book's own row, then one line per source the
-  // console reads. Eleven sources need eleven rows, which only a tall terminal has; below that they
-  // collapse to a row of marks, so the panel always says whether anything is down.
-  const statusRows = draw >= 44 ? 14 : draw >= 30 ? 5 : draw >= 22 ? 4 : 3;
+  // The top panel is the critical information, and it is short: the book's own row, the state it is
+  // in, one mark per source, and what the last action said. The sources' own detail is a page, which
+  // is what keeps the rest of this height with the chart and the feed.
+  const statusRows = draw >= 30 ? 4 : draw >= 22 ? 3 : 3;
 
   const BORDER = 2;
   // The keys have a section of their own below the feed now: one row inside its own border. They are

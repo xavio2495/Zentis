@@ -10,6 +10,27 @@ export interface Read<T> {
   readonly value: T | null;
   readonly error: string | null;
   readonly indexingErrors: boolean;
+  /** what the endpoint said about its own allowance, when it says anything */
+  readonly quota?: Quota | null;
+}
+
+/**
+ * An endpoint's own account of what is left.
+ *
+ * Studio meters each deployment over a window of hours and puts both facts in the headers of every
+ * answer, not only of its refusals. Reading them only on failure meant the console could say "out of
+ * allowance" but never "getting close", which is the point at which someone can still act.
+ */
+export interface Quota {
+  readonly remaining: number;
+  readonly resetsAtSeconds: number;
+}
+
+export function parseQuota(headers: Headers): Quota | null {
+  const remaining = Number(headers.get("x-ratelimit-remaining"));
+  const reset = Number(headers.get("x-ratelimit-reset"));
+  if (!Number.isFinite(remaining) || headers.get("x-ratelimit-remaining") === null) return null;
+  return { remaining, resetsAtSeconds: Number.isFinite(reset) ? reset : 0 };
 }
 
 export const failed = <T>(error: string): Read<T> => ({ value: null, error, indexingErrors: false });
@@ -38,13 +59,14 @@ export async function query<T>(url: string, body: string): Promise<Read<T>> {
   } catch (cause) {
     return failed(`could not reach the subgraph: ${String(cause)}`);
   }
+  const quota = parseQuota(response.headers);
   if (!response.ok) {
     // Subgraph Studio's allowance is per deployment endpoint over a window of hours, so the reset
     // time is the only part of a refusal anyone can act on. Backing off without it is guesswork.
     const reset = response.headers.get("x-ratelimit-reset");
     const when =
       reset === null ? "" : `, resets ${new Date(Number(reset) * 1000).toISOString().slice(11, 16)}Z`;
-    return failed(`subgraph HTTP ${response.status}${when}`);
+    return { ...failed<T>(`subgraph HTTP ${response.status}${when}`), quota };
   }
 
   let payload: { data?: T & { _meta?: { hasIndexingErrors: boolean } }; errors?: { message: string }[] };
@@ -58,7 +80,7 @@ export async function query<T>(url: string, body: string): Promise<Read<T>> {
   }
   if (payload.data === undefined || payload.data === null) return failed("the subgraph returned no data");
 
-  return ok(payload.data, payload.data._meta?.hasIndexingErrors === true);
+  return { ...ok(payload.data, payload.data._meta?.hasIndexingErrors === true), quota };
 }
 
 /** Reads a value that is absent rather than wrong when a source has nothing to say. */

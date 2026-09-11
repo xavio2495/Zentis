@@ -8,7 +8,7 @@ import { type LegQuote, type QuoteSet, fetchQuotes } from "./quotes.js";
 import { type Finality, type StoredRef, fetchFinality, fetchRef } from "./registry.js";
 import { type SpreadStack, recomputeVolatility, spreadStack } from "./spread.js";
 import { type SimReport, loadSimReport } from "./sim.js";
-import { ok } from "./graphql.js";
+import { type Quota, ok } from "./graphql.js";
 import { humanDuration } from "./duration.js";
 import { type Mark, fetchMarks } from "./mark.js";
 import { type MarkHistory, fetchMarkHistory, marketCacheKey } from "./market.js";
@@ -41,6 +41,8 @@ export interface LegSnapshot {
     readonly fills: string | null;
     readonly registry: string | null;
     readonly pool: string | null;
+    /** what the fills endpoint said about its own allowance, when it said anything */
+    readonly fillsQuota: Quota | null;
   };
   /** printed as-is; a missing source is part of the state, not an exception */
   readonly caveats: string[];
@@ -224,6 +226,7 @@ export async function takeSnapshot(
         fills: history.value === null ? history.error : null,
         registry: ref.value === null ? ref.error : null,
         pool: pool.value === null ? pool.error : null,
+        fillsQuota: history.quota ?? null,
       },
       caveats: legCaveats,
     };

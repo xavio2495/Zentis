@@ -202,7 +202,13 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
       pnl: legPnl(entry.history, entry.leg.shipped, MARK_MID, null),
       // Every source answered in the fake world, except a venue that no longer exists to answer:
       // the outage scenario is the one that sets the others.
-      sources: { fills: null, registry: null, pool: series === null ? POOL_RETIRED : null },
+      sources: {
+        fills: null,
+        registry: null,
+        pool: series === null ? POOL_RETIRED : null,
+        // The fake world's endpoints report a healthy allowance, so the status page has one to draw.
+        fillsQuota: { remaining: 2865, resetsAtSeconds: now + 3 * 3600 },
+      },
       caveats: spread.tooStaleToQuote
         ? [`the reference is ${Math.floor(ageSeconds / 60)}m old, past this leg's limit`]
         : [],
@@ -308,7 +314,7 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
             quoteBToA: null,
             mark: null,
             pnl: null,
-            sources: { fills: refusal, registry: null, pool: null },
+            sources: { fills: refusal, registry: null, pool: null, fillsQuota: { remaining: 0, resetsAtSeconds: now + 3600 } },
           },
     );
     return {

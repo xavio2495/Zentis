@@ -1,4 +1,4 @@
-import type { Read } from "./graphql.js";
+import type { Quota, Read } from "./graphql.js";
 
 /**
  * Per-source cadence, single-flight, and last-good-value on failure.
@@ -24,6 +24,8 @@ export interface Cached<T> {
   readonly indexingErrors: boolean;
   /** how long ago the value was actually read; zero when it is from this poll */
   readonly ageSeconds: number;
+  /** what the endpoint last said about its own allowance, kept with the value it came with */
+  readonly quota?: Quota | null;
 }
 
 export interface Cache {
@@ -44,6 +46,7 @@ interface Entry {
   indexingErrors: boolean;
   fetchedAt: number | null;
   inFlight: Promise<unknown> | null;
+  quota: Quota | null;
 }
 
 export function createCache(now: () => number = Date.now): Cache {
@@ -57,6 +60,7 @@ export function createCache(now: () => number = Date.now): Cache {
         indexingErrors: false,
         fetchedAt: null,
         inFlight: null,
+        quota: null,
       };
       entries.set(key, entry);
 
@@ -65,6 +69,9 @@ export function createCache(now: () => number = Date.now): Cache {
         error: entry.error,
         indexingErrors: entry.indexingErrors,
         ageSeconds: entry.fetchedAt === null ? 0 : Math.floor((now() - entry.fetchedAt) / 1000),
+        // Kept from the last answer, whichever way it went: an endpoint states its allowance when it
+        // refuses and when it does not, and the number is worth as much either way.
+        quota: entry.quota ?? null,
       });
 
       const fresh = entry.fetchedAt !== null && now() - entry.fetchedAt < cadenceMs;
@@ -79,6 +86,8 @@ export function createCache(now: () => number = Date.now): Cache {
 
       const request = read()
         .then((result) => {
+          // Whatever the endpoint said about its allowance, kept whichever way the read went.
+          if (result.quota != null) entry.quota = result.quota;
           if (result.value !== null) {
             entry.value = result.value;
             entry.error = null;

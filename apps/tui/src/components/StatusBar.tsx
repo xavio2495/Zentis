@@ -128,16 +128,16 @@ export function hints(actions: Action[], width: number): Seg[] {
   // The pages and the command line are keys like any other, and a key a reader is never told about
   // may as well not exist: the help page had them, the row a reader actually looks at did not. What
   // gives way as the row narrows is the words, never the keys themselves.
-  const pagesFull: Seg = { text: " · p positions · n pnl · w wallet · m sim · : command", color: UI.muted };
-  const pagesShort: Seg = { text: " · p pos · n pnl · w wal · m sim · : cmd", color: UI.muted };
+  const pagesFull: Seg = { text: " · p positions · n pnl · w wallet · m sim · d status · : command", color: UI.muted };
+  const pagesShort: Seg = { text: " · p pos · n pnl · w wal · m sim · d status · : cmd", color: UI.muted };
   const navFull: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
   const navShort: Seg = { text: " · ←→ · enter · t · ? help · x quit", color: UI.muted };
   const navBare: Seg = { text: " · ←→ enter t ? x", color: UI.muted };
   const navTiny: Seg = { text: " · ? x", color: UI.muted };
   // The page words without the dots between them: two characters short of fitting at a hundred and
   // twenty columns, and the words are what the row is for.
-  const pagesTight: Seg = { text: " · p pos n pnl w wal m sim : cmd", color: UI.muted };
-  const bare: Seg = { text: " p n w m : ←→ enter t ? x", color: UI.muted };
+  const pagesTight: Seg = { text: " · p pos n pnl w wal m sim d status : cmd", color: UI.muted };
+  const bare: Seg = { text: " p n w m d : ←→ enter t ? x", color: UI.muted };
 
   return fitSegments(
     [
@@ -204,21 +204,17 @@ export function StatusBar({
   // The book, then its state, then every source the console reads, then whatever the last action
   // said. The keys are not here any more: they have a section of their own below the feed, because
   // a row of keys is not critical information and it was sitting above the one thing that is.
-  const stateRows = rows >= 4 ? 1 : 0;
-  const noteRows = note === null ? 0 : 1;
-  const providerRows = Math.max(0, rows - 1 - stateRows - noteRows);
+  // Three rows: what the book is, what state it is in, and one mark per source. Everything else the
+  // sources have to say is a page of its own, which is what gave this panel's height back to the
+  // chart and the feed.
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
       <Box height={1}>
         <Segments segs={book} />
       </Box>
-      {stateRows === 1 && (
-        <Box height={1}>
-          <Segments segs={line} />
-        </Box>
-      )}
-      {providerRows > 0 && <Providers snapshot={snapshot} width={width} rows={providerRows} />}
-      {noteRows === 1 && <Box height={1}>{note}</Box>}
+      {rows > 1 && <Box height={1}>{rows < 3 && note !== null ? note : <Segments segs={line} />}</Box>}
+      {rows > 2 && <Providers snapshot={snapshot} width={width} />}
+      {rows > 3 && <Box height={1}>{note ?? <Text> </Text>}</Box>}
     </Box>
   );
 }

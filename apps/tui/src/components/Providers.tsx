@@ -1,85 +1,67 @@
 import { Box, Text } from "ink";
-import { type Provider, type Snapshot, providersOf } from "@zentis/console-data";
-import { type Seg, fitSegments, padRows } from "../layout.js";
+import { type Provider, type ProviderState, type Snapshot, providersOf } from "@zentis/console-data";
+import { type Seg, fitSegments } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { UI } from "../theme.js";
 
 /**
- * One line per source, or as close to that as the terminal allows.
+ * One mark per source, on one row.
  *
- * Eleven endpoints across three chains, and before this panel a failure in any of them arrived as a
- * sentence somewhere else on the screen — inside a card, inside the feed, under the status bar — so
- * a reader could not tell which sources were answering without reading everything and inferring it.
+ * It was a line each, which at a hundred and ninety columns took most of a panel whose subject is
+ * the book. What a reader needs at a glance is whether anything is wrong, and that is a colour: green
+ * answering, yellow serving its last good value, red down. What is wrong, what it said and when its
+ * window reopens is a page of its own on `d`.
  *
- * At a tall terminal each source gets its row. At a short one they collapse into marks, with the
- * ones that are down named: a reader who can see nothing else must still see what is not answering.
- * The long explanation of any of it lives in help.
+ * The order is fixed — the chains in the cards' order, then the services, then the references — so
+ * the same dot means the same source every time and a reader learns the row's shape rather than
+ * reading it.
  */
-const DOT = { up: "●", down: "▲" } as const;
+export const DOT = { up: "●", stale: "◐", down: "▲" } as const;
 
-function line(provider: Provider, width: number): Seg[] {
-  const tone = provider.ok ? UI.fill : UI.rejection;
-  const state: Seg = { text: `${provider.ok ? DOT.up : DOT.down} `, color: tone };
-  const name: Seg = { text: provider.name.padEnd(16), color: UI.muted };
-  const said: Seg = provider.ok
-    ? { text: provider.detail ?? "", color: UI.muted }
-    : { text: provider.reason ?? "down", color: UI.caveat };
-  return fitSegments(
-    [
-      [state, name, said],
-      [state, { text: `${provider.name} `, color: UI.muted }, said],
-      [state, { text: provider.name, color: UI.muted }],
-    ],
-    width,
-  );
+export const dotColour = (state: ProviderState): string =>
+  state === "up" ? UI.fill : state === "stale" ? UI.caveat : UI.rejection;
+
+export function providerDots(providers: Provider[], width: number): Seg[] {
+  const marks: Seg[] = providers.flatMap((p, i) => [
+    ...(i === 0 ? [] : [{ text: " " }]),
+    { text: DOT[p.state], color: dotColour(p.state) },
+  ]);
+  // Grouped by kind, because the per-chain ones repeat their chain's name and "sepolia ● sepolia"
+  // says nothing about which of the two is which. Three dots under "rpc" are the three chains, in
+  // the cards' order, every time.
+  const GROUPS: [string, Provider["kind"][]][] = [
+    ["rpc", ["rpc"]],
+    ["fills", ["fills"]],
+    ["quotes", ["quotes"]],
+    ["mark", ["mark"]],
+    ["market", ["market"]],
+    ["refs", ["reference"]],
+  ];
+  const labelled: Seg[] = GROUPS.flatMap(([label, kinds], i): Seg[] => {
+    const group = providers.filter((p) => kinds.includes(p.kind));
+    if (group.length === 0) return [];
+    return [
+      ...(i === 0 ? [] : [{ text: "  " }]),
+      { text: `${label} `, color: UI.muted },
+      ...group.map((p) => ({ text: DOT[p.state], color: dotColour(p.state) })),
+    ];
+  });
+  const down = providers.filter((p) => p.state === "down");
+  const stale = providers.filter((p) => p.state === "stale");
+  const said: Seg[] =
+    down.length > 0
+      ? [{ text: `  ${down.length} down · d`, color: UI.rejection }]
+      : stale.length > 0
+        ? [{ text: `  ${stale.length} on last-good · d`, color: UI.caveat }]
+        : [{ text: "  all answering · d", color: UI.muted }];
+
+  return fitSegments([[...labelled, ...said], [...marks, ...said], marks], width);
 }
 
-/** Every source as one row of marks, with the failing ones named after them. */
-function marks(providers: Provider[], width: number): Seg[] {
-  const chips: Seg[] = providers.map((p) => ({ text: p.ok ? DOT.up : DOT.down, color: p.ok ? UI.fill : UI.rejection }));
-  const down = providers.filter((p) => !p.ok);
-  const named: Seg[] =
-    down.length === 0
-      ? [{ text: "  all sources answering", color: UI.muted }]
-      : [{ text: `  ${down.map((p) => p.name).join(", ")} down`, color: UI.caveat }];
-  return fitSegments(
-    [
-      [...chips, ...named],
-      [...chips, { text: down.length === 0 ? "  all up" : `  ${down.length} down`, color: down.length === 0 ? UI.muted : UI.caveat }],
-      chips,
-    ],
-    width,
-  );
-}
-
-export function Providers({
-  snapshot,
-  width,
-  rows,
-}: {
-  snapshot: Snapshot;
-  width: number;
-  /** how many rows this panel may use for sources, after the book's own row */
-  rows: number;
-}) {
-  const providers = providersOf(snapshot);
-  if (rows <= 0) return null;
-  // One row each when they all fit; otherwise the marks, which say the same thing in one row for a
-  // reader who only needs to know whether anything is wrong.
-  const each = rows >= providers.length;
-  const drawn = each ? providers.map((p) => line(p, width)) : [marks(providers, width)];
-
+export function Providers({ snapshot, width }: { snapshot: Snapshot; width: number }) {
   return (
-    <Box flexDirection="column" width={width} height={rows} overflow="hidden">
-      {padRows(
-        drawn.map((segs, i) => <Segments key={i} segs={segs} />),
-        rows,
-        null,
-      ).map((row, i) => (
-        <Box key={i} height={1}>
-          {row ?? <Text> </Text>}
-        </Box>
-      ))}
+    <Box width={width} height={1} overflow="hidden">
+      <Segments segs={providerDots(providersOf(snapshot), width)} />
     </Box>
   );
 }
