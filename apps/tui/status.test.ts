@@ -41,8 +41,11 @@ const keysOf = (lines: string[]) => {
 };
 
 test("the key hints are always there, and pressing a disabled key does not replace them", async () => {
+  // A watcher has no publisher, so `r` and `s` are not among their keys at all; what is left is
+  // theirs, and pressing a key that is not offered changes nothing.
   const watching = keysOf((await drive(120, 40, { keys: ["r"] })).lines);
-  expect(watching).toMatch(/r .*s .*f .*q/);
+  expect(watching).toMatch(/f .*q .*p .*n/);
+  expect(watching).not.toMatch(/\br (fill|republish|fast)/);
   // The signing-key sentence is not a warning for someone who only wants to watch.
   expect(watching).not.toContain("set ZENTIS_ENV");
   expect(statusOf((await drive(120, 40, { keys: ["r"] })).lines)).not.toContain("set ZENTIS_ENV");
@@ -56,7 +59,9 @@ test("how to arm the console is in the help overlay", async () => {
 test("the hints name the pages and the command line, since a key nobody is told about is not a key", async () => {
   // The pages and the colon arrived after the hint row was written, so the row went on listing the
   // live view's keys alone: three pages and a command line that only the help page knew existed.
-  const hints = (await drive(190, 50, { armed: true })).lines.find((l) => /\br republish/.test(l))!;
+  // Read from the keys panel: at this width the labels are short, so the row is found by where it
+  // is rather than by a word that the fitting may have shortened.
+  const hints = keysOf((await drive(190, 50, { publisher: "cloud" })).lines);
   expect(hints).toBeDefined();
   for (const key of ["p", "n", "w", "m", ":"]) {
     expect(hints).toContain(key);

@@ -96,7 +96,9 @@ export function fit(cols: number, rows: number): Regions {
   // The top panel is the critical information, and it is short: the book's own row, the state it is
   // in, one mark per source, and what the last action said. The sources' own detail is a page, which
   // is what keeps the rest of this height with the chart and the feed.
-  const statusRows = draw >= 30 ? 4 : draw >= 22 ? 3 : 3;
+  // Two: the book, and the reference's state with the source marks beside it. A note from the last
+  // action takes the book's row while it is live rather than adding one of its own.
+  const statusRows = 2;
 
   const BORDER = 2;
   // The keys have a section of their own below the feed now: one row inside its own border. They are

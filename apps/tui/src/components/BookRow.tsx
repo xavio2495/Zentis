@@ -87,10 +87,11 @@ export function bookSegments(
   // so the row names the key rather than spending the line on it.
   const profitLong: Seg[] =
     book.pnlA === null || tokenA === null
-      ? [
+      ? // No pointer to the page: the keys row names `n`, and a line that explains where to read
+        // about itself is a line spending width on the screen's own furniture.
+        [
           { text: "profit ", color: UI.muted },
           { text: "unknown", color: UI.caveat },
-          { text: " · n for why", color: UI.muted },
         ]
       : [
           { text: "profit ", color: UI.muted },

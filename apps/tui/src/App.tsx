@@ -12,7 +12,7 @@ import {
   pushPlan,
 } from "@zentis/console-data";
 import type { Action } from "./action-types.js";
-import { buildQuoteAction } from "./actions.js";
+import { type PublisherMode, buildQuoteAction } from "./actions.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
@@ -67,6 +67,7 @@ export function App({
   runAction,
   makeStore = createStore,
   commands = null,
+  publisher = "none",
 }: {
   actions: Action[];
   /**
@@ -76,9 +77,14 @@ export function App({
    */
   commands?: {
     fill: (fill: { leg: LegConfig; amountRaw: bigint; isAToB: boolean }) => Action;
-    republish: (workflow: "fast" | "slow") => Action;
+    republish: (workflow: "fast" | "slow") => Action | null;
     push: (push: { leg: LegConfig; plan: PushPlan }) => Action;
   } | null;
+  /**
+   * Which publisher this console can reach. It decides whether `r` and `s` exist at all — with none
+   * they are not offered, not disabled — and the status page says which one is in use.
+   */
+  publisher?: PublisherMode;
   /** resolves to the line the status bar should show once the command has finished */
   runAction: ((action: Action) => Promise<string>) | null;
   /**
@@ -113,8 +119,8 @@ export function App({
   const [windowChoice, setWindowChoice] = useState<number | null>(null);
   const [confirming, setConfirming] = useState<Action | null>(null);
   const [running, setRunning] = useState<string | null>(null);
-  const [transient, setTransient] = useState<{ text: string; quiet: boolean } | null>(null);
-  const say = (text: string, quiet = false) => setTransient({ text, quiet });
+  const [transient, setTransient] = useState<{ text: string; quiet: boolean; at: number } | null>(null);
+  const say = (text: string, quiet = false) => setTransient({ text, quiet, at: Date.now() });
   const [awaiting, setAwaiting] = useState<Pending | null>(null);
   // The command line: what is being typed, what the last one answered, and what has been typed
   // before. `null` is closed — the row only exists while it has the keyboard.
@@ -155,6 +161,16 @@ export function App({
     const timer = setInterval(() => setShown((current) => current + 1), ROTATE_MS);
     return () => clearInterval(timer);
   }, [overlay, stepped]);
+
+  // A note takes the book's row for five seconds and then gives it back. It is news, not state: the
+  // thing it is about — watch-only, a running command — is on the screen in its own right, and a
+  // sentence that stays forever stops being read while still holding the row it sits in.
+  const NOTE_MS = 5_000;
+  useEffect(() => {
+    if (transient === null) return undefined;
+    const timer = setTimeout(() => setTransient((current) => (current?.at === transient.at ? null : current)), NOTE_MS);
+    return () => clearTimeout(timer);
+  }, [transient]);
 
   const snapshot = state.snapshot;
   // Read every render; the one-second tick above is what makes "polled 12s ago" count up.
@@ -263,6 +279,15 @@ export function App({
           command.kind === "fill"
             ? commands.fill({ leg: command.leg, amountRaw: command.amountRaw, isAToB: command.isAToB })
             : commands.republish(command.workflow);
+        if (action === null) {
+          // Not "you are missing a variable": this console simply is not the one that republishes,
+          // and the workflows run on their own regardless.
+          setAnswer({
+            text: "republishing is an operator action; the publisher runs on its own every five minutes",
+            bad: false,
+          });
+          return;
+        }
         if (action.disabledReason !== null) {
           setAnswer({ text: action.disabledReason, bad: true });
           return;
@@ -538,7 +563,11 @@ export function App({
               ) : page === "wallet" ? (
                 <WalletPage snapshot={snapshot} armed={armed} {...panelInner(regions.rightWidth, pageRows)} />
               ) : page === "status" ? (
-                <Status snapshot={snapshot} {...panelInner(regions.rightWidth, pageRows)} />
+                <Status
+                  snapshot={snapshot}
+                  publisher={publisher}
+                  {...panelInner(regions.rightWidth, pageRows)}
+                />
               ) : (
                 <Simulation report={snapshot.sim} {...panelInner(regions.rightWidth, pageRows)} />
               )}

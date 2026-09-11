@@ -1,11 +1,11 @@
 import { Box, Text } from "ink";
-import { type Snapshot, humanDuration, referenceAgeSeconds, weightPercent } from "@zentis/console-data";
+import { type Snapshot, humanDuration, providersOf, referenceAgeSeconds, weightPercent } from "@zentis/console-data";
 import { duration } from "../format.js";
 import type { Action } from "../action-types.js";
-import { type Seg, fitSegments, trunc } from "../layout.js";
+import { type Seg, fitSegments, segWidth, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { bookSegments } from "./BookRow.js";
-import { Providers } from "./Providers.js";
+import { providerDots } from "./Providers.js";
 import { TERM, UI } from "../theme.js";
 
 /**
@@ -131,8 +131,9 @@ export function hints(actions: Action[], width: number): Seg[] {
   const pagesFull: Seg = { text: " · p positions · n pnl · w wallet · m sim · d status · : command", color: UI.muted };
   const pagesShort: Seg = { text: " · p pos · n pnl · w wal · m sim · d status · : cmd", color: UI.muted };
   const navFull: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
-  const navShort: Seg = { text: " · ←→ · enter · t · ? help · x quit", color: UI.muted };
-  const navBare: Seg = { text: " · ←→ enter t ? x", color: UI.muted };
+  const navShort: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
+  // Titled to the last: a key without a word beside it is a key nobody presses on purpose.
+  const navBare: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
   const navTiny: Seg = { text: " · ? x", color: UI.muted };
   // The page words without the dots between them: two characters short of fitting at a hundred and
   // twenty columns, and the words are what the row is for.
@@ -177,7 +178,7 @@ export function StatusBar({
    * What the last action said, while it matters. `quiet` is for notes that are not warnings — a
    * watch-only viewer pressing a key that is off — and they are drawn dim.
    */
-  transient: { text: string; quiet: boolean } | null;
+  transient: { text: string; quiet: boolean; at: number } | null;
   /** seconds since the last completed poll, or null before the first */
   polledAgo: number | null;
   loading: boolean;
@@ -201,20 +202,22 @@ export function StatusBar({
   // shed in that order as the height goes, except that a live note takes the state's row, because a
   // confirmation prompt has to be seen.
   const book = bookSegments(snapshot, armed, polledAgo, loading, width);
-  // The book, then its state, then every source the console reads, then whatever the last action
-  // said. The keys are not here any more: they have a section of their own below the feed, because
-  // a row of keys is not critical information and it was sitting above the one thing that is.
-  // Three rows: what the book is, what state it is in, and one mark per source. Everything else the
-  // sources have to say is a page of its own, which is what gave this panel's height back to the
-  // chart and the feed.
+
+  // Two rows. The book on the first, or whatever the last action said while that is still news — a
+  // note is what the reader is looking for at that moment, and it belongs where they are looking.
+  // The reference's state on the second, with the source marks pushed to the right of it: they are
+  // a glance rather than a sentence, and they read better against the frame than after the words.
+  const dots = providerDots(providersOf(snapshot), Math.max(0, width - segWidth(line) - 2));
+  const gap = Math.max(1, width - segWidth(line) - segWidth(dots));
+
   return (
     <Box flexDirection="column" width={width} height={rows} overflow="hidden">
-      <Box height={1}>
-        <Segments segs={book} />
-      </Box>
-      {rows > 1 && <Box height={1}>{rows < 3 && note !== null ? note : <Segments segs={line} />}</Box>}
-      {rows > 2 && <Providers snapshot={snapshot} width={width} />}
-      {rows > 3 && <Box height={1}>{note ?? <Text> </Text>}</Box>}
+      <Box height={1}>{note ?? <Segments segs={book} />}</Box>
+      {rows > 1 && (
+        <Box height={1}>
+          <Segments segs={[...line, { text: " ".repeat(gap) }, ...dots]} />
+        </Box>
+      )}
     </Box>
   );
 }

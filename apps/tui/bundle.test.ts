@@ -63,21 +63,18 @@ test("`watch` refuses to sign even when an env file is present", () => {
   expect(statSync(binary).size).toBeGreaterThan(0);
 
   // The site serves this mode, so it must not become signing-capable because a file happens to be
-  // on disk next to it. `watch` drops the env file whatever the environment says.
-  const run = Bun.spawnSync({
-    cmd: [
-      "sh",
-      "-c",
-      `(sleep 3; printf r; sleep 2; printf x; sleep 2) | ZENTIS_ENV=/dev/null script -qec ${JSON.stringify(`stty cols 120 rows 44; ${binary} watch`)} /dev/null`,
-    ],
-    stdout: "pipe",
-    stderr: "pipe",
-    timeout: 30_000,
+  // on disk next to it. `watch` drops the env file whatever the environment says. Driven against the
+  // recorded fixtures, like every other binary test: a console a test starts must not be able to
+  // reach an indexer, and this one used to run for three seconds against the live ones.
+  const { screen, exitCode } = runBinary(binary, {
+    keys: "r",
+    waitSeconds: 3,
+    args: ["watch"],
+    env: { ZENTIS_ENV: "/dev/null", ZENTIS_FIXTURES: "1" },
   });
-  const screen = new TextDecoder().decode(run.stdout);
   expect(screen).toContain("watch-only");
   expect(screen).not.toContain("press y to broadcast");
-  expect(run.exitCode).toBe(0);
+  expect(exitCode).toBe(0);
 }, 90_000);
 
 test("the compiled binary finds the repository from its working directory, not from its own path", () => {
@@ -105,10 +102,10 @@ test("the compiled binary finds the repository from its working directory, not f
 
   // Outside it, the keys are disabled with a reason the operator can act on, rather than failing at
   // spawn time after they have already confirmed a broadcast.
-  // A republish resolves to the cloud publisher first, so the reason outside a checkout names that;
-  // the fallback is a local `cre` run, which is what ZENTIS_REPO points at.
+  // Outside a checkout, with no cloud project, there is no publisher to ask — so the key is not
+  // offered at all rather than offered and refused, and nothing can be confirmed.
   const outside = drive(dir, { ZENTIS_ENV: envFile, ZENTIS_GCP_PROJECT: "" });
-  expect(outside).toMatch(/ZENTIS_GCP_PROJECT|ZENTIS_REPO/);
+  expect(outside).not.toMatch(/r republish|r fast/);
   expect(outside).not.toContain("press y to broadcast");
 
   const pointed = drive(dir, { ZENTIS_ENV: envFile, ZENTIS_REPO: repo, ZENTIS_GCP_PROJECT: "" });

@@ -46,14 +46,11 @@ export function providerDots(providers: Provider[], width: number): Seg[] {
       ...group.map((p) => ({ text: DOT[p.state], color: dotColour(p.state) })),
     ];
   });
+  // Nothing after the marks when they are all green: "all answering" says what a row of green marks
+  // already says, and spends the width the reference's own line needs. A failure still gets a word,
+  // because a red mark says something is wrong without saying how much.
   const down = providers.filter((p) => p.state === "down");
-  const stale = providers.filter((p) => p.state === "stale");
-  const said: Seg[] =
-    down.length > 0
-      ? [{ text: `  ${down.length} down · d`, color: UI.rejection }]
-      : stale.length > 0
-        ? [{ text: `  ${stale.length} on last-good · d`, color: UI.caveat }]
-        : [{ text: "  all answering · d", color: UI.muted }];
+  const said: Seg[] = down.length === 0 ? [] : [{ text: `  ${down.length} down`, color: UI.rejection }];
 
   return fitSegments([[...labelled, ...said], [...marks, ...said], marks], width);
 }

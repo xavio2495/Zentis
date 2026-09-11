@@ -112,7 +112,25 @@ const cloudCommand = (workflow: "fast" | "slow", project: string): ActionCommand
 const PUBLISHER_JOB = "zentis-publisher";
 const PUBLISHER_REGION = "us-central1";
 
-const NO_PUBLISHER = "set ZENTIS_GCP_PROJECT to republish through the cloud publisher";
+/**
+ * Which publisher this console can reach, if any.
+ *
+ * Republishing is the operator's: the workflows run on their own every five minutes, and a reader
+ * who cannot reach a publisher has no use for a key that would ask one to run. Shown as disabled it
+ * is still a key they will press, and it teaches them the console is holding something back — which
+ * it is not, since filling and pushing with their own keys are theirs.
+ */
+export type PublisherMode = "cloud" | "local" | "none";
+
+export function publisherMode(
+  envFile: string | null,
+  repo: string | null,
+  gcpProject: string | undefined = process.env["ZENTIS_GCP_PROJECT"],
+): PublisherMode {
+  if (gcpProject !== undefined && gcpProject !== "") return "cloud";
+  // A checkout on its own is not a publisher: `cre` signs with the key in the env file.
+  return repo !== null && envFile !== null ? "local" : "none";
+}
 
 const creCommand = (workflow: "fast" | "slow", envFile: string, repo: string): ActionCommand => ({
   cmd: ["cre", "-e", envFile, "workflow", "simulate", workflow, "--target", "staging-settings", "--broadcast"],
@@ -289,38 +307,46 @@ export function buildActions(
   // Resolution order for a republish: the cloud job, then a checkout, then neither. The job is
   // preferred because it is where the publisher actually runs — a local `cre` run is the fallback
   // for someone working on the workflow itself.
-  const cloud = gcpProject !== undefined && gcpProject !== "";
-  const publishBlocked = cloud ? null : repo === null ? NO_PUBLISHER : envFile === null ? NO_ENV : null;
-  const publishCommand = (workflow: "fast" | "slow"): ActionCommand | null =>
-    cloud ? cloudCommand(workflow, gcpProject!) : publishBlocked === null ? creCommand(workflow, envFile!, repo!) : null;
+  const mode = publisherMode(envFile, repo, gcpProject);
+  const cloud = mode === "cloud";
+  const publishCommand = (workflow: "fast" | "slow"): ActionCommand =>
+    cloud ? cloudCommand(workflow, gcpProject!) : creCommand(workflow, envFile!, repo!);
   // Both reasons are real and either alone is enough, so the missing repository is named first:
   // it is the one the operator can fix without going to look for a key.
   const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
   const blocker = repo === null ? ("repo" as const) : envFile === null ? ("env" as const) : null;
   const runnable = repo !== null && envFile !== null;
+  // Built separately, because with no publisher they are not disabled — they are not there.
+  const republishing: Action[] =
+    mode === "none"
+      ? []
+      : [
+          {
+            key: "r",
+            blocker: null,
+            label: "republish fast",
+            short: "fast",
+            disabledReason: null,
+            command: publishCommand("fast"),
+            describe: cloud
+              ? "asks the cloud publisher to run the fast workflow now, ahead of its own schedule"
+              : "runs the fast workflow against the testnets and broadcasts its report",
+          },
+          {
+            key: "s",
+            blocker: null,
+            label: "republish slow",
+            short: "slow",
+            disabledReason: null,
+            command: publishCommand("slow"),
+            describe: cloud
+              ? "asks the cloud publisher to run the slow workflow now: spread, markout and the boundary"
+            : "runs the slow workflow: spread, markout and the boundary",
+          },
+        ];
+
   return [
-    {
-      key: "r",
-      blocker: publishBlocked === null ? null : cloud ? null : repo === null ? "repo" : "env",
-      label: "republish fast",
-      short: "fast",
-      disabledReason: publishBlocked,
-      command: publishCommand("fast"),
-      describe: cloud
-        ? "asks the cloud publisher to run the fast workflow now, ahead of its own schedule"
-        : "runs the fast workflow against the testnets and broadcasts its report",
-    },
-    {
-      key: "s",
-      blocker: publishBlocked === null ? null : cloud ? null : repo === null ? "repo" : "env",
-      label: "republish slow",
-      short: "slow",
-      disabledReason: publishBlocked,
-      command: publishCommand("slow"),
-      describe: cloud
-        ? "asks the cloud publisher to run the slow workflow now: spread, markout and the boundary"
-        : "runs the slow workflow: spread, markout and the boundary",
-    },
+    ...republishing,
     {
       key: "f",
       blocker,
@@ -425,9 +451,10 @@ export function buildPushAction(
 export function commandActions(envFile: string | null, repo: string | null = findRepoRoot()) {
   return {
     fill: (fill: FillParams): Action => buildFillAction(envFile, repo, fill),
-    republish: (workflow: "fast" | "slow"): Action =>
-      buildActions(envFile, repo).find((a) => a.label === `republish ${workflow}`) ??
-      buildRepublishAction(envFile, repo, workflow),
+    // Null where there is no publisher to ask: the command line says so in its own words rather than
+    // offering an action that would be refused.
+    republish: (workflow: "fast" | "slow"): Action | null =>
+      buildActions(envFile, repo).find((a) => a.label === `republish ${workflow}`) ?? null,
     // No repository in its arguments: a push is three `cast` calls the binary makes itself.
     push: (push: { leg: LegConfig; plan: PushPlan }): Action => buildPushAction(envFile, push),
   };

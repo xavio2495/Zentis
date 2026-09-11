@@ -35,6 +35,8 @@ export interface RunOptions {
   readonly waitSeconds?: number;
   /** how long the console is allowed to live, including its own shutdown; derived when not given */
   readonly seconds?: number;
+  /** arguments after the binary, e.g. `watch` */
+  readonly args?: string[];
   readonly cwd?: string;
   readonly env?: Record<string, string>;
   readonly cols?: number;
@@ -47,12 +49,12 @@ export interface Run {
 }
 
 export function runBinary(binary: string, options: RunOptions = {}): Run {
-  const { keys = "", waitSeconds = 2, cwd, env = {}, cols = 120, rows = 44 } = options;
+  const { keys = "", waitSeconds = 2, args = [], cwd, env = {}, cols = 120, rows = 44 } = options;
   // The deadline has to outlast the keystrokes it is there to backstop, or every run reports the
   // timeout's own exit code and no test can tell a hung console from a slow one.
   const feed = `(sleep ${waitSeconds}; printf %s ${JSON.stringify(keys)}; sleep 2; printf x; sleep 2)`;
   const seconds = options.seconds ?? waitSeconds + 10;
-  const tty = `script -qec ${JSON.stringify(`stty cols ${cols} rows ${rows}; ${binary}`)} /dev/null`;
+  const tty = `script -qec ${JSON.stringify(`stty cols ${cols} rows ${rows}; ${[binary, ...args].join(" ")}`)} /dev/null`;
   const run = Bun.spawnSync({
     // No `timeout` in the pipeline: wrapping `script` in one stops the keystrokes reaching the pty,
     // so every run ended at the deadline and no test could tell a hung console from a quitting one.

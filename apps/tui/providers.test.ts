@@ -96,7 +96,7 @@ test("the keys live below the feed now, not above the book", async () => {
   const feedAt = lines.findIndex((l) => l.includes("┌ feed"));
   const keysAt = lines.findIndex((l) => l.includes("┌ keys"));
   expect(keysAt).toBeGreaterThan(feedAt);
-  expect(panelOf(lines, "keys").join("\n")).toMatch(/republish|r s f q/);
+  expect(panelOf(lines, "keys").join("\n")).toMatch(/r (republish|fast)/);
 }, 60_000);
 
 test("the whole console still fits at eighty by twenty-four with the new section", async () => {

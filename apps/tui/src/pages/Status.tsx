@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import { type Snapshot, humanDuration, providersOf } from "@zentis/console-data";
+import type { PublisherMode } from "../actions.js";
 import { type Seg, padRows, trunc } from "../layout.js";
 import { Segments } from "../components/Segments.js";
 import { DOT, dotColour } from "../components/Providers.js";
@@ -16,7 +17,18 @@ import { type Column, columns } from "./table.js";
  */
 const STATE_WORD = { up: "answering", stale: "last-good", down: "down" } as const;
 
-export function Status({ snapshot, width, height }: { snapshot: Snapshot; width: number; height: number }) {
+export function Status({
+  snapshot,
+  publisher,
+  width,
+  height,
+}: {
+  snapshot: Snapshot;
+  /** which publisher this console can reach, which is what decides whether `r` and `s` exist */
+  publisher: PublisherMode;
+  width: number;
+  height: number;
+}) {
   const providers = providersOf(snapshot);
   const now = snapshot.takenAtSeconds;
 
@@ -89,6 +101,24 @@ export function Status({ snapshot, width, height }: { snapshot: Snapshot; width:
       );
     }
   }
+
+  // Which publisher this console is on, said once and here: it is the reason `r` and `s` are on the
+  // keys row or absent from it, and a reader who wonders where they went should find the answer.
+  const PUBLISHER_WORDS: Record<PublisherMode, string> = {
+    cloud: "cloud — the Cloud Run job, asked to run ahead of its own five-minute tick",
+    local: "local — cre run from this checkout, with the key in ZENTIS_ENV",
+    none: "none — the workflows run on their own; republishing is not offered here",
+  };
+  rows.push(<Text key="sp3"> </Text>);
+  rows.push(
+    <Segments
+      key="publisher"
+      segs={[
+        { text: "publisher  ", color: UI.muted },
+        { text: PUBLISHER_WORDS[publisher], color: publisher === "none" ? UI.muted : UI.heading },
+      ]}
+    />,
+  );
 
   const polled = snapshot.takenAtSeconds;
   rows.push(<Text key="sp2"> </Text>);

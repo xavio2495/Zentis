@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { render } from "ink";
 import { App } from "./App.js";
-import { buildActions, commandActions } from "./actions.js";
+import { buildActions, commandActions, findRepoRoot, publisherMode } from "./actions.js";
 import { fixedStore } from "../sandbox/state.js";
 import { fakeSnapshot } from "../sandbox/world.js";
 import { run, summarise } from "./runner.js";
@@ -71,6 +71,7 @@ const app = render(
     actions={buildActions(envFile)}
     runAction={runAction}
     commands={commandActions(envFile)}
+    publisher={publisherMode(envFile, findRepoRoot())}
     makeStore={makeStore}
   />,
 );

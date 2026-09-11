@@ -1,7 +1,7 @@
 import { render } from "ink";
 import { PassThrough, Writable } from "node:stream";
 import { App } from "../src/App.js";
-import { buildActions, commandActions } from "../src/actions.js";
+import { buildActions, commandActions, findRepoRoot, publisherMode } from "../src/actions.js";
 import type { Action } from "../src/action-types.js";
 import { type Scenario, fakeSnapshot } from "./world.js";
 
@@ -51,7 +51,16 @@ export interface Frame {
 export async function drive(
   cols: number,
   rows: number,
-  options: { scenario?: Scenario; keys?: string[]; armed?: boolean } = {},
+  options: {
+    scenario?: Scenario;
+    keys?: string[];
+    armed?: boolean;
+    /**
+     * Which publisher the console can reach. Stated rather than inherited: whether this machine
+     * exports ZENTIS_GCP_PROJECT is not something a test's result should depend on.
+     */
+    publisher?: "cloud" | "local" | "none";
+  } = {},
 ): Promise<Frame> {
   const stdin = Object.assign(new PassThrough(), {
     isTTY: true,
@@ -69,13 +78,23 @@ export async function drive(
   const makeStore =
     options.scenario === "loading" ? loadingStore() : fixedStore(fakeSnapshot(options.scenario ?? "fresh"));
 
-  const actions: Action[] =
-    // Watch-only the way the real binary is when run from the repo: a repository, no signing key.
-    options.armed === true ? buildActions("/dev/null") : buildActions(null);
+  const project = options.publisher === "cloud" ? "zentis-cg1-2026" : "";
+  // Watch-only the way the real binary is when run from the repo: a repository, no signing key.
+  // `publisher: "local"` is the operator's other case — a checkout and a key, no cloud project.
+  const envFile = options.armed === true || options.publisher === "local" ? "/dev/null" : null;
+  const actions: Action[] = buildActions(envFile, undefined, project);
   // The same factory the binary passes, built from the same env file, so a typed command in the
   // sandbox is refused or allowed for exactly the reason it would be live.
-  const commands = commandActions(options.armed === true ? "/dev/null" : null);
-  const app = render(<App actions={actions} runAction={null} makeStore={makeStore} commands={commands} />, {
+  const commands = commandActions(envFile);
+  const app = render(
+    <App
+      actions={actions}
+      runAction={null}
+      makeStore={makeStore}
+      commands={commands}
+      publisher={publisherMode(envFile, findRepoRoot(), project)}
+    />,
+    {
     stdout: stdout as never,
     stdin: stdin as never,
     debug: true,
