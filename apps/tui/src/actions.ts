@@ -95,8 +95,11 @@ const cloudCommand = (workflow: "fast" | "slow", project: string): ActionCommand
         `--project "$ZENTIS_GCP_PROJECT" --args ${workflow} --wait --format="value(metadata.name)")`,
       'echo "execution $EXEC"',
       // The publisher echoes its own "fast rc=0 …" line to stdout, which is the result worth showing.
+      // The inner quotes are escaped for the shell, not merely written: unescaped, the shell eats
+      // them and gcloud receives `textPayload:rc=`, which it rejects with "Unparseable filter:
+      // syntax error … token '='" and refuses the whole read. Seen live on 2026-09-11.
       `gcloud logging read "resource.type=cloud_run_job AND ` +
-        `labels.\"run.googleapis.com/execution_name\"=\"$EXEC\" AND textPayload:rc=" ` +
+        `labels.\\"run.googleapis.com/execution_name\\"=\\"$EXEC\\" AND textPayload:\\"rc=\\"" ` +
         `--project "$ZENTIS_GCP_PROJECT" --limit 10 --freshness=30m --format="value(textPayload)"`,
     ].join("; "),
   ],
