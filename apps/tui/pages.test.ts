@@ -175,3 +175,16 @@ test("the help page wraps rather than clipping, because it is the page that expl
   const text = (await drive(120, 40, { keys: ["?"] })).lines.join("\n");
   expect(text).not.toContain("…");
 }, 60_000);
+
+test("the pnl page fills its lower half with the fills the totals are made of", async () => {
+  // The totals are three rows and the page is twenty; what belongs underneath is what they are made
+  // of — each fill, its size, and what it took against the reference and the one published after it.
+  const snapshot = fakeSnapshot("fresh");
+  const fills = snapshot.legs.flatMap((l) => l.pnl?.perFill ?? []);
+  expect(fills.length).toBeGreaterThan(0);
+  const text = (await drive(190, 50, { keys: ["n"] })).lines.join("\n");
+  expect(text).toMatch(/per fill|each fill/);
+  // Dated, sized and scored: a row per fill rather than a repeat of the total.
+  expect(text).toMatch(/\d+[dhm] ago|\d+[dhm]\b/);
+  expect(text).toContain("markout");
+}, 60_000);
