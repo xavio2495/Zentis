@@ -1,9 +1,10 @@
 import { describe, expect } from 'bun:test'
 import { test } from '@chainlink/cre-sdk/test'
+import type { TeeRuntime } from '@chainlink/cre-sdk'
 
 import { sigmaOverHorizonBps, volatilitySpreadBps } from '@zentis/strategy-sdk'
 
-import { bandEdgeFromQuote, marketSamples } from './workflow'
+import { bandEdgeFromQuote, marketSamples, readMarkout, type Config } from './workflow'
 import vectors from './volatility_vectors.json'
 
 describe('bandEdgeFromQuote', () => {
@@ -95,5 +96,62 @@ describe('the volatility series', () => {
 		expect(sigmaOverHorizonBps(samples, HORIZON)).toBe(2n)
 		expect(volatilitySpreadBps(samples, HORIZON, 10_000n, 200n)).toBe(2n)
 		expect(volatilitySpreadBps(samples, HORIZON, 3_000n, 200n)).toBe(0n)
+	})
+})
+
+describe('a leg whose fills subgraph cannot be read', () => {
+	// One exhausted indexer quota used to take down the whole publish: readMarkout threw, and it runs
+	// over every leg before the volatility and the boundary are computed, so a single rate-limited
+	// subgraph cost the book all three legs' markout AND their spread AND their boundary. A leg whose
+	// own indexer is silent should cost the book that leg's measurement and nothing else. The slow
+	// workflow already has this vocabulary: a failed crowding read allocates the leg its full budget
+	// rather than throwing.
+	const config = {
+		markoutWindow: 50,
+		markoutHorizonSeconds: 300,
+		markoutCapBps: 200,
+	} as unknown as Config
+
+	const runtimeAnswering = (statusCode: number, body: string) =>
+		({
+			config,
+			callCapability: () => ({
+				result: () => ({ statusCode, body: new TextEncoder().encode(body) }),
+			}),
+		}) as unknown as TeeRuntime<Config>
+
+	const leg = { fillsSubgraphUrl: 'https://example.invalid/fills' } as unknown as Parameters<
+		typeof readMarkout
+	>[1]
+	const positionId = `0x${'00'.repeat(31)}01` as const
+
+	test('a rate-limited indexer reads as unmeasured rather than throwing', () => {
+		const runtime = runtimeAnswering(429, 'Too many requests, please try again later.')
+		expect(readMarkout(runtime, leg, positionId)).toBeNull()
+	})
+
+	test('a subgraph that answers with a GraphQL error is unmeasured too', () => {
+		const body = JSON.stringify({ errors: [{ message: 'indexers not found' }] })
+		expect(readMarkout(runtimeAnswering(200, body), leg, positionId)).toBeNull()
+	})
+
+	test('a position with no indexed fills scores zero, which is measured, not unmeasured', () => {
+		// Absence of evidence about adverse selection is not evidence of it, and it is not the same
+		// thing as not having looked. Zero is published; unmeasured carries the stored number.
+		const body = JSON.stringify({ data: { position: null } })
+		expect(readMarkout(runtimeAnswering(200, body), leg, positionId)).toEqual({
+			markoutBps: 0n,
+			mid: 0n,
+		})
+	})
+
+	test('a healthy reply is measured, and carries the newest indexed mid', () => {
+		const body = JSON.stringify({
+			data: { position: { fills: [], references: [{ updatedAt: '1789108526', mid: '404784606639443958798733096' }] } },
+		})
+		expect(readMarkout(runtimeAnswering(200, body), leg, positionId)).toEqual({
+			markoutBps: 0n,
+			mid: 404784606639443958798733096n,
+		})
 	})
 })
