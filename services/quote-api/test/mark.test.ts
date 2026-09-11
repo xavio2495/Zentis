@@ -4,16 +4,16 @@ import { MARKS, midFromUsd, parseMarkResponse } from "../src/mark.js";
 describe("the mainnet mark", () => {
   test("two USD prices become a mid in the registry's units, exactly", () => {
     // 1e18 raw USDC (6dp) is 1e12 USDC; at 1.0004 USD each and 2464.64 USD per WETH that buys
-    // 1.0004e12 / 2464.64 WETH, which in wei is the mid. Checked against a rational computation:
-    // floor(1.0004e12 * 1e18 / 2464.64) = 405,900,000,000,000,000,000,000,000 - (rounding)
+    // 1.0004e12 / 2464.64 WETH, and the mid is that in wei: floor(1e30 * 1.0004 / 2464.64), which
+    // as one exact rational is 10004e28 / 246464.
     const mid = midFromUsd("1.0004", "2464.64", 6, 18);
-    expect(mid).toBe((10004n * 10n ** 30n) / 246464n);
+    expect(mid).toBe((10004n * 10n ** 28n) / 246464n);
   });
 
   test("the mid converts back to a price a person recognises", () => {
     const mid = midFromUsd("1", "2464.64", 6, 18);
-    // 1 WETH in USDC = 1e30 / mid
-    expect(Number(10n ** 30n / mid)).toBeCloseTo(2464.64, 0);
+    // 1 WETH in USDC = 1e30 / mid; compared as floats to a hundredth of a cent
+    expect(1e30 / Number(mid)).toBeCloseTo(2464.64, 2);
   });
 
   test("every testnet leg has a mainnet counterpart to be marked at", () => {

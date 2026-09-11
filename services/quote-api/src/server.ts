@@ -3,6 +3,7 @@ import { fetchLeg, type LegResult } from "./legs.js";
 import { QuoteRefused, quoteLeg } from "./quote.js";
 import { absenceCaveat, explain } from "./reason.js";
 import { type Refusal, decodeRefusal } from "./refusal.js";
+import { fetchMark } from "./mark.js";
 import { crowdingBps, fetchVenue } from "./crowding.js";
 
 interface LegQuote {
@@ -149,6 +150,18 @@ async function handleQuote(url: URL): Promise<Response> {
   });
 }
 
+/**
+ * The mainnet mark for every leg: what inventory and PnL are valued at. The pool mid is what the
+ * band uses and can sit an order of magnitude off the market on a testnet; this is the market.
+ */
+async function handleMark(): Promise<Response> {
+  const apiKey = process.env["ONEINCH_API_KEY"];
+  const marks = await Promise.all(
+    CHAINS.map(async (chain) => ({ chainId: chain.chainId, chain: chain.name, ...(await fetchMark(chain.chainId, apiKey)) })),
+  );
+  return json({ marks });
+}
+
 async function handleCrowding(url: URL): Promise<Response> {
   const first = Number(url.searchParams.get("first") ?? "20");
   const midRaw = url.searchParams.get("mid");
@@ -222,6 +235,7 @@ const server = Bun.serve({
     const url = new URL(request.url);
     if (url.pathname === "/quote") return handleQuote(url);
     if (url.pathname === "/crowding") return handleCrowding(url);
+    if (url.pathname === "/mark") return handleMark();
     if (url.pathname === "/health") return json({ ok: true, chains: CHAINS.map((c) => c.name) });
     return json({ error: "not found" }, 404);
   }

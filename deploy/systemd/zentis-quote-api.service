@@ -3,6 +3,7 @@ Description=Zentis quote API (the taker-facing quote surface, read by the consol
 
 [Service]
 Environment=PATH=%h/.nvm/versions/node/v24.18.0/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-%h/.zentis/quote-api.env
 WorkingDirectory=%h/projects/Zentis/services/quote-api
 ExecStart=%h/.nvm/versions/node/v24.18.0/bin/bun run src/server.ts
 Restart=always
