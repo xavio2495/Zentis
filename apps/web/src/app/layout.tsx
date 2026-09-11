@@ -21,9 +21,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const SITE = "https://zentis-eth.vercel.app";
-const TITLE = "Zentis — one position, two chains, no bridge";
+const TITLE = "Zentis — one position, three chains, no bridge";
 const DESCRIPTION =
-  "Zentis is a market maker that runs a single Aqua position across two chains and rebalances by pricing rather than by bridging.";
+  "Zentis is a market maker that runs a single Aqua position across several chains and rebalances by pricing rather than by bridging.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),

@@ -26,7 +26,7 @@ export const INTEGRATIONS: Integration[] = [
     name: "The Graph",
     role: "data",
     claim:
-      "A standardized Aqua position schema, and a fills subgraph on each of the two testnets.",
+      "A standardized Aqua position schema, and a fills subgraph on each of the three testnets.",
   },
   {
     name: "Chainlink",
@@ -41,23 +41,23 @@ export const LOADER_WORDS = ["Quote", "Tilt", "Fill"] as const;
 
 export const COPY = {
   wordmark: "ZENTIS",
-  heroLine: "Market making · Two chains · One position",
+  heroLine: "Market making · Three chains · One position",
   tagline: "Price the imbalance. Don't bridge it.",
 
-  statement: "One mid. Two chains. No bridge.",
+  statement: "One mid. Three chains. No bridge.",
   statementBody:
-    "A market maker holds one position and quotes it in two places. When the two sides drift apart, the usual answer is to move inventory across a bridge and pay for the privilege in time, in fees and in risk. Zentis answers with price instead: the quote tilts toward the side that is short, and the imbalance is worth something to close. Nothing crosses.",
+    "A market maker holds one position and quotes it in several places at once. When the legs drift apart, the usual answer is to move inventory across a bridge and pay for the privilege in time, in fees and in risk. Zentis answers with price instead: every leg quotes the same mid, the quote tilts toward the leg that is short, and the imbalance becomes worth something to close. Nothing crosses.",
 
   integrationsLabel: "Built on",
   installLabel: "Install the console",
   installHint: "Click to copy",
   installCopied: "Copied",
 
-  outro: "Two chains. One position. Nothing in transit.",
+  outro: "Three legs. One book. Nothing in transit.",
   footer: "Zentis · Aqua · SwapVM",
 
   noscript:
-    "Zentis is a market maker that runs a single Aqua position across two chains and rebalances by pricing rather than by bridging. When the two sides drift apart, the quote tilts toward the side that is short instead of moving inventory across a bridge. This page is an animated introduction; enable JavaScript for it, or install the console with the command below.",
+    "Zentis is a market maker that runs a single Aqua position across several chains and rebalances by pricing rather than by bridging. When the legs drift apart, the quote tilts toward the leg that is short instead of moving inventory across a bridge. This page is an animated introduction; enable JavaScript for it, or install the console with the command below.",
 } as const;
 
 /**
