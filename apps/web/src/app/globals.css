@@ -186,3 +186,99 @@ body.ready .rise-4 {
     opacity: 0.7;
   }
 }
+
+/* ── The first screen ───────────────────────────────────────────────
+   The wordmark sits at just over half white so the point field behind
+   it reads through the letterforms rather than around them. */
+.hero-name {
+  font-weight: 800;
+  font-size: clamp(2.6rem, 11vw, 11.5rem);
+  letter-spacing: 0.04em;
+  line-height: 0.95;
+  text-align: center;
+  color: #ffffff8c;
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.hero-line {
+  margin-top: 1.5rem;
+  font-size: clamp(0.62rem, 1.4vw, 0.82rem);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  mix-blend-mode: difference;
+  text-shadow: 0 0 12px rgba(10, 10, 10, 0.8);
+  opacity: 0;
+}
+
+.hero-tagline {
+  margin-top: 1rem;
+  font-size: clamp(1.12rem, 2.4vw, 1.4rem);
+  color: var(--color-ink-soft);
+  mix-blend-mode: difference;
+  text-shadow: 0 0 12px rgba(10, 10, 10, 0.8);
+  opacity: 0;
+}
+
+@media (max-width: 560px) {
+  .hero-name {
+    white-space: normal;
+  }
+  .hero-line {
+    letter-spacing: 0.32em;
+  }
+}
+
+/* ── Loader ─────────────────────────────────────────────────────────
+   Its rail is one of the few places the accent is allowed to appear. */
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--color-bg);
+  transition: opacity 0.6s var(--ease-out);
+}
+
+.loader[data-done="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loader-word {
+  font-size: clamp(2.19rem, 7vw, 4.27rem);
+  color: #f5f5f5d1;
+  transition:
+    opacity 0.4s var(--ease-out),
+    transform 0.4s var(--ease-out);
+}
+
+.loader-count {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(4rem, 10vw, 8.5rem);
+  line-height: 1;
+}
+
+.loader-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #1f1f1f80;
+}
+
+.loader-fill {
+  height: 100%;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--color-em-soft) 0%, var(--color-em) 100%);
+}
+
+/* Corner brackets, the only frame the integration cards get. */
+.bracket {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 0 solid var(--color-em);
+  pointer-events: none;
+}
