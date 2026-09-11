@@ -44,19 +44,6 @@ const legSchema = z.object({
 	 */
 	fillsSubgraphUrl: z.string(),
 	/**
-	 * This leg's reference-pool subgraph and the pool in it: the price series the volatility term is
-	 * measured on. Empty means no series, which publishes no term — absence of a series is not
-	 * evidence of calm, but a spread that widens on missing data would brick a leg for a broken URL.
-	 */
-	referencePoolSubgraphUrl: z.string().default(''),
-	referencePool: z.string().default(''),
-	/**
-	 * Per-leg override of the volatility multiplier. A reference pool whose moves are a few large
-	 * jumps rather than a diffusion is not covered by any spread, and a one-sigma term there only
-	 * shuts the leg; measured on the indexed series before being set, never guessed.
-	 */
-	volatilityMultiplierBps: z.number().optional(),
-	/**
 	 * The standardized Aqua subgraph for the mainnet this leg corresponds to, and the pair to read
 	 * from it. Empty means no positioning data for this leg, which allocates it the full budget —
 	 * absence of evidence about crowding is not evidence of it.
@@ -132,6 +119,21 @@ export const configSchema = z.object({
 	volatilityWindowSeconds: z.number(),
 	/** How many standard deviations of the move over the horizon the spread covers, in bps of one. */
 	volatilityMultiplierBps: z.number(),
+	/**
+	 * Where the price series is measured: the same mainnet market the mid is read from, through The
+	 * Graph's decentralised gateway. ONE series for the whole book, not one per leg — the spread has
+	 * to cover the move of the number the legs actually quote from, and that is one number now.
+	 *
+	 * Measuring it on each leg's own testnet pool priced risk the position does not carry: those
+	 * pools are not arbitraged, so their moves are venue noise, and a term built from them widened
+	 * the legs for something that was never going to reach a taker.
+	 */
+	volatility: z.object({
+		subgraphUrl: z.string(),
+		/** The pool inside that subgraph, with token0 playing the role of every leg's tokenA. */
+		pool: z.string(),
+		apiKeySecretId: z.string(),
+	}),
 	/** Ceiling on the term: a wild series widens a leg, it does not brick it. */
 	volatilityCapBps: z.number(),
 	/** The secret holding how hard the maker responds to a crowded venue. */
@@ -419,41 +421,69 @@ const readMarkout = (
  * The window is anchored on the newest indexed swap, not on a clock: the enclave has none it can
  * trust, and a series that ends where the index ends is the same series on every node.
  */
-const readVolatility = (runtime: TeeRuntime<Config>, leg: z.infer<typeof legSchema>): bigint => {
-	const config = runtime.config
-	if (leg.referencePoolSubgraphUrl === '' || leg.referencePool === '') return 0n
+/**
+ * A page of indexed swaps, newest-first as the gateway answers, turned into the ascending series the
+ * estimator wants.
+ *
+ * The window is anchored on the newest indexed swap, not on a clock: the enclave has none it can
+ * trust, and a series that ends where the index ends is the same series on every node. On this
+ * market one page reaches back a couple of hours rather than the configured week, so the page length
+ * is what sets the sample; that is fine for a sixty-second horizon and it is measured, not assumed.
+ *
+ * token0 plays the role of every leg's tokenA, so `sqrtPriceX96` already gives raw tokenB per 1e18
+ * raw tokenA and nothing is inverted — the same scale as `mid`, and no decimals handling anywhere.
+ */
+export const marketSamples = (
+	swaps: { timestamp: string; sqrtPriceX96: string }[],
+	windowSeconds: bigint,
+): PriceSample[] => {
+	if (swaps.length === 0) return []
+	const newest = BigInt((swaps[0] as { timestamp: string }).timestamp)
+	return swaps
+		.filter((s) => newest - BigInt(s.timestamp) <= windowSeconds)
+		.map((s) => ({ timestamp: BigInt(s.timestamp), mid: midFromSqrtPriceX96(BigInt(s.sqrtPriceX96)) }))
+		.reverse()
+}
 
+/**
+ * The volatility term, measured once per run on the market the whole book quotes from.
+ *
+ * An empty series publishes no term. Absence of a series is not evidence of calm, but a spread that
+ * widened on missing data would brick every leg for one broken URL, and the staleness ramp already
+ * covers a reference that stops arriving.
+ */
+const readVolatility = (runtime: TeeRuntime<Config>, apiKey: string): bigint => {
+	const config = runtime.config
 	const body = JSON.stringify({
 		query: VOLATILITY_QUERY,
-		variables: { pool: leg.referencePool.toLowerCase() },
+		variables: { pool: config.volatility.pool.toLowerCase() },
 	})
 	const response = new cre.capabilities.HTTPClient()
 		.sendRequest(runtime, {
-			url: leg.referencePoolSubgraphUrl,
+			url: config.volatility.subgraphUrl,
 			method: 'POST',
-			multiHeaders: { 'Content-Type': { values: ['application/json'] } },
+			multiHeaders: {
+				'Content-Type': { values: ['application/json'] },
+				// The gateway also takes the key in the path. It goes in a header so it is not part
+				// of the URL, which is the part that ends up in a log line.
+				Authorization: { values: [`Bearer ${apiKey}`] },
+			},
 			body: toBase64(new TextEncoder().encode(body)),
 		})
 		.result()
-	if (!ok(response)) throw new Error(`reference-pool subgraph failed with status ${response.statusCode}`)
+	if (!ok(response)) throw new Error(`market subgraph failed with status ${response.statusCode}`)
 
 	const payload = JSON.parse(text(response)) as VolatilityResponse
 	if (payload.errors && payload.errors.length > 0) {
-		throw new Error(`reference-pool subgraph returned an error: ${payload.errors[0]?.message}`)
+		throw new Error(`market subgraph returned an error: ${payload.errors[0]?.message}`)
 	}
-	const swaps = payload.data?.swaps ?? []
-	if (swaps.length === 0) return 0n
+	const samples = marketSamples(payload.data?.swaps ?? [], BigInt(config.volatilityWindowSeconds))
+	if (samples.length === 0) return 0n
 
-	const newest = BigInt((swaps[0] as { timestamp: string }).timestamp)
-	const window = BigInt(config.volatilityWindowSeconds)
-	const samples: PriceSample[] = swaps
-		.filter((s) => newest - BigInt(s.timestamp) <= window)
-		.map((s) => ({ timestamp: BigInt(s.timestamp), mid: midFromSqrtPriceX96(BigInt(s.sqrtPriceX96)) }))
-		.reverse()
 	return volatilitySpreadBps(
 		samples,
 		BigInt(config.volatilityHorizonSeconds),
-		BigInt(leg.volatilityMultiplierBps ?? config.volatilityMultiplierBps),
+		BigInt(config.volatilityMultiplierBps),
 		BigInt(config.volatilityCapBps),
 	)
 }
@@ -556,7 +586,11 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 	const congestionBps = BigInt(runtime.getSecret({ id: config.congestionSecretId }).result().value)
 
 	const signals = config.legs.map((leg) => readMarkout(runtime, leg, positionId))
-	const volatility = config.legs.map((leg) => readVolatility(runtime, leg))
+	// One market, one series, one term: the spread covers the move of the mid every leg quotes from,
+	// and that is a single number now. A per-leg term would be pricing a per-leg risk that the
+	// position stopped carrying the moment the legs stopped pricing off their own venues.
+	const graphApiKey = runtime.getSecret({ id: config.volatility.apiKeySecretId }).result().value
+	const volatility = readVolatility(runtime, graphApiKey)
 	const crowding = config.legs.map((leg, i) => {
 		// The venue is on a mainnet; value it at a mainnet mid when the leg names one, and only
 		// fall back to the leg's own mid when it does not.
@@ -587,7 +621,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 			positionId,
 			{
 				...ref,
-				spreadBps: config.baseSpreadBps + Number(volatility[index] as bigint),
+				spreadBps: config.baseSpreadBps + Number(volatility),
 				bandEdgeBps: Number(
 					publishedBoundary(
 						BigInt(ref.tiltBps),
@@ -606,7 +640,7 @@ export const onCronTrigger = (runtime: TeeRuntime<Config>): string => {
 			.result()
 		return (
 			`${leg.registry}: seq ${ref.seq} -> ${ref.seq + 1}, ` +
-			`spreadBps ${config.baseSpreadBps}+${volatility[index]}, ` +
+			`spreadBps ${config.baseSpreadBps}+${volatility}, ` +
 			`bandEdgeBps ${edges[index]}, markoutBps ${(signals[index] as LegSignals).markoutBps}, ` +
 			`crowdingBps ${crowding[index]}`
 		)
