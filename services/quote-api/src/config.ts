@@ -33,9 +33,14 @@ export const CHAINS: readonly ChainConfig[] = [
   {
     chainId: 11155111,
     name: "sepolia",
+    // v0.2.0, not v0.2.1: Studio meters each version label separately and v0.2.1 spent its whole
+    // 3000-query allowance on 2026-09-11, returning 429 for twelve hours. v0.2.0 is the previous
+    // deployment of the same subgraph, still indexing at head, with its own untouched allowance.
+    // The only difference is that its mapping reports `chainId` as 0, a field nothing reads: the
+    // data layer takes the chain from its own config and this service selects but never uses it.
     subgraphUrl: env(
       "ZENTIS_SUBGRAPH_SEPOLIA",
-      "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1"
+      "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.0"
     ),
     rpcUrl: env("ZENTIS_RPC_SEPOLIA", "https://ethereum-sepolia-rpc.publicnode.com")
   }

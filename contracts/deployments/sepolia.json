@@ -46,7 +46,7 @@
   },
   "subgraphs": {
     "referencePool": "https://api.studio.thegraph.com/query/1760020/zentis-reference-pool-sepolia/v0.0.1",
-    "fills": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1"
+    "fills": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.0"
   },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",

@@ -54,7 +54,7 @@
     {
       "chainSelector": "16015286601757825753",
       "registry": "0xA5dCB9B329b17253FF35202dEb7a2093d06fd7b0",
-      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.1",
+      "fillsSubgraphUrl": "https://api.studio.thegraph.com/query/1760015/zentis-fills-sepolia/v0.2.0",
       "crowdingSubgraphUrl": "https://api.studio.thegraph.com/query/1760020/aqua-standard-ethereum/v0.2.0",
       "crowdingTokenA": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       "crowdingTokenB": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
