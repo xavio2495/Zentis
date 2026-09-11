@@ -1,6 +1,6 @@
 import type { PriceSample } from "@zentis/strategy-sdk";
 import { type Read, failed, ok, query } from "./graphql.js";
-import type { LegConfig } from "./config.js";
+import { POOL_RETIRED, type LegConfig } from "./config.js";
 
 /**
  * The reference pool's recent swaps, as the volatility term's input.
@@ -48,6 +48,7 @@ export async function fetchSeries(
   midOf: (sqrtPriceX96: bigint) => bigint,
   first = 1000,
 ): Promise<Read<PoolSeries>> {
+  if (leg.referencePool === null || leg.referencePoolSubgraphUrl === null) return failed(POOL_RETIRED);
   const read = await query<RawSeries>(leg.referencePoolSubgraphUrl, swapsQuery(leg.referencePool, first));
   if (read.value === null) return failed(read.error ?? "the reference-pool subgraph returned nothing");
   const series = parseSeries(read.value, midOf);

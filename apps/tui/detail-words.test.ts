@@ -32,8 +32,10 @@ test("the why line is labelled in the same column as pool and reference", async 
   expect(whyRow).toBeDefined();
   // "why" is followed by padding to the value column, like "pool" and "reference" are.
   const valueColumn = (row: string) => [...row].findIndex((c, i) => i > 1 && c !== " " && [...row][i - 1] === " ");
-  const poolRow = rows.find((r) => r.startsWith("│pool"))!;
-  expect(valueColumn(whyRow!)).toBe(valueColumn(poolRow));
+  // The leg's pool row is labelled "old venue" now: the book quotes from one mainnet mid, and this
+  // is where the leg's trades land rather than what its price comes from.
+  const labelled = rows.find((r) => r.startsWith("│old venue") || r.startsWith("│reference"))!;
+  expect(valueColumn(whyRow!)).toBe(valueColumn(labelled));
   expect(col("why")).toBeGreaterThan(-1);
 });
 

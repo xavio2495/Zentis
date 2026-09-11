@@ -28,9 +28,17 @@ export interface LegConfig {
   readonly deadline: number;
   readonly tokenA: TokenConfig;
   readonly tokenB: TokenConfig;
-  readonly referencePool: `0x${string}`;
+  /**
+   * The testnet pool this leg's price chart is drawn from, or null where it was retired.
+   *
+   * The book prices off one mainnet mid now, and the slow workflow measures its spread on that one
+   * series, so two of the three legs no longer have a reference pool at all. Null rather than a
+   * missing field: a leg without one has to say so, and an address read off a config that dropped it
+   * arrives as undefined and reaches an RPC as the string "undefined".
+   */
+  readonly referencePool: `0x${string}` | null;
   readonly fillsSubgraphUrl: string;
-  readonly referencePoolSubgraphUrl: string;
+  readonly referencePoolSubgraphUrl: string | null;
   readonly rpcUrl: string;
   /** the slow workflow's per-leg override, or the book-wide default when it has none */
   readonly volatilityMultiplierBps: number;
@@ -142,6 +150,8 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
   }
   const label = LABELS[deployment.name];
   if (label === undefined) throw new Error(`${deployment.name} has no column label`);
+  const pool = (deployment as { referencePool?: { address?: string } }).referencePool;
+  const subgraphs = (deployment as { subgraphs?: { referencePool?: string } }).subgraphs;
 
   return {
     chainId: deployment.chainId,
@@ -154,9 +164,12 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     deadline: deployment.position.deadline,
     tokenA: deployment.tokens.tokenA as TokenConfig,
     tokenB: deployment.tokens.tokenB as TokenConfig,
-    referencePool: slow.referencePool as `0x${string}`,
+    // From the deployment record, which is where a pool address belongs: it is a fact about the
+    // chain rather than a workflow parameter, and the workflow stopped carrying it when the book
+    // moved to one mainnet mid.
+    referencePool: (pool?.address as `0x${string}` | undefined) ?? null,
     fillsSubgraphUrl: slow.fillsSubgraphUrl,
-    referencePoolSubgraphUrl: slow.referencePoolSubgraphUrl,
+    referencePoolSubgraphUrl: subgraphs?.referencePool ?? null,
     rpcUrl: rpcUrl(deployment.name),
     // Read through a widened type: `markAtShip` is written by `scripts/reship.py` from 2026-09-11
     // and is simply absent on every generation shipped before it, which is what leaves the hold
@@ -165,9 +178,18 @@ export const LEGS: readonly LegConfig[] = DEPLOYMENTS.map((deployment) => {
     // `supersededPositions`, so the count is a fact about the file and never drifts from it.
     generations: ((deployment as { supersededPositions?: unknown[] }).supersededPositions?.length ?? 0) + 1,
     shipped: shippedOf(deployment.position as RawShipped),
-    volatilityMultiplierBps: slow.volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
+    // The per-leg override went with the one-mid change; the book-wide figure is what the workflow
+    // now applies to every leg, so it is what the console recomputes against.
+    volatilityMultiplierBps:
+      (slow as { volatilityMultiplierBps?: number }).volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
   };
 });
+
+/**
+ * Why a leg has no price chart, in one sentence, so every screen that has to say it says it the same.
+ */
+export const POOL_RETIRED =
+  "this leg's reference pool was retired when the book moved to one mainnet mid";
 
 /** The pair, taken from the legs rather than named, so a different book renames the header. */
 export const PAIR = `${LEGS[0]!.tokenA.symbol}/${LEGS[0]!.tokenB.symbol}`;

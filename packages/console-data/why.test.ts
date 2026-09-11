@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { LegSnapshot } from "./src/snapshot.js";
+import { LEGS } from "./src/config.js";
 import { why } from "./src/why.js";
 
 const leg = (over: Partial<LegSnapshot>): LegSnapshot =>
@@ -35,7 +36,15 @@ test("a leg that really has no position still says so", () => {
 test("the volatility sentence names the market the book prices from, not a pool of its own", () => {
   // The slow workflow measures volatility on the one mainnet series the mid comes from. Saying "the
   // pool this leg prices from" claimed a per-leg price source that was retired with that change.
-  const shift = { correction: 0, ownConcession: 0, bookConcession: 0, tiltBps: 0 } as never;
+  // Volatility is the largest term, so it is the one the sentence picks; the shift's own terms are
+  // zero here, in the units each of them really carries.
+  const shift = {
+    correction: 0n,
+    ownConcession: 0n,
+    bookConcession: 0n,
+    tiltBps: 0,
+    weightA: 5n * 10n ** 17n,
+  } as never;
   const spread = {
     baseBps: 10,
     volatilityBps: 98,
@@ -45,7 +54,14 @@ test("the volatility sentence names the market the book prices from, not a pool 
     referenceAgeSeconds: 60,
     tooStaleToQuote: false,
   } as never;
-  const sentence = why({ shift, spread, caveats: [], sources: { fills: null, registry: null, pool: null } } as never);
+  const sentence = why({
+    config: LEGS[0]!,
+    position: { active: true, balanceA: 1n, balanceB: 1n } as never,
+    shift,
+    spread,
+    caveats: [],
+    sources: { fills: null, registry: null, pool: null },
+  } as never);
   expect(sentence).toContain("98 bps");
   expect(sentence).not.toContain("the pool this leg prices from");
   expect(sentence).toMatch(/market/);

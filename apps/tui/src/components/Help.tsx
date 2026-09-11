@@ -24,6 +24,7 @@ import { TERM, UI } from "../theme.js";
  */
 const TERMS: [string, string, string][] = [
   ["shift", TERM.correction, "how far off the mid a leg quotes; one signed number on-chain"],
+  ["venue", UI.muted, "where a leg's trades settle; the book's price comes from the mainnet mark"],
   ["correction", TERM.correction, "the leg's curve drifted; the quote is put back on the mid"],
   ["concession", TERM.concession, "the leg pays to shed the token it holds too much of"],
   ["book", TERM.bookConcession, "the same concession charged across all three legs at once"],

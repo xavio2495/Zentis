@@ -42,7 +42,9 @@ export function why(leg: LegSnapshot): string {
     {
       size: spread.volatilityBps,
       say:
-        `the pool this leg prices from moved enough over the week to carry ` +
+        // The one mainnet series the mid comes from, shared by all three legs: the per-leg reference
+        // pools were retired when the book moved to one mid, and the spread is measured there now.
+        `the market this book prices from moved enough over the week to carry ` +
         `${spread.volatilityBps} bps of the spread`,
     },
     {

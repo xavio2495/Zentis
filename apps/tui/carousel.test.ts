@@ -39,7 +39,9 @@ test("a leg's number opens its detail where the chart was, and the same number c
 
 test("the detail carries the position, the pool, the pricing and the leg's own price line", async () => {
   const detail = await text(["1"]);
-  for (const part of ["inventory", "shift", "spread", "pool", "reference", "price"]) {
+  // "venue" rather than "pool": the per-leg reference pools were retired when the book moved to one
+  // mainnet mid, and the row now says where the leg's trades settle.
+  for (const part of ["inventory", "shift", "spread", "venue", "reference", "price"]) {
     expect(detail).toContain(part);
   }
 });

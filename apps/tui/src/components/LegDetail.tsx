@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import {
+  POOL_RETIRED,
   type LegSnapshot,
   humanDuration,
   invertMid,
@@ -152,11 +153,11 @@ export function LegDetail({
     );
   }
 
-  if (leg.series !== null) {
+  if (leg.series !== null && leg.config.referencePool !== null) {
     line(
       "pool",
       <>
-        <Text color={UI.muted}>{"pool       "}</Text>
+        <Text color={UI.muted}>{"venue      "}</Text>
         <Text color={UI.heading}>{pairPrice(leg.series.mid, leg.config.tokenA, leg.config.tokenB)}</Text>
         <Text color={UI.muted}>{`  ${leg.config.referencePool.slice(0, 10)}…${leg.config.referencePool.slice(-6)}`}</Text>
         {/* Liquidity is not shown: a Uniswap v3 liquidity value is not an amount of either token, and
@@ -170,6 +171,18 @@ export function LegDetail({
     );
   } else if (leg.sources.pool !== null) {
     line("pool", <Text color={UI.caveat}>{trunc(`pool       ${leg.sources.pool}`, width)}</Text>);
+  }
+
+  // A leg whose pool was retired says so where the venue would have been; the sentence about what a
+  // venue now is lives in `?`, because it is a fact about the whole book rather than this leg.
+  if (leg.series === null && leg.config.referencePool === null) {
+    line(
+      "venue-none",
+      <>
+        <Text color={UI.muted}>{"venue      "}</Text>
+        <Text color={UI.muted}>{trunc(POOL_RETIRED, width - 11)}</Text>
+      </>,
+    );
   }
 
   if (ref !== null) {

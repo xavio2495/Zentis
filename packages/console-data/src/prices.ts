@@ -1,6 +1,6 @@
 import { midFromSqrtPriceX96, type PriceSample } from "@zentis/strategy-sdk";
 import { createPublicClient, http, type PublicClient } from "viem";
-import type { LegConfig } from "./config.js";
+import { POOL_RETIRED, type LegConfig } from "./config.js";
 import { type Read, failed, ok } from "./graphql.js";
 import type { PoolSeries } from "./pool.js";
 
@@ -203,6 +203,9 @@ export function createPriceReader(
 
       try {
         const pool = leg.referencePool;
+        // A retired leg has no pool to read. Said once, here, rather than left to fail as an RPC
+        // error about an address that is not an address.
+        if (pool === null) return failed(POOL_RETIRED);
         if (state.aligned === null) {
           const token0 = await client.readContract({ address: pool, abi: SLOT0, functionName: "token0" });
           state.aligned = token0.toLowerCase() === leg.tokenA.address.toLowerCase();
