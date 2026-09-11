@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { COPY, LOADER_WORDS } from "@/lib/copy";
 
 /**
@@ -15,12 +15,10 @@ export function Loader() {
   const [progress, setProgress] = useState(0);
   const [word, setWord] = useState(0);
   const [done, setDone] = useState(false);
-  const started = useRef(false);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-
+    // No mount guard: each run owns the frame it cancels, so a remount simply
+    // restarts the count rather than leaving a cancelled loop behind.
     const start = performance.now();
     const duration = 1600;
     let frame = 0;

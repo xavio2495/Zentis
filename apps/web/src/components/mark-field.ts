@@ -190,14 +190,18 @@ export function mountMarkField(host: HTMLElement): () => void {
 
     // The field comes toward the reader and opens out of the wordmark.
     group.position.z = -34 + 34 * eased;
-    group.scale.setScalar(0.15 + 0.85 * eased);
-    material.uniforms.uOpacity.value = 0.25 + 0.75 * eased;
+    group.scale.setScalar(0.22 + 0.78 * eased);
 
     // Past the traverse it turns slowly, by scroll and, unless the reader asked
     // otherwise, a little by itself.
-    const past = clamp((scrolled - viewport * 2.2) / (viewport * 3), 0, 1);
+    const past = clamp((scrolled - viewport * 2.2) / (viewport * 0.8), 0, 1);
     group.rotation.y = past * Math.PI * 0.9 + (reduced ? 0 : time * 0.06);
     group.rotation.x = past * 0.2;
+
+    // Once there are words on screen the mark yields to them: it moves off the
+    // centre line on a wide viewport, and gives up most of its light either way.
+    group.position.x = (innerWidth < 768 ? 0 : 6.8) * past;
+    material.uniforms.uOpacity.value = (0.25 + 0.75 * eased) * (1 - 0.72 * past);
 
     // The scatter, over the last screen of the document.
     const docEnd = document.documentElement.scrollHeight - viewport;

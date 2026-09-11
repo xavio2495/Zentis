@@ -45,7 +45,7 @@ export default function Home() {
             wordmark is in the source and nothing shifts when React arrives. */}
         <section
           id="hero"
-          className="flex h-screen flex-col items-center justify-center"
+          className="relative flex h-screen flex-col items-center justify-center"
           style={{ height: "100svh" }}
         >
           <h1 className="hero-name rise-1">{COPY.wordmark}</h1>
