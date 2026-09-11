@@ -86,3 +86,21 @@ test("the second choice asks for the path where it was offered, rather than else
   expect(frame.overflows).toBe(false);
 }, 60_000);
 
+test("a page with rows to spare carries the mark, because the brand goes where there is room", async () => {
+  // The pages are tables, and a table that ends halfway down its panel leaves the rest blank. That
+  // space is the mark's: it is the only place it can go without taking a row off anything.
+  for (const key of ["p", "n"]) {
+    const frame = await drive(120, 40, { keys: [key] });
+    expect(marked(frame.lines)).toBeGreaterThan(3);
+    expect(frame.overflows).toBe(false);
+  }
+}, 60_000);
+
+test("the mark on a page is the finished one, since a page does not repaint to animate it", async () => {
+  const frame = await drive(120, 40, { keys: ["?"] });
+  // Help is prose, and at a hundred and twenty columns it already scrolls, so there is nothing spare
+  // to draw into. What the pages get instead is checked above.
+  expect(frame.lines.join("\n")).toContain("what this is");
+  expect(frame.overflows).toBe(false);
+}, 60_000);
+
