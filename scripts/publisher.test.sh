@@ -34,8 +34,7 @@ cat >"$work/bin/cre" <<STUB
 #!/usr/bin/env bash
 echo "Initializing..."
 echo "Compiling workflow..."
-echo "✗ workflow execution failed: secret \"CRE_GRAPH_API_KEY\" not found for owner"
-echo "  request used $SECRET_VALUE"
+echo "✗ workflow execution failed: secret \"CRE_GRAPH_API_KEY\" not found for owner, sent $SECRET_VALUE"
 exit 1
 STUB
 chmod +x "$work/bin/cre"
@@ -55,6 +54,29 @@ check "the secret VALUE never reaches disk"   "$line"  "$SECRET_VALUE"          
 check "the redaction is visible where it hid" "$line"  "redacted"                 present
 [ "$rc" -eq 1 ] && { pass=$((pass + 1)); echo "  ok   the exit code is passed through"; } \
 	|| { fail=$((fail + 1)); echo "  FAIL exit code: wanted 1, got $rc"; }
+
+
+# A short secret must NOT be redacted. SECRET_KAPPA_BPS is "10000", which also appears in ordinary
+# output (`maxTiltBps 10000`, a mid, a block number); blanking every occurrence of it would corrupt
+# the result line to protect a gain that is already published on chain in the tilt it produces.
+cat >"$work/bin/cre" <<'STUB'
+#!/usr/bin/env bash
+echo "✓ Workflow Simulation Result:"
+echo '"baseEdgeBps 58 | spreadBps 10+2, maxTiltBps 10000, seq 1789108526"'
+exit 0
+STUB
+chmod +x "$work/bin/cre"
+set +e
+PATH="$work/bin:$PATH" ZENTIS_CRE_ENV="$work/cre.env" ZENTIS_LOG_DIR="$work/logs" \
+	"$here/publisher.sh" slow >/dev/null 2>&1
+ok_rc=$?
+set -e
+good=$(tail -1 "$work/logs/slow.log")
+echo "logged: $good"
+check "a successful run logs its result"      "$good"  "baseEdgeBps 58"           present
+check "a short secret is left alone"          "$good"  "maxTiltBps 10000"         present
+check "a successful run is recorded as such"  "$good"  "rc=0"                     present
+[ "$ok_rc" -eq 0 ] || { fail=$((fail + 1)); echo "  FAIL success exit code: got $ok_rc"; }
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
