@@ -7,6 +7,7 @@ import { headline, loadSimReport } from "./src/sim.js";
 import { midOf, recomputeVolatility, spreadStack, stalenessWidening } from "./src/spread.js";
 import type { StoredRef } from "./src/registry.js";
 
+import slowConfig from "../../cre/slow/config.staging.json" with { type: "json" };
 import historySepolia from "./fixtures/history-sepolia.json" with { type: "json" };
 import historyArbitrum from "./fixtures/history-arbitrum-sepolia.json" with { type: "json" };
 import historyBase from "./fixtures/history-base-sepolia.json" with { type: "json" };
@@ -109,7 +110,15 @@ test("the volatility term recomputes inside its cap, and Base's own multiplier i
     expect(term).toBeGreaterThanOrEqual(0n);
     expect(term).toBeLessThanOrEqual(BigInt(BOOK.volatilityCapBps));
   }
-  expect(LEGS[2]!.volatilityMultiplierBps).toBe(3000);
+  // Read from the workflow's own config rather than written down: the multiplier is the slow
+  // workflow's to set, a leg may override it, and a number pinned here turns an ordinary change to
+  // that config into a failing console test about nothing.
+  const configured = (slowConfig.legs as { registry: string; volatilityMultiplierBps?: number }[]).find(
+    (l) => l.registry.toLowerCase() === LEGS[2]!.registry.toLowerCase(),
+  );
+  expect(LEGS[2]!.volatilityMultiplierBps).toBe(
+    configured?.volatilityMultiplierBps ?? slowConfig.volatilityMultiplierBps,
+  );
 });
 
 test("off-mid is signed against the reference's own mid and absent when a leg did not price", () => {
