@@ -91,3 +91,13 @@ test("a leg the console could not read is marked unread in its own column", asyn
   expect(publish.slice(at.Arbitrum, at.Arbitrum + 6)).toBe("unread");
   expect(publish.slice(at.Sepolia)).toMatch(/^[-+]?\d/);
 }, 60_000);
+
+test("the refusals of one stale publish share a row, each under the chain that refused it", async () => {
+  // Three chains refusing the same relayed seq within a minute is one event seen three times. As
+  // three rows it spent three-quarters of the table on blank cells.
+  const [header, ...body] = feedOf((await drive(190, 50, { armed: true })).lines);
+  const at = columnsOf(header!);
+  const together = body.find((r) => (r.match(/stale seq/g)?.length ?? 0) === 3);
+  expect(together).toBeDefined();
+  for (const start of Object.values(at)) expect(together!.slice(start, start + 9)).toBe("stale seq");
+}, 60_000);
