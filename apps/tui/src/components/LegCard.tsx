@@ -144,7 +144,8 @@ export function LegCard({
         {chooseFit([`${spinnerAt(Date.now())} waiting on fills`, "position unread"], inner)}
       </Text>,
     );
-    if (leg.series !== null) rows.push(<Text color={UI.muted}>{trunc("pool price from RPC", inner)}</Text>);
+    // Nothing about the venue here: it is where this leg's trades settle, not what the book prices
+    // from, and on an unread card it named a source the reader has no use for.
   } else if (position === null) {
     rows.push(<Text color={UI.muted}>{trunc("no position on this chain", inner)}</Text>);
   } else {

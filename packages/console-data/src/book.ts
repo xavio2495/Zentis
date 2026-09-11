@@ -47,12 +47,16 @@ export function bookTotals(legs: readonly LegSnapshot[]): BookTotals {
     inventoryA = (inventoryA ?? 0n) + inA + inB;
   }
 
+  // Every leg, and at least one: summing over none of them gives the empty sum, and a screen that
+  // printed 0n during an outage was claiming the maker earned nothing when nothing had been read.
   const withPnl = legs.filter((leg) => leg.pnl?.totalA != null);
-  const pnlA = withPnl.length === legs.length ? withPnl.reduce((sum, leg) => sum + (leg.pnl?.totalA ?? 0n), 0n) : null;
-  const tradingA = withPnl.length === legs.length ? withPnl.reduce((sum, leg) => sum + (leg.pnl?.tradingA ?? 0n), 0n) : null;
-  const holdA = withPnl.length === legs.length ? withPnl.reduce((sum, leg) => sum + (leg.pnl?.holdA ?? 0n), 0n) : null;
+  const complete = legs.length > 0 && withPnl.length === legs.length;
+  const pnlA = complete ? withPnl.reduce((sum, leg) => sum + (leg.pnl?.totalA ?? 0n), 0n) : null;
+  const tradingA = complete ? withPnl.reduce((sum, leg) => sum + (leg.pnl?.tradingA ?? 0n), 0n) : null;
+  const holdA = complete ? withPnl.reduce((sum, leg) => sum + (leg.pnl?.holdA ?? 0n), 0n) : null;
 
   const notes: string[] = [];
+  if (legs.length === 0) notes.push("no legs could be read, so there is nothing to total");
   if (unvalued > 0) notes.push(`${unvalued} of ${legs.length} legs could not be valued, so they are left out of the book`);
   if (pnlA === null && legs.length > 0) {
     notes.push(`${withPnl.length} of ${legs.length} legs have a profit and loss, so there is no book total`);
