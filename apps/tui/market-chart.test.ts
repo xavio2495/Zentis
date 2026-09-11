@@ -42,3 +42,29 @@ test("the chart says how the series was drawn, since an hour of hourly closes is
   // The sandbox's series is hourly, and the chart says so rather than implying every point is a trade.
   expect(text).toMatch(/hourly|per swap/);
 }, 60_000);
+
+test("the window the title names is the window the chart draws", async () => {
+  // The label came from one leg's automatic window while the series was the week: the border said
+  // "1h window · auto" over a line spanning six days.
+  const lines = (await drive(190, 50, {})).lines;
+  const title = lines.find((l) => l.includes("┌ market"))!;
+  const footer = lines.find((l) => /\d+[dhm] ago/.test(l) && /now$|now\s*│/.test(l))!;
+  const named = /(\dh|\d+h|\dd|7d|24h|1h) window/.exec(title)![1]!;
+  const drawn = /(\d+)([dhm])\s+ago/.exec(footer)!;
+  const hours = { d: 24, h: 1, m: 1 / 60 }[drawn[2] as "h"]! * Number(drawn[1]);
+  const namedHours = named === "1h" ? 1 : named === "24h" ? 24 : 168;
+  // The drawn span never exceeds the window it is named by, give or take the last point's age.
+  expect(hours).toBeLessThanOrEqual(namedHours + 1);
+}, 60_000);
+
+test("the chart's headline price is the series' own last close, and says how old it is", async () => {
+  // 2,372 in the title beside a mark of 2,467 on the same screen reads as a broken screen. They are
+  // two different readings — an hourly close and a spot mark — so the title says which it is.
+  const snapshot = fakeSnapshot("fresh");
+  const newest = snapshot.market!.points.at(-1)!;
+  const mark = snapshot.legs[0]!.mark!.mid;
+  // The recorded world ends its series at the mark, so the two agree rather than differing by 4%.
+  expect(newest.mid).toBe(mark);
+  const title = (await drive(190, 50, {})).lines.find((l) => l.includes("┌ market"))!;
+  expect(title).toMatch(/1 WETH = [\d,]+ USDC/);
+}, 60_000);
