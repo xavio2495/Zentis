@@ -2,8 +2,15 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { LEGS } from "@zentis/console-data";
-import { buildActions, buildFillAction, buildPushAction, describeCommand, findRepoRoot } from "./src/actions.js";
+import { LEGS, QUOTE_SIZE_A } from "@zentis/console-data";
+import {
+  buildActions,
+  buildFillAction,
+  buildPushAction,
+  buildQuoteAction,
+  describeCommand,
+  findRepoRoot,
+} from "./src/actions.js";
 
 // A file shaped like the operator's real one, so that "the console never holds a key" is asserted
 // against something a key could actually leak out of.
@@ -78,20 +85,22 @@ test("the fill sources the env file inside the child, skipping names a shell can
   const script = command.cmd.join(" ");
   expect(script).toContain(envPath);
   // Sourcing the file whole fails: a variable whose name starts with a digit is not a shell
-  // identifier, and `.` on this file dies with "command not found" before forge ever runs.
+  // identifier, and `.` on this file dies with "command not found" before anything runs.
   expect(script).toContain("[A-Za-z_][A-Za-z0-9_]*=");
-  expect(script).toContain("forge script");
-  expect(command.cwd).toMatch(/\/contracts$/);
+  // No forge and no repository: the fill is two `cast` sends against bytes the deployment record
+  // carries, so the compiled console can take a quote wherever it is run.
+  expect(script).toContain("cast send");
+  expect(script).not.toContain("forge");
 });
 
 test("the fill is built from the deployment record, not from numbers typed here", () => {
-  const env = find(envPath, "f").command!.env!;
-  expect(env["ZENTIS_ROUTER"]).toMatch(/^0x[0-9a-fA-F]{40}$/);
-  expect(env["REF_REGISTRY"]).toMatch(/^0x[0-9a-fA-F]{40}$/);
-  expect(env["TOKEN_A"]).toMatch(/^0x[0-9a-fA-F]{40}$/);
-  expect(env["POSITION_ID"]).toMatch(/^0x[0-9a-fA-F]{64}$/);
-  expect(Number(env["POSITION_DEADLINE"])).toBeGreaterThan(0);
-  expect(Number(env["FILL_AMOUNT"])).toBeGreaterThan(0);
+  const script = find(envPath, "f").command!.cmd.join(" ");
+  const leg = LEGS[0]!;
+  expect(script).toContain(leg.fill!.router);
+  expect(script).toContain(leg.fill!.orderTuple);
+  expect(script).toContain(leg.fill!.takerDataAToB);
+  // The size is the book's own quote size, which is configured rather than chosen here.
+  expect(script).toContain(String(QUOTE_SIZE_A));
 });
 
 test("re-quote runs no child process at all: it re-reads through the quote path", () => {
@@ -115,12 +124,15 @@ test("the repo root is found by walking up from the working directory", () => {
   );
 });
 
-test("with no root, no command is built against a guess", () => {
-  for (const key of ["r", "s", "f"]) {
+test("with no root, no workflow command is built against a guess", () => {
+  // The two workflow actions run `cre` from the repository's own directory and still need it. The
+  // fill does not any more: its order comes from the deployment record, so it runs anywhere.
+  for (const key of ["r", "s"]) {
     const action = buildActions(envPath, null).find((a) => a.key === key)!;
     expect(action.command).toBeNull();
     expect(action.disabledReason).toContain("ZENTIS_REPO");
   }
+  expect(buildActions(envPath, null).find((a) => a.key === "f")!.command).not.toBeNull();
   // Re-quote reads through the quote path and needs no repository at all.
   expect(buildActions(envPath, null).find((a) => a.key === "q")!.disabledReason).toBeNull();
 });
@@ -139,19 +151,17 @@ test("ZENTIS_REPO overrides the search, and a wrong one is ignored rather than o
   expect(findRepoRoot(dir, join(dir, "nowhere"))).toBe(REPO);
 });
 
-test("a typed fill names its own leg, side and size, and those win over the env file's", () => {
-  // The parameters are assigned on the command line *after* the file is sourced. `set -a` inside the
-  // child exports everything the file assigns, so a stale FILL_AMOUNT in the operator's env file
-  // would otherwise quietly replace the size they just typed.
+test("a typed fill names its own leg, side and size", () => {
+  // Nothing is passed through the environment any more, so nothing in the operator's env file can
+  // replace what they typed: the leg, the size and the side are in the command itself.
   const leg = LEGS.find((l) => l.name === "base-sepolia")!;
-  const action = buildFillAction("/tmp/private.env", "/repo", { leg, amountRaw: 250_000n, isAToB: false });
+  const action = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 250_000n, isAToB: false });
   expect(action.disabledReason).toBeNull();
   const script = action.command!.cmd.join(" ");
-  expect(script).toContain("FILL_AMOUNT=250000");
-  expect(script).toContain("FILL_A_TO_B=false");
-  expect(script.indexOf("FILL_AMOUNT=")).toBeGreaterThan(script.indexOf("set +a"));
-  expect(action.command!.env!["ZENTIS_RPC"]).toBe(leg.rpcUrl);
-  expect(action.command!.env!["ZENTIS_ROUTER"]).toBe(leg.app);
+  expect(script).toContain("250000");
+  expect(script).toContain(leg.fill!.takerDataBToA);
+  expect(script).toContain(leg.rpcUrl);
+  expect(script).toContain(leg.fill!.router);
   expect(action.label).toContain("base");
 });
 
@@ -257,6 +267,27 @@ test("a fill quotes first and checks the swap matched it, which is the parity th
 test("a leg with no recorded bytes offers no fill, and says that rather than reaching for forge", () => {
   const leg = { ...LEGS[0]!, fill: null };
   const action = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 1n, isAToB: true });
+  expect(action.command).toBeNull();
+  expect(action.disabledReason).toContain("no fill bytes recorded");
+});
+
+test("a typed quote is a static call the console makes itself, needing no key and no service", () => {
+  // `cast call` is a static call, which is what `asView()` is in Solidity — the quote path the
+  // anti-patterns require. It needs no key, so it works watch-only, and no quote service, so it
+  // still answers when that service is the thing that is down.
+  const leg = LEGS.find((l) => l.name === "sepolia")!;
+  const action = buildQuoteAction({ leg, amountRaw: 150_000n, isAToB: true });
+  expect(action.disabledReason).toBeNull();
+  const script = action.command!.cmd.join(" ");
+  expect(script).toContain("cast call");
+  expect(script).toContain("quote(");
+  expect(script).toContain(leg.fill!.orderTuple);
+  expect(script).not.toContain("cast send");
+  expect(script).not.toContain("PRIVATE_KEY");
+});
+
+test("a quote for a leg with no recorded bytes says so rather than guessing an order", () => {
+  const action = buildQuoteAction({ leg: { ...LEGS[0]!, fill: null }, amountRaw: 1n, isAToB: true });
   expect(action.command).toBeNull();
   expect(action.disabledReason).toContain("no fill bytes recorded");
 });
