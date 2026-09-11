@@ -13,14 +13,15 @@ describe("the page makes no claim it cannot source", () => {
     expect(INTEGRATIONS.map((i) => i.name)).toEqual(["1inch", "The Graph", "Chainlink"]);
     expect(INTEGRATIONS[0].claim).toContain("unmodified");
     expect(INTEGRATIONS[1].claim).toContain("subgraph");
+    expect(INTEGRATIONS[1].claim.toLowerCase()).toContain("three");
     expect(INTEGRATIONS[2].claim).toContain("registry");
     for (const integration of INTEGRATIONS) {
       expect(integration.claim.length).toBeLessThan(140);
     }
   });
 
-  test("the position is one, and the chains are two", () => {
-    expect(COPY.statement.toLowerCase()).toContain("two chains");
+  test("the position is one, and the chains are three", () => {
+    expect(COPY.statement.toLowerCase()).toContain("three chains");
     expect(COPY.statement.toLowerCase()).toContain("no bridge");
   });
 });
