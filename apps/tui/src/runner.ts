@@ -35,7 +35,9 @@ export async function run(command: ActionCommand): Promise<RunResult> {
     // entries are the ones built from the deployment records. Nothing read from the env file is
     // here — that file is opened by the child, never by this process.
     env: { ...process.env, ...command.env },
-    stdin: "ignore",
+    // An intent is written here rather than passed as an argument: `ps` shows arguments to every
+    // user on the machine.
+    stdin: command.stdin === undefined ? "ignore" : new TextEncoder().encode(command.stdin),
     stdout: "pipe",
     stderr: "pipe",
   });

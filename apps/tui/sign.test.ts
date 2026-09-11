@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -66,4 +66,6 @@ test("redaction holds even when the key is not the one that was passed in", () =
   expect(redact(`boom ${other}`, SECRET)).not.toContain(other);
 });
 
-rmSync(dir, { recursive: true, force: true });
+// After the tests, not while the module is being read: at module scope this ran before the first
+// test did, and every one of them then failed on a directory that was already gone.
+afterAll(() => rmSync(dir, { recursive: true, force: true }));

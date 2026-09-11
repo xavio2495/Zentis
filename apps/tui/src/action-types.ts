@@ -10,6 +10,13 @@ export interface ActionCommand {
   readonly cwd: string
   /** extra environment for the child; never contains anything read from the env file */
   readonly env?: Record<string, string>
+  /**
+   * What to write to the child's stdin.
+   *
+   * An intent goes this way rather than as an argument: arguments are visible in `ps` to every user
+   * on the machine, and an intent names amounts, addresses and which key to use.
+   */
+  readonly stdin?: string
 }
 
 export interface Action {

@@ -45,6 +45,19 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
   });
 }
 
+/**
+ * `zentis sign` — the signing child, and the only part of this program that reads a key.
+ *
+ * It runs before anything renders: the intent arrives on stdin, the child signs and sends, prints a
+ * hash and a status, and exits. The interactive process spawns it and reads those lines back, so the
+ * key exists only in a process that has no terminal and no screen.
+ */
+if (process.argv.slice(2)[0] === "sign") {
+  const { signMain } = await import("./sign.js");
+  const stdin = await new Response(Bun.stdin.stream()).text();
+  process.exit(await signMain(stdin, process.env["ZENTIS_ENV"] ?? null));
+}
+
 const watchOnly = process.argv.slice(2).includes("watch");
 const envFile = watchOnly ? null : (process.env.ZENTIS_ENV ?? null);
 

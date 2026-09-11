@@ -342,3 +342,31 @@ test("the log filter quotes its term, because an unquoted = is a syntax error to
   expect(script).toContain('textPayload:\\"rc=\\"');
   expect(script).not.toMatch(/textPayload:rc=[^"]/);
 });
+
+test("a fill is this binary signing for itself, with the intent on stdin and no Foundry anywhere", () => {
+  // A stranger's device has the console and nothing else. `cast: command not found` at the moment of
+  // the first fill is the wall this removes.
+  const leg = LEGS.find((l) => l.name === "sepolia")!;
+  const action = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 150_000n, isAToB: true });
+  expect(action.disabledReason).toBeNull();
+  const command = action.command!;
+  expect(command.cmd.join(" ")).not.toContain("cast");
+  expect(command.cmd.join(" ")).not.toContain("forge");
+  expect(command.cmd).toContain("sign");
+  // The intent goes on stdin, never in the arguments: `ps` shows arguments to everyone.
+  expect(command.stdin).toBeDefined();
+  const intent = JSON.parse(command.stdin!) as { kind: string; chainId: number; amount: string; isAToB: boolean };
+  expect(intent.kind).toBe("fill");
+  expect(intent.chainId).toBe(leg.chainId);
+  expect(intent.amount).toBe("150000");
+  expect(intent.isAToB).toBe(true);
+  expect(command.cmd.join(" ")).not.toContain("150000");
+  // And the child is handed the file's path, as before, never its contents.
+  expect(command.env!["ZENTIS_ENV"]).toBe("/tmp/private.env");
+});
+
+test("nothing in the console's own source spawns cast for a fill or a quote any more", async () => {
+  const source = await Bun.file(new URL("./src/actions.ts", import.meta.url)).text();
+  expect(source).not.toContain('"cast call"');
+  expect(source).not.toMatch(/cast send \$\{|cast call \$\{/);
+});
