@@ -57,3 +57,47 @@ export function rebalanceOf(leg: { balanceA: bigint; balanceB: bigint; mid: bigi
   }
   return { wantedB, topUpB: wantedB - leg.balanceB, offMidBps, canFix: true, reason: null };
 }
+
+/**
+ * The three transactions a top-up takes, sized from what the chain says.
+ *
+ * `push()` is a `transferFrom`: it spends the allowance now, and every later fill that takes tokenB
+ * from the maker is settled by Aqua pulling against whatever is left, up to the whole committed
+ * balance. So the approval has two jobs and must cover `topUp + wantedB`. Sizing it to the top-up
+ * alone is what left every leg at a zero WETH allowance with its commitment intact on 2026-09-11 —
+ * found by this console's own wallet page, which is why the number is computed here rather than
+ * anywhere a screen could round it.
+ *
+ * Wrapping comes first and only for the shortfall: the maker's ETH is gas, and wrapping more of it
+ * than the push needs is a decision nobody asked for.
+ */
+export interface PushPlan {
+  readonly topUpB: bigint;
+  readonly wantedB: bigint;
+  /** what the allowance must be after this push, so the next settlement still has room */
+  readonly approval: bigint;
+  readonly needsApproval: boolean;
+  /** native to wrap first, when the wallet does not hold enough tokenB free */
+  readonly wrap: bigint;
+}
+
+export function pushPlan(leg: {
+  balanceA: bigint;
+  balanceB: bigint;
+  mid: bigint;
+  /** the wallet's own tokenB balance, which includes what is already committed */
+  held: bigint;
+  allowance: bigint;
+}): PushPlan | null {
+  const plan = rebalanceOf(leg);
+  if (!plan.canFix || plan.wantedB === null || plan.topUpB <= 0n) return null;
+  const free = leg.held > leg.balanceB ? leg.held - leg.balanceB : 0n;
+  const approval = plan.topUpB + plan.wantedB;
+  return {
+    topUpB: plan.topUpB,
+    wantedB: plan.wantedB,
+    approval,
+    needsApproval: leg.allowance < approval,
+    wrap: plan.topUpB > free ? plan.topUpB - free : 0n,
+  };
+}

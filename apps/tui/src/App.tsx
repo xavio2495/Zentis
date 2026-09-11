@@ -1,6 +1,16 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { BOOK, LEGS, type LegConfig, type Store, createStore, fetchQuotes, offMidBps } from "@zentis/console-data";
+import {
+  BOOK,
+  LEGS,
+  type LegConfig,
+  type PushPlan,
+  type Store,
+  createStore,
+  fetchQuotes,
+  offMidBps,
+  pushPlan,
+} from "@zentis/console-data";
 import type { Action } from "./action-types.js";
 import { Feed } from "./components/Feed.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
@@ -59,6 +69,7 @@ export function App({
   commands?: {
     fill: (fill: { leg: LegConfig; amountRaw: bigint; isAToB: boolean }) => Action;
     republish: (workflow: "fast" | "slow") => Action;
+    push: (push: { leg: LegConfig; plan: PushPlan }) => Action;
   } | null;
   /** resolves to the line the status bar should show once the command has finished */
   runAction: ((action: Action) => Promise<string>) | null;
@@ -199,14 +210,44 @@ export function App({
         setPage("positions");
         setAnswer({ text: `${command.leg.name}'s rebalance is on the positions page`, bad: false });
         return;
-      case "push":
-        // Named, never run. A push moves the maker's own money, the script sizes it from the chain
-        // rather than from anything on this screen, and the operator is the one who signs it.
-        setAnswer({
-          text: `run it yourself: python3 scripts/rebalance.py --only ${command.leg.name}  (--dry-run reads it first)`,
-          bad: false,
+      case "push": {
+        // The console's own three calls, sized from what it has already read: the committed balances
+        // over RPC, the published mid, and the wallet's own tokenB holding and allowance. It still
+        // asks before it broadcasts, and the operator is the one who answers.
+        if (commands === null) {
+          setAnswer({ text: "this console was given no way to sign, so it cannot run that", bad: true });
+          return;
+        }
+        const leg = snapshot?.legs.find((l) => l.config.chainId === command.leg.chainId) ?? null;
+        const chain = snapshot?.wallet?.chains.find((c) => c.chainId === command.leg.chainId) ?? null;
+        if (leg === null || leg.ref === null || chain === null) {
+          setAnswer({ text: `${command.leg.name} has not been read yet, so a push cannot be sized`, bad: true });
+          return;
+        }
+        // The amount typed is what the operator wants moved; the plan says what that costs in
+        // approval and wrapping, and refuses a leg a push cannot help.
+        const planned = pushPlan({
+          balanceA: chain.tokenA.committed,
+          balanceB: chain.tokenB.committed,
+          mid: leg.ref.mid,
+          held: chain.tokenB.held,
+          allowance: chain.tokenB.allowance,
         });
+        if (planned === null) {
+          setAnswer({ text: `${command.leg.name} holds more than the mid says it should; a push cannot fix that`, bad: true });
+          return;
+        }
+        const action = commands.push({ leg: command.leg, plan: { ...planned, topUpB: command.amountRaw } });
+        if (action.disabledReason !== null) {
+          setAnswer({ text: action.disabledReason, bad: true });
+          return;
+        }
+        setTyping(null);
+        setAnswer(null);
+        setConfirming(action);
+        say(`press y to broadcast — ${action.label}: ${action.describe}`);
         return;
+      }
       case "fill":
       case "republish": {
         if (commands === null) {

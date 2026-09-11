@@ -108,8 +108,8 @@ test("the positions page offers a rebalance for a leg whose reserves sit off the
   expect(text).toContain("rebalance");
   // The move, sized from the leg's own balances against the mid, with the command to make it.
   expect(text).toMatch(/push .*WETH|top up .*WETH/);
-  expect(text).toContain("scripts/rebalance.py");
-  expect(text).toContain("--only");
+  // The command is the console's own, since a compiled binary has no checkout to run a script from.
+  expect(text).toMatch(/: ?push /);
   expect(frame.overflows).toBe(false);
 }, 60_000);
 

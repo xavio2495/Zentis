@@ -317,5 +317,7 @@ export function commandActions(envFile: string | null, repo: string | null = fin
   return {
     fill: (fill: FillParams): Action => buildFillAction(envFile, repo, fill),
     republish: (workflow: "fast" | "slow"): Action => buildRepublishAction(envFile, repo, workflow),
+    // No repository in its arguments: a push is three `cast` calls the binary makes itself.
+    push: (push: { leg: LegConfig; plan: PushPlan }): Action => buildPushAction(envFile, push),
   };
 }

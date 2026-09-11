@@ -208,8 +208,15 @@ export function Positions({
         { text: "top up ", color: UI.muted },
         { text: `${tokenAmount(plan.topUpB, tokenB.decimals)} ${tokenB.symbol}`, color: UI.heading, bold: true },
       ];
-      const command: Seg[] = [{ text: `python3 scripts/rebalance.py --only ${leg.config.name}`, color: UI.action }];
-      const note: Seg = { text: "  (--dry-run reads it first)", color: UI.muted };
+      // The console's own command, which a compiled binary can run: a script path could not work for
+      // an operator who has no checkout, and this console is handed out as one file.
+      const command: Seg[] = [
+        {
+          text: `: push ${leg.config.name.replace(/-sepolia$/, "")} ${tokenB.symbol.toLowerCase()} ${tokenAmount(plan.topUpB, tokenB.decimals)}`,
+          color: UI.action,
+        },
+      ];
+      const note: Seg = { text: "  (it asks before it broadcasts)", color: UI.muted };
       const joined = [...amount, { text: "  ·  ", color: UI.frame }, ...command, note];
       const oneRow = segWidth(joined) <= width;
       rows.push(<Segments key={`rb-${name}-a`} segs={oneRow ? joined : amount} />);
