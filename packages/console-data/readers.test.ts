@@ -12,7 +12,6 @@ import historySepolia from "./fixtures/history-sepolia.json" with { type: "json"
 import historyArbitrum from "./fixtures/history-arbitrum-sepolia.json" with { type: "json" };
 import historyBase from "./fixtures/history-base-sepolia.json" with { type: "json" };
 import poolSepolia from "./fixtures/pool-sepolia.json" with { type: "json" };
-import poolBase from "./fixtures/pool-base-sepolia.json" with { type: "json" };
 import refSepolia from "./fixtures/ref-sepolia.json" with { type: "json" };
 import recordedAt from "./fixtures/recorded-at.json" with { type: "json" };
 
@@ -103,13 +102,14 @@ test("past its staleness limit a leg does not quote wide, it stops quoting", () 
   expect(spreadStack(ref, position, BOOK, past, null).tooStaleToQuote).toBe(true);
 });
 
-test("the volatility term recomputes inside its cap, and Base's own multiplier is used", () => {
+test("the volatility term recomputes inside its cap, at whatever multiplier the workflow is set to", () => {
+  // Only Sepolia still has a recorded series: the other two reference pools were retired when the
+  // book moved to one mainnet mid, so there is nothing left to recompute a per-leg term from. The
+  // multiplier is still asserted for a retired leg, because the term is computed with it wherever
+  // a series comes from.
   const sepolia = recomputeVolatility(parseSeries(poolSepolia as never, midOf)!, LEGS[0]!, BOOK)!;
-  const base = recomputeVolatility(parseSeries(poolBase as never, midOf)!, LEGS[2]!, BOOK)!;
-  for (const term of [sepolia, base]) {
-    expect(term).toBeGreaterThanOrEqual(0n);
-    expect(term).toBeLessThanOrEqual(BigInt(BOOK.volatilityCapBps));
-  }
+  expect(sepolia).toBeGreaterThanOrEqual(0n);
+  expect(sepolia).toBeLessThanOrEqual(BigInt(BOOK.volatilityCapBps));
   // Read from the workflow's own config rather than written down: the multiplier is the slow
   // workflow's to set, a leg may override it, and a number pinned here turns an ordinary change to
   // that config into a failing console test about nothing.

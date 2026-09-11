@@ -47,7 +47,11 @@ test("the detail carries the position, the pool, the pricing and the leg's own p
   const detail = await text(["1"]);
   // "venue" rather than "pool": the per-leg reference pools were retired when the book moved to one
   // mainnet mid, and the row now says where the leg's trades settle.
-  for (const part of ["inventory", "shift", "spread", "venue", "reference", "price"]) {
+  for (const part of ["inventory", "shift", "spread", "venue", "reference"]) {
     expect(detail).toContain(part);
+  }
+  // And a price, written as one: the word "price" is not on the row, the figure is.
+  expect(detail).toMatch(/1 WETH = [\d,]+ USDC/);
+  {
   }
 });

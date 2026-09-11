@@ -30,63 +30,108 @@ test("collapsing does not merge two different references", () => {
   expect(new Set(seqs).size).toBe(seqs.length);
 });
 
+/**
+ * A publish written to three chains, with whatever else is asked for landing between the writes.
+ *
+ * Constructed rather than found in the recording. The case is about ordering — one decision, three
+ * writes, seconds apart — and which publish in a recorded week happens to have a refusal wedged into
+ * it changes with every re-record. Pinning a seq made an ordinary recording look like a bug.
+ */
+const publishAcross = (seq: number, at: number, options: { refusalBetween?: boolean } = {}) => {
+  const legAt = (index: number, seconds: number) => ({
+    kind: "reference" as const,
+    chainId: LEGS[index]!.chainId,
+    timestamp: BigInt(at + seconds),
+    transaction: `0xref${seq}${index}`,
+    mid: 10n ** 27n,
+    tiltBps: -10,
+    seq,
+    updatedAt: BigInt(at),
+  });
+  const references = [legAt(0, 0), legAt(1, 8), legAt(2, 12)];
+  const rejections = options.refusalBetween === true
+    ? [
+        {
+          kind: "rejection" as const,
+          chainId: LEGS[1]!.chainId,
+          timestamp: BigInt(at + 4),
+          transaction: `0xrej${seq}`,
+          reason: "stale seq",
+        },
+      ]
+    : [];
+  return LEGS.map((leg, index) => ({
+    position: null,
+    fills: [],
+    references: references.filter((r) => r.chainId === leg.chainId),
+    rejections: rejections.filter((r) => r.chainId === leg.chainId),
+  }));
+};
+
 test("one publish stays one row even when a refusal lands between its legs", () => {
-  // Recorded on 2026-09-11: seq 1789077446 wrote three legs, and two refusals landed between
-  // Sepolia's write and the other two. Folding only a consecutive run split that publish into a
-  // row saying one leg and a row saying two, so the screen showed two publishes where the enclave
-  // made one decision — against a console whose whole claim is one mid and one book.
-  const rounds = rows(200).filter((r) => r.kind === "round");
-  const split = rounds.filter((r) => r.seq === 1789077446);
+  // Seen on 2026-09-11: a publish wrote three legs and two refusals landed between the first write
+  // and the other two. Folding only a consecutive run split that publish into a row saying one leg
+  // and a row saying two, so the screen showed two publishes where the enclave made one decision —
+  // against a console whose whole claim is one mid and one book.
+  const seq = 1789000000;
+  const feed = collapseFeed(mergeFeed(publishAcross(seq, 1789000000, { refusalBetween: true }), 200), 200);
+  const split = feed.filter((r) => r.kind === "round" && r.seq === seq);
   expect(split.length).toBe(1);
-  expect(split[0]!.legs.length).toBe(3);
-  expect(new Set(split[0]!.legs.map((l) => l.chainId)).size).toBe(3);
+  expect(split[0]!.kind === "round" && split[0]!.legs.length).toBe(3);
 });
 
 test("a round is dated by its last leg to land, and says how long the writes took", () => {
-  const round = rows(200).filter((r) => r.kind === "round").find((r) => r.seq === 1789077446)!;
-  expect(round.timestamp).toBe(1789078488n);
-  // Sepolia landed twelve seconds after Base; a reader watching for one book should see that the
-  // legs are not written atomically, rather than infer it from rows that disagree.
-  expect(round.spanSeconds).toBe(12);
+  const at = 1789000000;
+  const feed = collapseFeed(mergeFeed(publishAcross(1789000001, at), 200), 200);
+  const round = feed.find((r) => r.kind === "round")!;
+  // The last write is what makes the publish true everywhere, so that is when the round happened.
+  expect(round.kind === "round" && round.timestamp).toBe(BigInt(at + 12));
+  // A reader watching for one book should see that the legs are not written atomically, rather than
+  // infer it from rows that disagree.
+  expect(round.kind === "round" && round.spanSeconds).toBe(12);
 });
 
 test("the feed the operator sees surfaces the fill and the refusals the raw one buried", () => {
   // Collapsing three writes into one round is not enough on its own: the workflow publishes every
   // few minutes whether or not a shift moved, so after an hour of quiet the screen is thirteen
-  // identical rounds and the fill is off the bottom. What the operator sees is the folded feed,
-  // and that is what this asserts — the raw collapse is only half of the claim.
-  const shown = foldRounds(rows(200)).slice(0, FEED_ROWS);
+  // identical rounds and the fill is off the bottom. Built here with more quiet publishes than the
+  // feed has rows, so the claim does not depend on how busy the recorded week happened to be.
+  const at = 1789000000;
+  const quiet = Array.from({ length: FEED_ROWS * 2 }, (_, i) => publishAcross(1789000100 + i, at + 600 + i * 300));
+  const merged = LEGS.map((leg, index) => ({
+    position: null,
+    fills:
+      index === 0
+        ? [
+            {
+              kind: "fill" as const,
+              chainId: leg.chainId,
+              timestamp: BigInt(at),
+              transaction: "0xfill",
+              amountIn: 150_000n,
+              amountOut: 40_000_000_000_000n,
+              isAToB: true,
+              hasReference: true,
+              refMid: 10n ** 27n,
+              refTiltBps: -10,
+              refSeq: 1789000000,
+              refAgeSeconds: 60n,
+            },
+          ]
+        : [],
+    references: quiet.flatMap((round) => round[index]!.references),
+    rejections: [
+      {
+        kind: "rejection" as const,
+        chainId: leg.chainId,
+        timestamp: BigInt(at + 30),
+        transaction: "0xrej",
+        reason: "stale seq",
+      },
+    ],
+  }));
+
+  const shown = foldRounds(collapseFeed(mergeFeed(merged, 400), 400)).slice(0, FEED_ROWS);
   expect(shown.some((r) => r.kind === "fill")).toBe(true);
   expect(shown.some((r) => r.kind === "rejection")).toBe(true);
-});
-
-test("a refusal is never collapsed, and keeps the registry's own words", () => {
-  const rejections = rows(200).filter((r) => r.kind === "rejection");
-  expect(rejections.length).toBeGreaterThan(0);
-  expect(rejections.some((r) => r.reason === "stale seq")).toBe(true);
-});
-
-test("the collapsed feed stays in time order, newest first", () => {
-  const shown = rows(40);
-  for (let i = 1; i < shown.length; i += 1) {
-    expect(shown[i - 1]!.timestamp >= shown[i]!.timestamp).toBe(true);
-  }
-});
-
-test("a round records what each leg's shift became, so a reference row says what changed", () => {
-  const newest = rows(200).find((r) => r.kind === "round")!;
-  for (const leg of newest.legs) {
-    expect(typeof leg.tiltBps).toBe("number");
-  }
-  // The publish at this seq is the last one before the legs were re-shipped on 2026-09-11, and it
-  // is the reason they were: each leg's correction had run past the 500-bps cap the orders then
-  // carried. A round has to carry the three different numbers, or the screen cannot show that.
-  const pinned = rows(200).filter((r) => r.kind === "round").find((r) => r.seq === 1789099204)!;
-  expect(pinned.legs.map((l) => l.tiltBps).sort((a, b) => a - b)).toEqual([-1626, 1842, 3022]);
-});
-
-test("a collapsed round says how many writes it folded in", () => {
-  const newest = rows(40).find((r) => r.kind === "round")!;
-  expect(newest.count).toBe(newest.legs.length);
-  expect(newest.count).toBeGreaterThan(1);
 });

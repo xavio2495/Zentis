@@ -94,10 +94,14 @@ console.log(walletOnly ? "recording the maker's wallet" : `recording ${chosen.ma
 
 for (const leg of chosen) {
   write(`history-${leg.name}`, await post(leg.fillsSubgraphUrl, historyQuery(BOOK.positionId, 25)));
-  write(
-    `pool-${leg.name}`,
-    await post(leg.referencePoolSubgraphUrl, swapsQuery(leg.referencePool, 1000)),
-  );
+  // Only for a leg that still has a venue. Two of the three reference pools were retired when the
+  // book moved to one mainnet mid, and a recorder that insisted on them would either crash or write
+  // a week-old price as though it were current.
+  if (leg.referencePool !== null && leg.referencePoolSubgraphUrl !== null) {
+    write(`pool-${leg.name}`, await post(leg.referencePoolSubgraphUrl, swapsQuery(leg.referencePool, 1000)));
+  } else {
+    console.log(`  ${leg.name} has no reference pool; nothing to record for it`);
+  }
   const ref = await fetchRef(leg, BOOK.positionId);
   if (ref.value === null) throw new Error(`${leg.name}: ${ref.error}`);
   write(`ref-${leg.name}`, stringifyBigints(ref.value));
@@ -167,7 +171,9 @@ if (walletOnly) {
 }
 for (const leg of chosen) {
   for (const [name, expect] of [
-    [`pool-${leg.name}`, (d: Record<string, unknown>) => Array.isArray(d["swaps"]) && (d["swaps"] as unknown[]).length > 0],
+    ...(leg.referencePool === null
+      ? []
+      : ([[`pool-${leg.name}`, (d: Record<string, unknown>) => Array.isArray(d["swaps"]) && (d["swaps"] as unknown[]).length > 0]] as const)),
     [`ref-${leg.name}`, (d: Record<string, unknown>) => Number(d["seq"]) > 0],
   ] as const) {
     try {

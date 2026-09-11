@@ -1,12 +1,11 @@
-import type { Snapshot } from "@zentis/console-data";
-import { ASSUMED_GAINS, BOOK, LEGS, PAIR, bookTotals, parseWalletFixture, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
+import type { LegHistory, Snapshot } from "@zentis/console-data";
+import { ASSUMED_GAINS, BOOK, LEGS, PAIR, POOL_RETIRED, bookTotals, parseWalletFixture, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
 import recordedWallet from "../../../packages/console-data/fixtures/wallet.json" with { type: "json" };
+import recordedAt from "../../../packages/console-data/fixtures/recorded-at.json" with { type: "json" };
 import historySepolia from "../../../packages/console-data/fixtures/history-sepolia.json" with { type: "json" };
 import historyArbitrum from "../../../packages/console-data/fixtures/history-arbitrum-sepolia.json" with { type: "json" };
 import historyBase from "../../../packages/console-data/fixtures/history-base-sepolia.json" with { type: "json" };
 import poolSepolia from "../../../packages/console-data/fixtures/pool-sepolia.json" with { type: "json" };
-import poolArbitrum from "../../../packages/console-data/fixtures/pool-arbitrum-sepolia.json" with { type: "json" };
-import poolBase from "../../../packages/console-data/fixtures/pool-base-sepolia.json" with { type: "json" };
 import refSepolia from "../../../packages/console-data/fixtures/ref-sepolia.json" with { type: "json" };
 import refArbitrum from "../../../packages/console-data/fixtures/ref-arbitrum-sepolia.json" with { type: "json" };
 import refBase from "../../../packages/console-data/fixtures/ref-base-sepolia.json" with { type: "json" };
@@ -35,7 +34,10 @@ export type Scenario =
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;
-const pools = { 11155111: poolSepolia, 421614: poolArbitrum, 84532: poolBase } as const;
+// Only Sepolia still has a reference pool; the other two were retired when the book moved to one
+// mainnet mid, and the fake world says so the same way the live one does rather than drawing a
+// price from a recording of a pool nobody reads any more.
+const pools: Record<number, typeof poolSepolia | undefined> = { 11155111: poolSepolia };
 
 const storedRef = (chainId: number, seq: number, updatedAt: bigint) => {
   const raw = refs[chainId as keyof typeof refs];
@@ -49,10 +51,69 @@ const storedRef = (chainId: number, seq: number, updatedAt: bigint) => {
   };
 };
 
-/** The sandbox's own reference seq, exported so a test can name it without writing it down twice. */
-export const SANDBOX_SEQ = 1789049382;
+/**
+ * The sandbox's own reference seq, read from the recording rather than written down: a re-record
+ * changes it, and a number typed here turns that into a rendering failure about nothing.
+ */
+export const SANDBOX_SEQ = (refSepolia as { seq: number }).seq;
 
-export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
+/**
+ * The moment the fixtures were taken, which is the fake world's clock.
+ *
+ * It was a constant, and when a re-record moved the fixtures past it every age in the feed came out
+ * as "0s" — the publishes were in the screen's future, so their ages clamped to nothing.
+ */
+export const SANDBOX_NOW = (recordedAt as { seconds: number }).seconds;
+
+/**
+ * The demo's beat, added to the recorded history: one fill, and one publish refused on every chain.
+ *
+ * Constructed rather than recorded, because whether the market gave the book a fill in the recorded
+ * week is not something the screen's layout should depend on. The morning's clean re-record had
+ * neither, and three tests about how a fill and a refusal are drawn went red over a quiet market.
+ * The publishes around them are the real ones.
+ */
+function withBeat(leg: (typeof LEGS)[number], history: LegHistory, now: number): LegHistory {
+  const isFirst = leg.chainId === LEGS[0]!.chainId;
+  return {
+    ...history,
+    fills: [
+      ...history.fills,
+      ...(isFirst
+        ? [
+            {
+              kind: "fill" as const,
+              chainId: leg.chainId,
+              timestamp: BigInt(now - 20 * 60),
+              transaction: "0xfill000000000000000000000000000000000000000000000000000000000beat",
+              amountIn: 150_000n,
+              amountOut: 60_700_000_000_000n,
+              isAToB: true,
+              hasReference: true,
+              refMid: (history.references[0]?.mid ?? 10n ** 27n),
+              refTiltBps: history.references[0]?.tiltBps ?? 0,
+              refSeq: history.references[0]?.seq ?? 0,
+              refAgeSeconds: 180n,
+            },
+          ]
+        : []),
+    ],
+    // One relayed seq refused everywhere, within a few seconds, which is what finality looks like
+    // from outside and what the feed folds into a single row.
+    rejections: [
+      ...history.rejections,
+      {
+        kind: "rejection" as const,
+        chainId: leg.chainId,
+        timestamp: BigInt(now - 40 * 60 + LEGS.findIndex((l) => l.chainId === leg.chainId) * 4),
+        transaction: "0xrej0000000000000000000000000000000000000000000000000000000000beat",
+        reason: "stale seq",
+      },
+    ],
+  };
+}
+
+export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
   // Ages are what most of the scenarios differ by, so they are set here rather than baked into the
   // fixtures: the same recorded chain state, seen at a different moment.
   const ageSeconds = scenario === "stale" ? 4 * 3600 + 16 * 60 : 3 * 60;
@@ -61,7 +122,7 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
 
   const parsed = LEGS.map((leg) => ({
     leg,
-    history: parseHistory(leg.chainId, histories[leg.chainId as keyof typeof histories] as never),
+    history: withBeat(leg, parseHistory(leg.chainId, histories[leg.chainId as keyof typeof histories] as never), now),
     ref: storedRef(leg.chainId, seq, updatedAt),
   }));
 
@@ -74,7 +135,9 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
   const book = decomposeBook(active, ASSUMED_GAINS, BOOK.maxTiltBps);
 
   const legs = active.map((entry) => {
-    const series = parseSeries(pools[entry.leg.chainId as keyof typeof pools] as never, midOf);
+    // Null for a leg whose pool was retired, which is what the live reader returns for it.
+    const recordedPool = pools[entry.leg.chainId];
+    const series = recordedPool === undefined ? null : parseSeries(recordedPool as never, midOf);
     const position = entry.history.position!;
     const spread = spreadStack(
       entry.ref,
@@ -133,8 +196,9 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
       // number the live console cannot have would hide the case the screen has to render.
       mark: { mainnetChainId: 1, mid: 405_837_064_044_766_950_299_015_618n, source: "1inch spot", readAtSeconds: now, error: null },
       pnl: legPnl(entry.history, entry.leg.shipped, 405_837_064_044_766_950_299_015_618n, null),
-      // Every source answered in the fake world; the outage scenario is the one that sets these.
-      sources: { fills: null, registry: null, pool: null },
+      // Every source answered in the fake world, except a venue that no longer exists to answer:
+      // the outage scenario is the one that sets the others.
+      sources: { fills: null, registry: null, pool: series === null ? POOL_RETIRED : null },
       caveats: spread.tooStaleToQuote
         ? [`the reference is ${Math.floor(ageSeconds / 60)}m old, past this leg's limit`]
         : [],

@@ -62,6 +62,8 @@ test("the shift splits into a correction and a concession that add back up to it
  * and a later one, taken minutes after a re-ship, had all three legs evenly split with nothing
  * capped. The edge is worth a test either way, so the test makes the edge.
  */
+const ONE = 10n ** 18n;
+
 const boundarySpent = () =>
   inputs.map((input) =>
     input.leg.label === "Base Sepolia"
@@ -73,7 +75,19 @@ const boundarySpent = () =>
           },
           ref: { ...input.ref, tiltBps: -300, bandEdgeBps: 300 },
         }
-      : input,
+      : {
+          // The other two are put *exactly* on the mid, rather than assumed to be there: whether a
+          // recorded leg happens to sit at the even split is a fact about the testnet that morning,
+          // and the claim being tested is what a leg on the mid decomposes to.
+          ...input,
+          history: {
+            ...input.history,
+            position: {
+              ...input.history.position!,
+              balanceB: (input.history.position!.balanceA * input.ref.mid) / ONE,
+            },
+          },
+        },
   );
 
 test("a leg whose boundary equals its shift has no room left, so it concedes nothing", () => {
