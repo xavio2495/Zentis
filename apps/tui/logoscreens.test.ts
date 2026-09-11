@@ -86,14 +86,17 @@ test("the second choice asks for the path where it was offered, rather than else
   expect(frame.overflows).toBe(false);
 }, 60_000);
 
-test("a page with rows to spare carries the mark, because the brand goes where there is room", async () => {
-  // The pages are tables, and a table that ends halfway down its panel leaves the rest blank. That
-  // space is the mark's: it is the only place it can go without taking a row off anything.
-  // Positions and wallet end early; pnl's own table fills its panel, and it keeps every row.
-  for (const key of ["p", "w"]) {
+test("the mark goes on the three pages that are the wallet's, and on no other", async () => {
+  // Wallet, simulation and status end well short of their panel and are the pages a reader lingers
+  // on. Positions and pnl are tables to be read against each other; the mark under one of them is
+  // decoration where a number was expected.
+  for (const key of ["w", "m", "d"]) {
     const frame = await drive(120, 40, { keys: [key] });
     expect(marked(frame.lines)).toBeGreaterThan(3);
     expect(frame.overflows).toBe(false);
+  }
+  for (const key of ["p", "n"]) {
+    expect(marked((await drive(120, 40, { keys: [key] })).lines)).toBe(0);
   }
 }, 60_000);
 

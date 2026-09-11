@@ -116,6 +116,20 @@ test("redaction holds even when the key is not the one that was passed in", () =
   expect(redact(`boom ${other}`, SECRET)).not.toContain(other);
 });
 
+test("a hash this process sent is not a key, and every other 32-byte hex still is", () => {
+  // A key and a transaction hash are both 32 bytes, so no rule about their shape can tell them
+  // apart. What can is provenance: the only 32-byte values allowed out are the ones this process got
+  // back from `sendTransaction`, which is why the console can show a hash at all.
+  const hash = "0x227404a1d0d0f1f45ae4b2e05eaf7f4b1ea72c0c47c7dd36ee9a71bc8b9b7f2c";
+  expect(redact(`filled ${hash} success`, SECRET, [hash])).toContain(hash);
+  // The allowance is that hash and nothing else: another key in the same line still goes.
+  const leaked = redact(`filled ${hash} success — key ${SECRET}`, SECRET, [hash]);
+  expect(leaked).toContain(hash);
+  expect(leaked).not.toContain(SECRET);
+  // And without the allowance it is treated as a key, which is what an unknown 32-byte value is.
+  expect(redact(`filled ${hash} success`, SECRET)).not.toContain(hash);
+});
+
 // After the tests, not while the module is being read: at module scope this ran before the first
 // test did, and every one of them then failed on a directory that was already gone.
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

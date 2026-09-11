@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ROTATE_MS } from "./src/App.js";
+import { ROTATE_MS, cardPicked } from "./src/App.js";
 import { drive } from "./sandbox/drive.js";
 
 const text = async (keys: string[]) => (await drive(120, 40, { keys, armed: true })).lines.join("\n");
@@ -58,3 +58,14 @@ test("the detail carries the position, the pool, the pricing and the leg's own p
   {
   }
 });
+
+test("a card is picked out only while its detail is open, so closing one lets go of it", () => {
+  // The number that opens a detail closes it, and the coloured border is what says a detail is open.
+  // Left on after the detail had gone, it marked a card as chosen with nothing on screen to show for
+  // the choice.
+  expect(cardPicked("leg", 2, 2)).toBe(true);
+  expect(cardPicked("leg", 2, 0)).toBe(false);
+  expect(cardPicked("none", 2, 2)).toBe(false);
+  expect(cardPicked("help", 2, 2)).toBe(false);
+});
+
