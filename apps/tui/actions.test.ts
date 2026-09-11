@@ -291,3 +291,45 @@ test("a quote for a leg with no recorded bytes says so rather than guessing an o
   expect(action.command).toBeNull();
   expect(action.disabledReason).toContain("no fill bytes recorded");
 });
+
+test("with a cloud project set, a republish asks the job to run rather than running cre here", () => {
+  // The publisher moved off the laptop: it is a Cloud Run job with its own schedule and its own
+  // secrets. "Republish now" is therefore a request to that job, not a workflow run on this machine,
+  // and the console needs no repository and no signing key of its own to make it.
+  const [fast, slow] = ["fast", "slow"].map(
+    (workflow) => buildActions(null, null, "zentis-cg1-2026").find((a) => a.key === (workflow === "fast" ? "r" : "s"))!,
+  );
+  expect(fast!.disabledReason).toBeNull();
+  const script = fast!.command!.cmd.join(" ");
+  expect(script).toContain("gcloud run jobs execute zentis-publisher");
+  expect(script).toContain("--region us-central1");
+  expect(script).toContain("--args fast");
+  expect(script).toContain("--wait");
+  expect(script).not.toContain("cre ");
+  expect(slow!.command!.cmd.join(" ")).toContain("--args slow");
+});
+
+test("the console reads the publisher's own line back out of that execution's logs", () => {
+  const action = buildActions(null, null, "zentis-cg1-2026").find((a) => a.key === "r")!;
+  const script = action.command!.cmd.join(" ");
+  // Filtered to the execution it just started: the job ticks on its own every five minutes, so the
+  // newest line in that log is not necessarily the run the operator asked for.
+  expect(script).toContain("gcloud logging read");
+  expect(script).toMatch(/execution/);
+  expect(script).toContain("rc=");
+});
+
+test("the project is passed to the child rather than written into the command", () => {
+  const action = buildActions(null, null, "zentis-cg1-2026").find((a) => a.key === "r")!;
+  expect(action.command!.cmd.join(" ")).toContain('"$ZENTIS_GCP_PROJECT"');
+  expect(action.command!.env!["ZENTIS_GCP_PROJECT"]).toBe("zentis-cg1-2026");
+});
+
+test("without a project the repository still works, and without either the reason says what to set", () => {
+  // Resolution order: the cloud job, then a checkout, then neither.
+  const local = buildActions(envPath, REPO).find((a) => a.key === "r")!;
+  expect(local.command!.cmd.join(" ")).toContain("cre");
+  const neither = buildActions(envPath, null).find((a) => a.key === "r")!;
+  expect(neither.command).toBeNull();
+  expect(neither.disabledReason).toContain("ZENTIS_GCP_PROJECT");
+});
