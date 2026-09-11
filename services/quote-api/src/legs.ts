@@ -82,7 +82,11 @@ export interface LegResult {
  * window is deliberately short: this is the surface a taker acts on, and a stale balance is a
  * mispriced quote, so ZENTIS_LEG_CACHE_SECONDS trades allowance for freshness and nothing else.
  */
-const CACHE_SECONDS = Number(process.env["ZENTIS_LEG_CACHE_SECONDS"] ?? "60");
+// Raised from 60s on 2026-09-11, after the Sepolia fills endpoint spent its whole allowance and
+// went to 429 for twelve hours. A leg's indexed state changes when a fill lands or the workflow
+// publishes, neither of which is faster than a couple of minutes, so the freshness given up is
+// nominal and the allowance bought is half of what this service was spending.
+const CACHE_SECONDS = Number(process.env["ZENTIS_LEG_CACHE_SECONDS"] ?? "120");
 interface Cached { readonly result: LegResult; readonly at: number }
 const fresh = new Map<string, Cached>();
 const lastGood = new Map<string, Cached>();
