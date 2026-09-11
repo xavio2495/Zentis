@@ -218,3 +218,45 @@ test("without an env file a push is refused in the same words as every other sig
   expect(action.command).toBeNull();
   expect(action.disabledReason).toContain("ZENTIS_ENV");
 });
+
+test("a fill is the console's own two cast sends, from the recorded bytes, with no checkout", () => {
+  // The order and its taker traits come from the deployment record, produced by the Solidity
+  // builders and checked against the router's own hash. The console passes them through; rebuilding
+  // them here would be a second implementation of the contract's encoder.
+  const leg = LEGS.find((l) => l.name === "sepolia")!;
+  const action = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 150_000n, isAToB: true });
+  expect(action.disabledReason).toBeNull();
+  const script = action.command!.cmd.join(" ");
+  expect(script).not.toContain("forge");
+  expect(script).toContain(leg.fill!.router);
+  expect(script).toContain(leg.fill!.swapSignature);
+  expect(script).toContain(leg.fill!.takerDataAToB);
+  // Approve the router for what goes in, then swap.
+  expect(script.indexOf("approve(address,uint256)")).toBeLessThan(script.indexOf(leg.fill!.swapSignature));
+  expect(script).toContain("$TAKER_PRIVATE_KEY");
+});
+
+test("the other side of the book uses the other side's taker data", () => {
+  const leg = LEGS.find((l) => l.name === "sepolia")!;
+  const script = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 1n, isAToB: false }).command!.cmd.join(" ");
+  expect(script).toContain(leg.fill!.takerDataBToA);
+  expect(script).not.toContain(leg.fill!.takerDataAToB);
+  // And approves the token that is actually going in.
+  expect(script).toContain(leg.tokenB.address);
+});
+
+test("a fill quotes first and checks the swap matched it, which is the parity the script asserted", () => {
+  const leg = LEGS.find((l) => l.name === "sepolia")!;
+  const script = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 150_000n, isAToB: true }).command!.cmd.join(" ");
+  expect(script).toContain("cast call");
+  expect(script).toContain("quote(");
+  // A quote that disagrees with the fill is the one thing this has to catch.
+  expect(script).toMatch(/quoted|parity/);
+});
+
+test("a leg with no recorded bytes offers no fill, and says that rather than reaching for forge", () => {
+  const leg = { ...LEGS[0]!, fill: null };
+  const action = buildFillAction("/tmp/private.env", null, { leg, amountRaw: 1n, isAToB: true });
+  expect(action.command).toBeNull();
+  expect(action.disabledReason).toContain("no fill bytes recorded");
+});
