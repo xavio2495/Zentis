@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { LOGO_GREEN, LOGO_PERIOD_MS, logoFrame, logoSize } from "./src/logo.js";
+import { LOGO_CELLS_PER_ROW, LOGO_GREEN, LOGO_PERIOD_MS, logoFrame, logoSize } from "./src/logo.js";
 
 /**
  * The mark, drawn from the same geometry the SVG is.
@@ -64,7 +64,7 @@ test("the grid is the file's own square, so the mark is neither flattened nor cr
   // many columns as rows. Any other ratio is the logo squashed, and cropping to the ink — which
   // bought a few rows — is what pushed the chains into the text above and below it.
   const size = logoSize(120, 30);
-  expect(size.width).toBe(size.height * 2);
+  expect(size.width).toBe(Math.round(size.height * LOGO_CELLS_PER_ROW));
 
   // The margin the file has above and below its ink is kept, which is what holds the mark clear of
   // whatever is drawn beside it.

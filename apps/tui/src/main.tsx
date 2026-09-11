@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+import { homedir } from "node:os";
 import { render } from "ink";
 import { App } from "./App.js";
 import { buildActions, commandActions, findRepoRoot, publisherMode, selfCommand } from "./actions.js";
-import { resolveEnvPath } from "./wallet-file.js";
+import { rememberEnvPath, resolveEnvPath } from "./wallet-file.js";
 import { fixedStore } from "../sandbox/state.js";
 import { fakeSnapshot } from "../sandbox/world.js";
 import { run, summarise } from "./runner.js";
@@ -135,8 +136,19 @@ const addressOf = (path: string | null): string | null => {
 const onboarding = !watchOnly && envFile === null;
 
 /** Making a wallet, or taking a path: both go to the child, which is where keys are handled. */
-const choose = async (choice: "generate" | "existing" | "watch"): Promise<string | null> => {
-  if (choice !== "generate") return null;
+const choose = async (choice: "generate" | "existing" | "watch", path?: string): Promise<string | null> => {
+  if (choice === "watch") return null;
+  if (choice === "existing") {
+    // The path is proved before it is remembered, and proving it means the child reading the file
+    // and saying which address it holds. This process never opens it: a console that could read a
+    // key is a console that could print one.
+    if (path === undefined || path.trim() === "") return null;
+    const at = path.trim().replace(/^~(?=\/|$)/, homedir());
+    const address = addressOf(at);
+    if (address === null) return `no key could be read from ${at} — it needs TAKER_PRIVATE_KEY in it`;
+    rememberEnvPath(at);
+    return `address ${address} · read from ${at} · the key stays in that file and is never shown here`;
+  }
   const result = await run({
     cmd: selfCommand("sign"),
     cwd: process.cwd(),

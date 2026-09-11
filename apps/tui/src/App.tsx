@@ -24,7 +24,8 @@ import { LegDetail } from "./components/LegDetail.js";
 import { CommandLine } from "./components/CommandLine.js";
 import { Panel, panelInner } from "./components/Panel.js";
 import { Pnl } from "./pages/Pnl.js";
-import { Onboarding } from "./pages/Onboarding.js";
+import { Logo, logoRows } from "./components/Logo.js";
+import { ONBOARDING_ROWS, Onboarding } from "./pages/Onboarding.js";
 import { Positions } from "./pages/Positions.js";
 import { Status } from "./pages/Status.js";
 import { Simulation } from "./pages/Simulation.js";
@@ -33,7 +34,7 @@ import { StatusBar, hints } from "./components/StatusBar.js";
 import { Segments } from "./components/Segments.js";
 import { type Pending, landed } from "./landed.js";
 import { chooseFit, pairPrice, signed, tokenAmount } from "./format.js";
-import { MIN_COLS, MIN_ROWS, fit, useSize } from "./layout.js";
+import { MIN_COLS, MIN_ROWS, fit, trunc, useSize } from "./layout.js";
 import { type Command, parseCommand } from "./command.js";
 import { resolve } from "./keymap.js";
 import { spinnerAt } from "./spinner.js";
@@ -113,7 +114,8 @@ export function App({
    */
   onboarding?: boolean;
   /** what to do with a choice: make a wallet, take a path, or watch. Null in the sandbox. */
-  onChoose?: ((choice: "generate" | "existing" | "watch") => Promise<string | null>) | null;
+  /** what a first-run choice does; "existing" carries the path that was typed for it */
+  onChoose?: ((choice: "generate" | "existing" | "watch", path?: string) => Promise<string | null>) | null;
   /**
    * Pick up the wallet that has just been written, without restarting.
    *
@@ -148,6 +150,11 @@ export function App({
   const [choosing, setChoosing] = useState(false);
   const [chose, setChose] = useState<string | null>(null);
   const [onboarded, setOnboarded] = useState(false);
+  // The second choice's field: the path being typed, and why the last one was not taken. Its own
+  // state rather than the command row's, because the command row belongs to a console that is
+  // already running and this one has not started yet.
+  const [asking, setAsking] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   // What the console became once a wallet was made mid-run; null until then, and what it was started
   // with is used. Named over the props so that every line below reads the same either way — a
   // console armed at startup and one armed a keystroke ago are the same console.
@@ -190,6 +197,14 @@ export function App({
   useEffect(() => {
     store.setMarketHours(marketHours);
   }, [store, marketHours]);
+
+  // The mark animates at about twelve frames a second, and only while a screen that shows it is up:
+  // the live view repaints when its data changes, and a spinner is no reason to redraw a book.
+  const showingLogo = onboarding && !onboarded;
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 80);
+    return () => clearInterval(timer);
+  }, [showingLogo]);
 
   useEffect(() => {
     store.start();
@@ -385,7 +400,7 @@ export function App({
         goOn();
         return;
       }
-      if (input === "3") {
+      if (input === "3" && asking === null) {
         goOn();
         return;
       }
@@ -396,11 +411,40 @@ export function App({
           .catch((cause: unknown) => setChose(String(cause)))
           .finally(() => setChoosing(false));
       }
+      // The field, once it is open, has the keyboard: a path contains the same characters the
+      // choices are, and "/home/3" must not be read as choosing to watch.
+      if (asking !== null) {
+        if (key.escape) {
+          setAsking(null);
+          setProblem(null);
+          return;
+        }
+        if (key.return) {
+          const path = asking.trim();
+          if (path === "" || choosing) return;
+          setChoosing(true);
+          setProblem(null);
+          void onChoose?.("existing", path)
+            .then((said) => {
+              // An address is the proof the file was readable and held a key. Anything else is the
+              // reason it was not, said with the field still open so it can be corrected.
+              if (said !== null && /0x[0-9a-fA-F]{40}/.test(said)) setChose(said);
+              else setProblem(said ?? `nothing readable at ${path}`);
+            })
+            .catch((cause: unknown) => setProblem(String(cause)))
+            .finally(() => setChoosing(false));
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setAsking((current) => (current ?? "").slice(0, -1));
+          return;
+        }
+        if (input !== "" && !key.ctrl && !key.meta) setAsking((current) => (current ?? "") + input);
+        return;
+      }
       if (input === "2" && onChoose != null) {
-        // A path is typed, so this hands over to the command row rather than inventing a second one.
-        setTyping("");
-        setAnswer({ text: "type the path to an env file with TAKER_PRIVATE_KEY in it", bad: false });
-        setOnboarded(true);
+        setAsking("");
+        return;
       }
       if (key.escape || input === "x") exit();
       return;
@@ -556,23 +600,37 @@ export function App({
   });
 
   if (size.tooSmall) {
+    // The mark, then the reason. A terminal this small cannot draw the console, but it can say whose
+    // console it is and what it needs.
     return (
-      <Text color={UI.caveat}>
-        {`the console needs at least ${MIN_COLS}×${MIN_ROWS}; this terminal is ${size.cols}×${size.rows}`}
-      </Text>
+      <Box flexDirection="column" width={size.cols} height={Math.max(1, size.rows - 1)} alignItems="center" overflow="hidden">
+        <Logo elapsedMs={Date.now()} cols={size.cols} rows={Math.max(0, size.rows - 4)} />
+        <Text color={UI.caveat}>
+          {trunc(`needs at least ${MIN_COLS}×${MIN_ROWS}; this is ${size.cols}×${size.rows}`, size.cols)}
+        </Text>
+      </Box>
     );
   }
 
   const regions = fit(size.cols, size.rows);
 
   if (onboarding && !onboarded) {
+    // The mark stands above the frame rather than inside it: a border drawn around a logo reads as a
+    // box somebody put a logo in, and this one belongs to what there is to choose.
+    const width = regions.legsWidth + regions.rightWidth;
+    const budget = Math.min(Math.floor(regions.draw / 2), regions.draw - ONBOARDING_ROWS - 2);
+    const mark = logoRows(width, Math.max(0, budget));
+    const panelHeight = regions.draw - mark;
     return (
-      <Box width={regions.legsWidth + regions.rightWidth} height={regions.draw} overflow="hidden">
-        <Panel title="zentis" width={regions.legsWidth + regions.rightWidth} height={regions.draw}>
+      <Box flexDirection="column" width={width} height={regions.draw} overflow="hidden">
+        <Logo elapsedMs={Date.now()} cols={width} rows={Math.max(0, budget)} />
+        <Panel title="zentis" width={width} height={panelHeight}>
           <Onboarding
             running={choosing}
             said={chose}
-            {...panelInner(regions.legsWidth + regions.rightWidth, regions.draw)}
+            asking={asking}
+            problem={problem}
+            {...panelInner(width, panelHeight)}
           />
         </Panel>
       </Box>
@@ -580,13 +638,17 @@ export function App({
   }
 
   if (snapshot === null) {
-    // A spinner and what it is waiting on. The sentence that used to be here listed every source the
-    // console reads, which is the status panel's job the moment there is one.
+    // The mark, with what it is waiting for underneath it: the first frame of a console that has
+    // asked three chains a question and not been answered yet.
+    const width = regions.legsWidth + regions.rightWidth;
     return (
-      <Box width={regions.legsWidth + regions.rightWidth} height={regions.draw} overflow="hidden">
-        <Text color={state.error === null ? UI.muted : UI.caveat}>
-          {state.error === null ? `${spinnerAt(Date.now())} reading the chains and the services` : state.error}
-        </Text>
+      <Box flexDirection="column" width={width} height={regions.draw} alignItems="center" justifyContent="center" overflow="hidden">
+        <Logo elapsedMs={Date.now()} cols={width} rows={regions.draw - 3} />
+        <Box height={1}>
+          <Text color={state.error === null ? UI.muted : UI.caveat}>
+            {state.error === null ? `${spinnerAt(Date.now())} reading the chains and the services` : state.error}
+          </Text>
+        </Box>
       </Box>
     );
   }

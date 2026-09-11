@@ -15,11 +15,20 @@ import { UI } from "../theme.js";
  * Nothing here asks what the reader intends to do with the console. The role follows from the
  * address, and the address follows from the key.
  */
+/**
+ * The rows the choices need: a title, a blank, and three choices of a heading and up to three
+ * wrapped lines each. The mark above gets whatever is left, and nothing when that is too little —
+ * a choice a reader cannot see is not offered, and the mark is the part that can be spared.
+ */
+export const ONBOARDING_ROWS = 17;
+
 export function Onboarding({
   width,
   height,
   running,
   said,
+  asking = null,
+  problem = null,
 }: {
   width: number;
   height: number;
@@ -27,6 +36,10 @@ export function Onboarding({
   running: boolean;
   /** what that child said: the address, the path, and the mode */
   said: string | null;
+  /** the path being typed, once the second choice has been taken; null while still choosing */
+  asking?: string | null;
+  /** why the last path did not work, kept on screen with the field still open */
+  problem?: string | null;
 }) {
   const rows: React.ReactNode[] = [];
   const choice = (key: string, title: string, detail: string): void => {
@@ -56,19 +69,76 @@ export function Onboarding({
   );
   rows.push(<Text key="sp0"> </Text>);
 
-  choice(
-    "1",
-    "make one here",
-    "Writes ~/.zentis/wallet.env, mode 600, and shows you the address. The key stays in that " +
-      "file and will not be shown again — not by this screen and not in any log it writes.",
-  );
-  choice(
-    "2",
-    "use a key you already have",
-    "Give the path to an env file with TAKER_PRIVATE_KEY in it. It is read by the process that " +
-      "signs, never by the one drawing this, and the path is remembered so you are not asked again.",
-  );
-  choice("3", "watch only", "Straight to the live view. Nothing that signs is offered.");
+  // The second choice asks for its path here rather than borrowing the live view's command row. That
+  // row belongs to a console that is already running, at the bottom of a screen a reader who has not
+  // chosen yet has never been shown; the question belongs where it was offered.
+  if (asking !== null) {
+    rows.push(
+      <Segments
+        key="asking"
+        segs={[
+          { text: "  2  ", color: UI.action, bold: true },
+          { text: "use a key you already have", color: UI.heading },
+        ] satisfies Seg[]}
+      />,
+    );
+    const detail =
+      "The path to an env file with TAKER_PRIVATE_KEY in it. It is read by the process that signs, " +
+      "never by the one drawing this, and the path is remembered so you are not asked again.";
+    for (const line of wrapLines(detail, width - 6, 3)) {
+      rows.push(
+        <Text key={`ask-${line.slice(0, 8)}`} color={UI.muted}>
+          {`     ${line}`}
+        </Text>,
+      );
+    }
+    rows.push(<Text key="ask-sp"> </Text>);
+    // Kept to its end when it is long: the tail is the part being typed, and the part that says
+    // which file this is.
+    const room = Math.max(1, width - 12);
+    const shown = asking.length > room ? `…${asking.slice(-(room - 1))}` : asking;
+    rows.push(
+      <Segments
+        key="field"
+        segs={[
+          { text: "     path  ", color: UI.muted },
+          { text: shown, color: UI.fill },
+          { text: "▏", color: UI.action },
+        ] satisfies Seg[]}
+      />,
+    );
+    rows.push(<Text key="ask-sp2"> </Text>);
+    if (problem !== null) {
+      for (const [i, line] of wrapLines(problem, width, 2).entries()) {
+        rows.push(
+          <Text key={`problem${i}`} color={UI.caveat}>
+            {line}
+          </Text>,
+        );
+      }
+    }
+    if (said === null) {
+      rows.push(
+        <Text key="ask-keys" color={UI.action}>
+          {trunc("enter to use it · esc to go back", width)}
+        </Text>,
+      );
+    }
+  } else {
+    choice(
+      "1",
+      "make one here",
+      "Writes ~/.zentis/wallet.env, mode 600, and shows you the address. The key stays in that " +
+        "file and will not be shown again — not by this screen and not in any log it writes.",
+    );
+    choice(
+      "2",
+      "use a key you already have",
+      "Give the path to an env file with TAKER_PRIVATE_KEY in it. It is read by the process that " +
+        "signs, never by the one drawing this, and the path is remembered so you are not asked again.",
+    );
+    choice("3", "watch only", "Straight to the live view. Nothing that signs is offered.");
+  }
 
   if (running) {
     rows.push(
