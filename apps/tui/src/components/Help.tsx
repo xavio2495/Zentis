@@ -35,6 +35,13 @@ const TERMS: [string, string, string][] = [
   ["staleness", TERM.staleness, "the quote widens with the reference's age, to a cap"],
 ];
 
+/**
+ * The simulation's three lines, wrapped rather than clipped.
+ *
+ * This is the page that explains every other one, so an ellipsis here takes away the explanation
+ * and leaves the thing being explained. The whole page now has room for the sentence instead: the
+ * run itself is a page of its own on `m`.
+ */
 function simLines(report: SimReport, width: number): string[] {
   const regimes = report.regimes
     .map((r) => `${r.regime} ${r.seedsAhead}/${r.seeds} +${r.meanBpsOfBook.toFixed(1)}`)
@@ -42,11 +49,12 @@ function simLines(report: SimReport, width: number): string[] {
   return [
     headline(report),
     // Basis points of the book, never the raw tokenA figure, which reads as dollars and is not.
-    trunc(regimes, width),
-    trunc(
+    ...wrapLines(regimes, width, 3),
+    ...wrapLines(
       `mean and worst as bps of the ${report.bookInA / 1e6} tokenA opening book · ${report.signal}` +
         ` · own ${report.kappaBps} / book ${report.kappaBookBps} · model ${report.modelCommit.slice(0, 10)}`,
       width,
+      3,
     ),
   ];
 }
@@ -155,12 +163,15 @@ export function Help({
     </Text>,
   );
   for (const [term, colour, meaning] of TERMS) {
-    push(
-      <Box key={term}>
-        <Text color={colour}>{term.padEnd(12)}</Text>
-        <Text color={UI.muted}>{trunc(meaning, width - 12)}</Text>
-      </Box>,
-    );
+    // Wrapped under its own term, never cut: a definition that stops mid-clause defines nothing.
+    for (const [i, text] of wrapLines(meaning, width - 12, 2).entries()) {
+      push(
+        <Box key={`${term}${i}`}>
+          <Text color={colour}>{(i === 0 ? term : "").padEnd(12)}</Text>
+          <Text color={UI.muted}>{text}</Text>
+        </Box>,
+      );
+    }
   }
 
   push(<Text key="sp2"> </Text>);
@@ -170,12 +181,14 @@ export function Help({
     </Text>,
   );
   for (const binding of BINDINGS) {
-    push(
-      <Box key={binding.keys.join("")}>
-        <Text color={UI.action}>{binding.keys.join(" / ").padEnd(12)}</Text>
-        <Text color={UI.muted}>{trunc(binding.label, width - 12)}</Text>
-      </Box>,
-    );
+    for (const [i, text] of wrapLines(binding.label, width - 12, 2).entries()) {
+      push(
+        <Box key={`${binding.keys.join("")}${i}`}>
+          <Text color={UI.action}>{(i === 0 ? binding.keys.join(" / ") : "").padEnd(12)}</Text>
+          <Text color={UI.muted}>{text}</Text>
+        </Box>,
+      );
+    }
   }
 
   return (

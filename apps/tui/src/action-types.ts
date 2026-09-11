@@ -15,6 +15,8 @@ export interface ActionCommand {
 export interface Action {
   readonly key: string
   readonly label: string
+  /** one word for the hint row, where the full label does not fit and a bare letter says nothing */
+  readonly short: string
   /** null when the action can run; otherwise why it cannot, said plainly */
   readonly disabledReason: string | null
   /**

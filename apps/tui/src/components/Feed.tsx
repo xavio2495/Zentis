@@ -112,10 +112,11 @@ function tableRow(row: FoldedRow, snapshot: Snapshot, ordered: LegSnapshot[]): T
     // The leg's column carries the shift the fill was priced at, the same quantity a publish row
     // puts there, so a fill reads against the publishes above and below it.
     legs: own(row.refTiltBps === null ? cell("–", UI.muted) : shiftCell(leg!, row.refTiltBps)),
+    // What the taker paid is what makes what they got mean anything, so the in side is the last
+    // thing given up rather than the first.
     note: [
       [{ text: `${inText} → ${outText}`, color: UI.heading }, { text: context, color: UI.muted }],
       [{ text: `${inText} → ${outText}`, color: UI.heading }],
-      [{ text: `→ ${outText}`, color: UI.heading }],
     ],
   };
 }
@@ -135,6 +136,9 @@ interface Layout {
 const LAYOUTS: Layout[] = [
   { level: 0, gap: 2, notesMayDrop: false },
   { level: 1, gap: 2, notesMayDrop: false },
+  // The seq goes bare before a fill's amounts go at all: "seq" is a word a reader can supply from
+  // the column header, and half a fill is not a fill.
+  { level: 2, gap: 2, notesMayDrop: false },
   { level: 1, gap: 2, notesMayDrop: true },
   { level: 2, gap: 2, notesMayDrop: true },
   // One cell between columns is the last resort: "stale seq stale seq" run together is the table

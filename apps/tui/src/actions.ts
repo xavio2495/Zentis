@@ -156,6 +156,7 @@ export function buildFillAction(
   const out = fill.isAToB ? fill.leg.tokenB : fill.leg.tokenA;
   return {
     key: "",
+    short: "fill",
     blocker: repo === null ? "repo" : envFile === null ? "env" : null,
     label: fillLabel(fill),
     disabledReason: blocked,
@@ -173,6 +174,7 @@ export function buildRepublishAction(
   const blocked = repo === null ? NO_REPO : envFile === null ? NO_ENV : null;
   return {
     key: "",
+    short: workflow,
     blocker: repo === null ? "repo" : envFile === null ? "env" : null,
     label: `republish ${workflow}`,
     disabledReason: blocked,
@@ -198,6 +200,7 @@ export function buildActions(
       key: "r",
       blocker,
       label: "republish fast",
+      short: "fast",
       disabledReason: blocked,
       command: runnable ? creCommand("fast", envFile!, repo!) : null,
       describe: "runs the fast workflow against the testnets and broadcasts its report",
@@ -206,6 +209,7 @@ export function buildActions(
       key: "s",
       blocker,
       label: "republish slow",
+      short: "slow",
       disabledReason: blocked,
       command: runnable ? creCommand("slow", envFile!, repo!) : null,
       describe: "runs the slow workflow: spread, markout and the boundary",
@@ -214,6 +218,7 @@ export function buildActions(
       key: "f",
       blocker,
       label: `fill sepolia ${Number(QUOTE_SIZE_A) / 10 ** LEGS[0]!.tokenA.decimals}`,
+      short: "fill",
       disabledReason: blocked,
       // The same builder the typed command uses, at the leg and size the demo's beat runs on.
       command: runnable
@@ -225,6 +230,7 @@ export function buildActions(
       key: "q",
       blocker: null,
       label: "re-quote",
+      short: "quote",
       disabledReason: null,
       // Performed in-process: the quote path already asks the deployed router through `asView`, so
       // a re-quote is a re-read and needs no key. That is also what keeps it working watch-only.

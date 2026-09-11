@@ -113,29 +113,46 @@ export function bookState(snapshot: Snapshot, armed: boolean): BookState {
  */
 function hints(actions: Action[], width: number): Seg[] {
   const tone = (a: Action) => (a.disabledReason === null ? UI.action : UI.disabled);
-  const keys = (long: boolean): Seg[] =>
+  // Three lengths, not two: the full label, the action's own one-word name, and the bare key. A row
+  // of bare letters at a hundred and twenty columns is a row to guess at when there was room for a
+  // word each.
+  const keys = (length: "full" | "short" | "bare"): Seg[] =>
     actions.flatMap((a, i): Seg[] => [
-      ...(i === 0 ? [] : [{ text: long ? " · " : " ", color: UI.muted }]),
-      { text: long ? `${a.key} ${a.label}` : a.key, color: tone(a) },
+      ...(i === 0 ? [] : [{ text: length === "bare" ? " " : " · ", color: UI.muted }]),
+      {
+        text: length === "full" ? `${a.key} ${a.label}` : length === "short" ? `${a.key} ${a.short}` : a.key,
+        color: tone(a),
+      },
     ]);
 
   // The pages and the command line are keys like any other, and a key a reader is never told about
   // may as well not exist: the help page had them, the row a reader actually looks at did not. What
   // gives way as the row narrows is the words, never the keys themselves.
-  const rest = (long: boolean): Seg[] =>
-    long
-      ? [
-          { text: " · p positions · n pnl · w wallet · m sim · : command", color: UI.muted },
-          { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted },
-        ]
-      : [{ text: " p n w m : ←→ enter t ? x", color: UI.muted }];
+  const pagesFull: Seg = { text: " · p positions · n pnl · w wallet · m sim · : command", color: UI.muted };
+  const pagesShort: Seg = { text: " · p pos · n pnl · w wal · m sim · : cmd", color: UI.muted };
+  const navFull: Seg = { text: " · ←→ leg · enter detail · t window · ? help · x quit", color: UI.muted };
+  const navShort: Seg = { text: " · ←→ · enter · t · ? help · x quit", color: UI.muted };
+  const navBare: Seg = { text: " · ←→ enter t ? x", color: UI.muted };
+  const navTiny: Seg = { text: " · ? x", color: UI.muted };
+  // The page words without the dots between them: two characters short of fitting at a hundred and
+  // twenty columns, and the words are what the row is for.
+  const pagesTight: Seg = { text: " · p pos n pnl w wal m sim : cmd", color: UI.muted };
+  const bare: Seg = { text: " p n w m : ←→ enter t ? x", color: UI.muted };
 
   return fitSegments(
     [
-      [...keys(true), ...rest(true)],
-      [...keys(true), rest(true)[0]!, { text: " · ? help · x quit", color: UI.muted }],
-      [...keys(true), ...rest(false)],
-      [...keys(false), ...rest(false)],
+      [...keys("full"), pagesFull, navFull],
+      [...keys("full"), pagesFull, navShort],
+      [...keys("full"), pagesFull, navBare],
+      [...keys("full"), pagesShort, navBare],
+      [...keys("short"), pagesShort, navBare],
+      // The pages keep their words to the last: `? x` alone still says how to reach everything else,
+      // and a console nobody can leave is worse than one whose pages are unlabelled.
+      [...keys("short"), pagesShort, navTiny],
+      [...keys("short"), pagesTight, navTiny],
+      [...keys("short"), pagesTight],
+      [...keys("short"), navBare],
+      [...keys("bare"), bare],
     ],
     width,
   );

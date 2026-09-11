@@ -68,6 +68,7 @@ export function Positions({
     },
     {
       header: "holds",
+      optional: true,
       cells: legs.map((leg) =>
         leg.position === null
           ? [{ text: "unread", color: UI.caveat }]
@@ -83,8 +84,10 @@ export function Positions({
     },
     {
       // Valued at the mainnet mark, like the book row: the leg's own pool is not arbitraged and
-      // marking there reports a fortune that is not in the position.
+      // marking there reports a fortune that is not in the position. Given up at the narrowest
+      // width, where the book row above already carries the same total.
       header: "at mark",
+      optional: true,
       align: "right",
       cells: legs.map((leg) => {
         const mid = leg.mark?.mid ?? null;

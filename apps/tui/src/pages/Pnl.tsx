@@ -114,8 +114,9 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
     rows.push(
       <Text key="mark" color={UI.muted}>
         {trunc(
-          `marked at ${mark.source}${age === null ? "" : `, read ${humanDuration(age)} ago`}` +
-            " · each leg's own pool mid is on its card",
+          // The legs' own pool mids used to be the alternative mark; two of those pools were retired
+          // with the move to one mid, so there is no second reading to point at any more.
+          `marked at ${mark.source}${age === null ? "" : `, read ${humanDuration(age)} ago`}`,
           width,
         )}
       </Text>,
