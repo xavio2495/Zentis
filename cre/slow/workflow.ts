@@ -665,5 +665,39 @@ export function initWorkflow(config: Config) {
 		cre.handlerInTee(cronTrigger.trigger({ schedule: config.schedule }), onCronTrigger, [
 			{ tee: 'nitro', regions: ['us-west-2'] },
 		]),
+		// NOTE: `restrictions` below is deliberately NOT wired in as a `preHook`, for the same reason
+		// as in the fast workflow: any workflow that supplies one fails to execute on cre-sdk 1.20.0 /
+		// CLI 1.32.0 with "Failed to parse configuration: Unexpected end of JSON input", including a
+		// plain handler with `preHook: () => ({})`. It is kept and unit-tested so that wiring it back
+		// is a one-line change once the SDK accepts hooks -- and so that what gets wired back has been
+		// checked against the calls this workflow actually makes, rather than written from memory on
+		// the day.
 	]
 }
+
+/**
+ * Capability budget, sized for the WORST single execution rather than the average.
+ *
+ * Per run, whatever the book holds: one cross-chain quote for the boundary and one price series for
+ * the volatility term. Then per leg: a markout read, a mainnet mid for crowding, a crowding read, one
+ * slot read and one report write. So HTTP scales as `2 + 3n` while the chain calls scale as `n`.
+ *
+ * Every published budget is doubled, so one retry — or one added read — does not take the workflow
+ * down. The audit-firewall template ships a budget of exactly 8 against exactly 8 calls, which is a
+ * bug to learn from. The EVM limits are per chain selector so that one busy leg cannot spend another
+ * leg's allowance; the HTTP limit is not, because the enclave makes those calls rather than a chain
+ * client.
+ */
+export const restrictions = (config: Config) => ({
+	capabilities: {
+		type: 'CAPABILITY_RESTRICTION_TYPE_OPEN' as const,
+		maxTotalCalls: 2 * (2 + 5 * config.legs.length),
+		restrictions: [
+			new cre.restrictors.HTTPClientRestrictor().limitSendRequest(2 * (2 + 3 * config.legs.length)),
+			...config.legs.flatMap((leg) => {
+				const r = new cre.restrictors.EVMRestrictor(BigInt(leg.chainSelector))
+				return [r.limitCallContract(2), r.limitWriteReport(2)]
+			}),
+		],
+	},
+})
