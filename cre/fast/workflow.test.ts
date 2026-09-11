@@ -4,16 +4,35 @@ import { protoBigIntToBigint, type TeeRuntime } from '@chainlink/cre-sdk'
 import { encodeAbiParameters, parseAbiParameters } from 'viem'
 
 import { onCronTrigger, restrictions, type Config } from './workflow'
-import { anchorTiltBps, antiSymmetric, legWeight, midFromSqrtPriceX96 } from '@zentis/strategy-sdk'
+import { anchorTiltBps, antiSymmetric, legWeight, midFromSqrtPriceX96, ONE } from '@zentis/strategy-sdk'
+import { midFromUsdPrices } from '../slow/policy'
 
 const KAPPA = '10000'
 const KAPPA_BOOK = '5000'
+const API_KEY = 'not-a-real-key'
+
+// The one market every leg is priced against: mainnet USDC/WETH, as the 1inch spot API returns it.
+const MAINNET = {
+	chainId: 1,
+	tokenA: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+	tokenB: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+	decimalsA: 6,
+	decimalsB: 18,
+}
+const USDC_USD = '0.9998'
+const WETH_USD = '2464.71'
+const MARKET_MID = midFromUsdPrices(USDC_USD, WETH_USD, MAINNET.decimalsA, MAINNET.decimalsB)
+
+/** The tokenB balance that makes a leg exactly even at the market mid. */
+const evenB = (balanceA: bigint) => (balanceA * MARKET_MID) / ONE
 
 const config: Config = {
 	schedule: '*/10 * * * * *',
 	positionId: `0x${'00'.repeat(31)}01`,
 	kappaSecretId: 'KAPPA_BPS',
 	kappaBookSecretId: 'KAPPA_BOOK_BPS',
+	apiKeySecretId: 'ONEINCH_API_KEY',
+	mainnet: MAINNET,
 	spreadBps: 10,
 	markoutBps: 0,
 	maxTiltBps: 500,
@@ -22,7 +41,6 @@ const config: Config = {
 	legs: [
 	{
 		chainSelector: '10344971235874465080',
-		pool: '0x46880b404CD35c165EDdefF7421019F8dD25F4Ad',
 		aqua: '0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9',
 		app: '0xdd9752b377870bd9e41cd041f4a0e90770d0fb41',
 		strategyHash: `0x${'11'.repeat(32)}`,
@@ -32,7 +50,6 @@ const config: Config = {
 	},
 	{
 		chainSelector: '3478487238524512106',
-		pool: '0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf',
 		aqua: '0x8F4f807C72a2BfAB4024e783f68Fc714d0Ce2bbe',
 		app: '0xfc603336a7b797f2d7eba03ed69734fad9ea521b',
 		strategyHash: `0x${'22'.repeat(32)}`,
@@ -45,7 +62,6 @@ const config: Config = {
 
 const SEPOLIA_LEG = {
 	chainSelector: '16015286601757825753',
-	pool: '0x6418eec70f50913ff0d756b48d32ce7c02b47c47',
 	aqua: '0xF86CdAeE90DB9901a5F104172294161085070C5A',
 	app: '0x57706A10f41d4649fE65de6D38c3eCe429D2d147',
 	strategyHash: `0x${'33'.repeat(32)}`,
@@ -68,19 +84,6 @@ const protoBigInt = (n: bigint) => {
 	const hex = n.toString(16)
 	return { absVal: bytes(hex.length % 2 ? `0${hex}` : hex), sign: 1n }
 }
-
-const slot0Data = (sqrtPriceX96: bigint) =>
-	bytes(
-		encodeAbiParameters(parseAbiParameters('uint160, int24, uint16, uint16, uint16, uint8, bool'), [
-			sqrtPriceX96,
-			0,
-			0,
-			1,
-			1,
-			0,
-			true,
-		]),
-	)
 
 const balancesData = (a: bigint, b: bigint) =>
 	bytes(encodeAbiParameters(parseAbiParameters('uint256, uint256'), [a, b]))
@@ -113,32 +116,30 @@ const storedData = (stored: Stored) =>
 	)
 
 /**
- * A chain that never changes: both legs' finalized block, pool price and Aqua balances are fixed.
- * Every determinism claim in this file rests on the handler being a pure function of these.
+ * A chain that never changes: every leg's finalized block and Aqua balances are fixed, and so is the
+ * market the mid is read from. Every determinism claim in this file rests on the handler being a
+ * pure function of these. All three legs start even AT THAT ONE MID, which is what re-shipping them
+ * against the market price produces and what three unrelated venue mids could not express.
  */
-type LegState = { block: bigint; ts: bigint; sqrt: bigint; bal: [bigint, bigint]; stored: Stored }
+type LegState = { block: bigint; ts: bigint; bal: [bigint, bigint]; stored: Stored }
 type ChainState = { legs: LegState[] }
 
 const LEG_A: LegState = {
 	block: 46561623n,
 	ts: 1788891534n,
-	sqrt: 1315805077060885543498123125042033n,
-	bal: [15_000_000n, 4137282795001288n],
+	bal: [15_000_000n, evenB(15_000_000n)],
 	stored: NOTHING_STORED,
 }
 const LEG_B: LegState = {
 	block: 306809662n,
 	ts: 1788891600n,
-	sqrt: 1782527366555253651198357277536396n,
-	bal: [15_000_000n, 7592844468186735n],
+	bal: [15_000_000n, evenB(15_000_000n)],
 	stored: NOTHING_STORED,
 }
-// Sepolia's reference pool, at the price the third leg was shipped against.
 const LEG_C: LegState = {
 	block: 11673302n,
 	ts: 1788891580n,
-	sqrt: 416770674707369483170269580145195n,
-	bal: [15_000_000n, 415074829001483n],
+	bal: [15_000_000n, evenB(15_000_000n)],
 	stored: NOTHING_STORED,
 }
 
@@ -148,17 +149,28 @@ const withLeg = (chain: ChainState, index: number, patch: Partial<LegState>): Ch
 	legs: chain.legs.map((leg, i) => (i === index ? { ...leg, ...patch } : leg)),
 })
 
-const makeRuntime = (chain: ChainState = CHAIN, cfg: Config = config) => {
+/** What the spot-price endpoint answers with. */
+type Market = { statusCode: number; body: string }
+const MARKET: Market = {
+	statusCode: 200,
+	body: JSON.stringify({
+		[MAINNET.tokenA.toLowerCase()]: USDC_USD,
+		[MAINNET.tokenB.toLowerCase()]: WETH_USD,
+	}),
+}
+
+const makeRuntime = (chain: ChainState = CHAIN, cfg: Config = config, market: Market = MARKET) => {
 	const logs: string[] = []
 	const reports: string[] = []
 	const calls: string[] = []
 	// The block each CallContract was pinned to: 'latest', or the block number as a string.
 	const blockTags: string[] = []
+	// Every URL the enclave fetched, so "once per run" can be counted rather than asserted in prose.
+	const httpUrls: string[] = []
 
-	// header, slot0, safeBalances, refOf — per leg, in the order observeLeg issues them.
+	// header, safeBalances, refOf — per leg, in the order observeLeg issues them.
 	const queue: Array<() => unknown> = chain.legs.flatMap((leg) => [
 		() => ({ header: { blockNumber: protoBigInt(leg.block), timestamp: leg.ts } }),
-		() => ({ data: slot0Data(leg.sqrt) }),
 		() => ({ data: balancesData(leg.bal[0], leg.bal[1]) }),
 		() => ({ data: storedData(leg.stored) }),
 	])
@@ -187,16 +199,35 @@ const makeRuntime = (chain: ChainState = CHAIN, cfg: Config = config) => {
 		log: (m: string) => logs.push(m),
 	}
 
+	const secrets: Record<string, string> = {
+		KAPPA_BPS: KAPPA,
+		KAPPA_BOOK_BPS: KAPPA_BOOK,
+		ONEINCH_API_KEY: API_KEY,
+	}
+
+	// The market read is the one capability the ENCLAVE runtime calls directly: the key it carries
+	// must not cross out to the DON, so it does not go through the `don` double above.
 	const runtime = {
 		config: cfg,
 		getSecret: ({ id }: { id: string }) => ({
-			result: () => ({ value: id === 'KAPPA_BOOK_BPS' ? KAPPA_BOOK : KAPPA }),
+			result: () => ({ value: secrets[id] ?? KAPPA }),
 		}),
+		callCapability: ({ method, payload }: { method: string; payload: { url: string } }) => {
+			calls.push(method)
+			if (method !== 'SendRequest') throw new Error(`unexpected enclave capability call: ${method}`)
+			httpUrls.push(payload.url)
+			return {
+				result: () => ({
+					statusCode: market.statusCode,
+					body: new TextEncoder().encode(market.body),
+				}),
+			}
+		},
 		log: (m: string) => logs.push(m),
 		usingTheDons: () => don,
 	}
 
-	return { runtime: runtime as unknown as TeeRuntime<Config>, logs, reports, calls, blockTags }
+	return { runtime: runtime as unknown as TeeRuntime<Config>, logs, reports, calls, blockTags, httpUrls }
 }
 
 describe('fast workflow', () => {
@@ -280,9 +311,7 @@ describe('fast workflow', () => {
 		onCronTrigger(runtime)
 		expect(blockTags).toEqual([
 			String(LEG_A.block),
-			String(LEG_A.block),
 			'latest',
-			String(LEG_B.block),
 			String(LEG_B.block),
 			'latest',
 		])
@@ -308,12 +337,13 @@ describe('fast workflow', () => {
 
 	test('with no room granted the published shift is the correction alone', () => {
 		const stored = { mid: 1n, spreadBps: 22, markoutBps: 0, bandEdgeBps: 2 } // room = 2 - |-2| = 0
-		const bal: [bigint, bigint] = [25_000_000n, 4137282795001288n]
+		const bal: [bigint, bigint] = [25_000_000n, evenB(15_000_000n)]
 		const { runtime, reports } = makeRuntime(withLeg(withLeg(CHAIN, 0, { stored }), 0, { bal }))
 		onCronTrigger(runtime)
 		const [, refA] = decodeRef(reports[0]!)
-		const mid = midFromSqrtPriceX96(LEG_A.sqrt)
-		const anchor = anchorTiltBps(legWeight({ balanceA: bal[0], balanceB: bal[1], mid }).weightA)
+		const anchor = anchorTiltBps(
+			legWeight({ balanceA: bal[0], balanceB: bal[1], mid: MARKET_MID }).weightA,
+		)
 		expect(BigInt(refA.tiltBps)).toBe(anchor < -500n ? -500n : anchor)
 	})
 
@@ -357,18 +387,79 @@ describe('fast workflow', () => {
 		// Leg C holds excess tokenA against its own mid and is repriced dear; the other two legs
 		// shed a little through the book term, and all three share one instant.
 		const { runtime, reports, blockTags } = makeRuntime(
-			withLeg(THREE, 2, { bal: [25_000_000n, 415074829001483n] }),
+			withLeg(THREE, 2, { bal: [25_000_000n, evenB(15_000_000n)] }),
 			configWithThreeLegs,
 		)
 		onCronTrigger(runtime)
 		expect(reports).toHaveLength(3)
-		expect(blockTags).toHaveLength(9)
+		expect(blockTags).toHaveLength(6)
 		const refs = reports.map((r) => decodeRef(r)[1])
 		expect(refs[2]!.tiltBps).toBeLessThan(0)
 		expect(refs[0]!.tiltBps).toBeGreaterThan(0)
 		expect(refs[1]!.tiltBps).toBeGreaterThan(0)
 		expect(new Set(refs.map((r) => r.seq)).size).toBe(1)
 		expect(BigInt(refs[0]!.updatedAt)).toBe(LEG_A.ts)
+	})
+
+	// The defect this replaced: each leg read its own testnet pool, and three unarbitraged pools
+	// quoted the same pair at 30,187, 2,583 and 4,156. `legWeight` values a leg's tokenB side at
+	// its own mid, so the book concession was averaging weights measured against three unrelated
+	// prices. One market read per run is what makes that average an average of comparable things.
+	test('the mid is read once per run, not once per leg', () => {
+		const { runtime, httpUrls } = makeRuntime(THREE, configWithThreeLegs)
+		onCronTrigger(runtime)
+		expect(httpUrls).toHaveLength(1)
+		expect(httpUrls[0]).toContain(`/${MAINNET.chainId}/`)
+		expect(httpUrls[0]!.toLowerCase()).toContain(MAINNET.tokenA.toLowerCase())
+		expect(httpUrls[0]!.toLowerCase()).toContain(MAINNET.tokenB.toLowerCase())
+	})
+
+	test('every leg publishes the market mid, and all three publish the same one', () => {
+		const { runtime, reports } = makeRuntime(THREE, configWithThreeLegs)
+		onCronTrigger(runtime)
+		const mids = reports.map((r) => decodeRef(r)[1].mid)
+		expect(new Set(mids).size).toBe(1)
+		expect(mids[0]).toBe(MARKET_MID)
+	})
+
+	test('legs that hold the same inventory are weighted the same, whatever chain they sit on', () => {
+		// The book term's premise, checked: same balances, same weight, so the same concession.
+		const lopsided: [bigint, bigint] = [17_000_000n, evenB(15_000_000n)]
+		const same: ChainState = { legs: THREE.legs.map((leg) => ({ ...leg, bal: lopsided })) }
+		const { runtime, reports } = makeRuntime(same, configWithThreeLegs)
+		onCronTrigger(runtime)
+		const refs = reports.map((r) => decodeRef(r)[1])
+		expect(refs[0]!.tiltBps).not.toBe(0)
+		expect(new Set(refs.map((r) => r.tiltBps)).size).toBe(1)
+		expect(new Set(refs.map((r) => r.dTiltPerA)).size).toBe(1)
+	})
+
+	// A fallback to the leg's own pool would put the defect back at the one moment nobody is
+	// watching. The registry keeps its last reference, the staleness ramp widens the quote, and at
+	// an hour the position goes dark: that is the honest behaviour and it is already built.
+	test('a failed market read publishes nothing', () => {
+		const { runtime, reports } = makeRuntime(CHAIN, config, { statusCode: 502, body: '' })
+		expect(() => onCronTrigger(runtime)).toThrow()
+		expect(reports).toEqual([])
+	})
+
+	test('a malformed price publishes nothing rather than a zero mid', () => {
+		const market = {
+			statusCode: 200,
+			body: JSON.stringify({
+				[MAINNET.tokenA.toLowerCase()]: '0',
+				[MAINNET.tokenB.toLowerCase()]: WETH_USD,
+			}),
+		}
+		const { runtime, reports } = makeRuntime(CHAIN, config, market)
+		expect(() => onCronTrigger(runtime)).toThrow()
+		expect(reports).toEqual([])
+	})
+
+	test('a reply missing one side of the pair publishes nothing', () => {
+		const { runtime, reports } = makeRuntime(CHAIN, config, { statusCode: 200, body: '{}' })
+		expect(() => onCronTrigger(runtime)).toThrow()
+		expect(reports).toEqual([])
 	})
 
 	test('the capability budget covers the calls actually made, with headroom', () => {
@@ -382,7 +473,7 @@ describe('fast workflow', () => {
 				.filter((r) => r.method?.method === m)
 				.reduce((sum, r) => sum + (r.method?.maxCalls ?? 0), 0)
 
-		for (const method of ['HeaderByNumber', 'CallContract', 'WriteReport']) {
+		for (const method of ['HeaderByNumber', 'CallContract', 'WriteReport', 'SendRequest']) {
 			expect(made(method)).toBeGreaterThan(0)
 			// Sized for the worst execution, not the average: a budget equal to the observed count is
 			// the audit-firewall template's bug, where one retry takes the workflow down.
@@ -445,6 +536,6 @@ function decodeRef(payload: string) {
 	const { decodeAbiParameters } = require('viem')
 	return decodeAbiParameters(REF_ABI, `0x${Buffer.from(payload, 'base64').toString('hex')}`) as [
 		string,
-		{ tiltBps: number; seq: number; updatedAt: number },
+		{ mid: bigint; tiltBps: number; seq: number; updatedAt: number; dTiltPerA: bigint },
 	]
 }
