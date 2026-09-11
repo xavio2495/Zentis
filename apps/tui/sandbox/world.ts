@@ -21,7 +21,16 @@ import refBase from "../../../packages/console-data/fixtures/ref-base-sepolia.js
  *
  * It is also what the site can show a visitor when the live reference is stale.
  */
-export type Scenario = "fresh" | "stale" | "docked" | "landing" | "outage" | "partial" | "refused";
+export type Scenario =
+  | "fresh"
+  | "stale"
+  | "docked"
+  | "landing"
+  | "outage"
+  | "partial"
+  | "refused"
+  | "pinned"
+  | "long";
 
 const refs = { 11155111: refSepolia, 421614: refArbitrum, 84532: refBase } as const;
 const histories = { 11155111: historySepolia, 421614: historyArbitrum, 84532: historyBase } as const;
@@ -154,6 +163,34 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     }),
     caveats: walletCaveats([]),
   };
+
+  /**
+   * A leg whose reserves sit off the published mid, in both directions.
+   *
+   * `pinned` halves Sepolia's tokenB so its own curve prices tokenA above the mid and a top-up can
+   * put it back; `long` doubles Arbitrum's so no top-up can, because `push()` only adds. Constructed
+   * rather than recorded: whether a leg is off the mid on the day the tests run is the market's
+   * business, and both cases have to be renderable on the day it is not.
+   */
+  if (scenario === "pinned" || scenario === "long") {
+    const target = scenario === "pinned" ? "sepolia" : "arbitrum-sepolia";
+    const moved = legs.map((leg) =>
+      leg.config.name !== target || leg.position === null
+        ? leg
+        : {
+            ...leg,
+            position: {
+              ...leg.position,
+              balanceB: scenario === "pinned" ? leg.position.balanceB / 2n : leg.position.balanceB * 2n,
+            },
+          },
+    );
+    return {
+      ...(fakeSnapshot("fresh", now) as Snapshot),
+      legs: moved,
+      book: bookTotals(moved as LegSnapshot[]),
+    } as unknown as Snapshot;
+  }
 
   if (scenario === "refused") {
     // Seen live: the router answers USDC → WETH on Sepolia and reverts WETH → USDC. The quote service

@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
-import { type LegSnapshot, type Snapshot, bInA, humanDuration } from "@zentis/console-data";
+import { type LegSnapshot, type Snapshot, bInA, humanDuration, rebalanceOf } from "@zentis/console-data";
 import { signed, tokenAmount } from "../format.js";
-import { type Seg, padRows, trunc } from "../layout.js";
+import { type Seg, padRows, trunc, wrapLines } from "../layout.js";
 import { Segments } from "../components/Segments.js";
 import { UI, legColour } from "../theme.js";
 import { type Column, columns } from "./table.js";
@@ -143,6 +143,76 @@ export function Positions({
         {trunc(`${leg.config.label}: ${leg.sources.fills}`, width)}
       </Text>,
     );
+  }
+
+  // The rebalance panel: the case pricing cannot cover.
+  //
+  // A leg whose reserves put its own curve off the mid is corrected by the shift until the cap runs
+  // out, and after that it quotes off the market until inventory moves. The panel names the cause
+  // rather than the symptom — the balances against the mid, and the tokenB that would close the gap
+  // — and gives the command that does it. The amount is the script's own arithmetic, not a second
+  // opinion derived from the shift, and a leg a top-up cannot fix is told so instead of being
+  // handed a command the script would decline.
+  const plans = legs
+    .map((leg) => ({
+      leg,
+      plan:
+        leg.position === null || leg.ref === null
+          ? null
+          : rebalanceOf({ balanceA: leg.position.balanceA, balanceB: leg.position.balanceB, mid: leg.ref.mid }),
+    }))
+    .filter((entry): entry is { leg: LegSnapshot; plan: NonNullable<typeof entry.plan> } => entry.plan !== null)
+    // Nothing to say about a leg that is on the mid: the panel is for the legs that are not.
+    .filter(({ plan }) => plan.canFix || (plan.offMidBps !== null && Math.abs(plan.offMidBps) > 0));
+
+  if (plans.length > 0) {
+    rows.push(<Text key="rbsp"> </Text>);
+    rows.push(
+      <Text key="rbhead" color={UI.heading} bold>
+        {trunc("rebalance", width)}
+      </Text>,
+    );
+  }
+  for (const { leg, plan } of plans) {
+    const name = leg.config.label.split(" ")[0] ?? leg.config.name;
+    const { tokenA, tokenB } = leg.config;
+    const held =
+      `${name} holds ${tokenAmount(leg.position!.balanceA, tokenA.decimals)} ${tokenA.symbol}` +
+      ` and ${tokenAmount(leg.position!.balanceB, tokenB.decimals)} ${tokenB.symbol}` +
+      (plan.wantedB === null
+        ? ""
+        : `, where the mid says ${tokenAmount(plan.wantedB, tokenB.decimals)} ${tokenB.symbol}`);
+    for (const [i, text] of wrapLines(held, width, 2).entries()) {
+      rows.push(
+        <Text key={`rb-${name}-h${i}`} color={UI.muted}>
+          {text}
+        </Text>,
+      );
+    }
+    if (plan.canFix) {
+      rows.push(
+        <Segments
+          key={`rb-${name}-do`}
+          segs={[
+            { text: "top up ", color: UI.muted },
+            { text: `${tokenAmount(plan.topUpB, tokenB.decimals)} ${tokenB.symbol}`, color: UI.heading, bold: true },
+            { text: "  ·  ", color: UI.frame },
+            // The operator's command, verbatim, so it can be read across and typed: the console runs
+            // it through `:push` behind a confirmation and never from a keystroke alone.
+            { text: `python3 scripts/rebalance.py --only ${leg.config.name}`, color: UI.action },
+            { text: "  (--dry-run reads it first)", color: UI.muted },
+          ]}
+        />,
+      );
+    } else if (plan.reason !== null) {
+      for (const [i, text] of wrapLines(plan.reason, width - 2, 2).entries()) {
+        rows.push(
+          <Text key={`rb-${name}-r${i}`} color={UI.caveat}>
+            {i === 0 ? `! ${text}` : `  ${text}`}
+          </Text>,
+        );
+      }
+    }
   }
 
   return (
