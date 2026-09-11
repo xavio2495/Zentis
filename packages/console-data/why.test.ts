@@ -31,3 +31,22 @@ test("the why line does not call an unread leg a leg with no position", () => {
 test("a leg that really has no position still says so", () => {
   expect(why(leg({}))).toContain("no indexed position");
 });
+
+test("the volatility sentence names the market the book prices from, not a pool of its own", () => {
+  // The slow workflow measures volatility on the one mainnet series the mid comes from. Saying "the
+  // pool this leg prices from" claimed a per-leg price source that was retired with that change.
+  const shift = { correction: 0, ownConcession: 0, bookConcession: 0, tiltBps: 0 } as never;
+  const spread = {
+    baseBps: 10,
+    volatilityBps: 98,
+    markoutBps: 0,
+    stalenessBps: 0,
+    totalBps: 108,
+    referenceAgeSeconds: 60,
+    tooStaleToQuote: false,
+  } as never;
+  const sentence = why({ shift, spread, caveats: [], sources: { fills: null, registry: null, pool: null } } as never);
+  expect(sentence).toContain("98 bps");
+  expect(sentence).not.toContain("the pool this leg prices from");
+  expect(sentence).toMatch(/market/);
+});
