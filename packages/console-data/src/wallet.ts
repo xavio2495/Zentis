@@ -163,3 +163,42 @@ export async function fetchWallet(legs: readonly LegConfig[], maker: `0x${string
   ]);
   return { maker, chains, caveats: [...caveats, ...walletCaveats(holdings)] };
 }
+
+/**
+ * A recorded wallet, back as the type the screen renders.
+ *
+ * Written by `scripts/record.ts` beside the rest of the moment, and read here rather than in the
+ * sandbox so that the derived fields — free, shortfall, whether the approval still covers the
+ * commitment — come out of the same function the live path uses. A fixture that recomputed them its
+ * own way could pass a test the real screen fails.
+ */
+export interface RawWallet {
+  maker: string;
+  chains: {
+    chainId: number;
+    chain: string;
+    gas: string;
+    tokenA: { symbol: string; decimals: number; held: string; committed: string; allowance: string };
+    tokenB: { symbol: string; decimals: number; held: string; committed: string; allowance: string };
+  }[];
+}
+
+export function parseWalletFixture(raw: RawWallet): Wallet {
+  const chains = raw.chains.map((chain) => ({
+    chainId: chain.chainId,
+    chain: chain.chain,
+    gas: BigInt(chain.gas),
+    tokenA: holdingOf(chain.tokenA, BigInt(chain.tokenA.held), BigInt(chain.tokenA.committed), BigInt(chain.tokenA.allowance)),
+    tokenB: holdingOf(chain.tokenB, BigInt(chain.tokenB.held), BigInt(chain.tokenB.committed), BigInt(chain.tokenB.allowance)),
+  }));
+  return {
+    maker: raw.maker as `0x${string}`,
+    chains,
+    caveats: walletCaveats(
+      chains.flatMap((chain) => [
+        { ...chain.tokenA, chain: chain.chain },
+        { ...chain.tokenB, chain: chain.chain },
+      ]),
+    ),
+  };
+}

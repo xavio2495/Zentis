@@ -5,6 +5,7 @@ import { historyQuery } from "../src/fills.js";
 import { swapsQuery } from "../src/pool.js";
 import { momentProblems } from "../src/moment.js";
 import { fetchRef } from "../src/registry.js";
+import { fetchWallet } from "../src/wallet.js";
 
 /**
  * Records the five sources as they answered, so the tests run on shapes the endpoints really
@@ -82,11 +83,14 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * at once, and a run that insists on all three waits for the slowest.
  */
 const wanted = process.argv.slice(2);
-const chosen = wanted.length === 0 ? LEGS : LEGS.filter((leg) => wanted.includes(leg.name));
-if (chosen.length === 0) {
+// `wallet` alone records just the maker's wallet, which is RPC only. That matters when an indexer's
+// allowance is spent: the wallet can still be captured without asking a subgraph anything.
+const walletOnly = wanted.length === 1 && wanted[0] === "wallet";
+const chosen = wanted.length === 0 || walletOnly ? (walletOnly ? [] : LEGS) : LEGS.filter((leg) => wanted.includes(leg.name));
+if (chosen.length === 0 && !walletOnly) {
   throw new Error(`no leg matches ${wanted.join(", ")}; known: ${LEGS.map((l) => l.name).join(", ")}`);
 }
-console.log(`recording ${chosen.map((l) => l.name).join(", ")}`);
+console.log(walletOnly ? "recording the maker's wallet" : `recording ${chosen.map((l) => l.name).join(", ")}`);
 
 for (const leg of chosen) {
   write(`history-${leg.name}`, await post(leg.fillsSubgraphUrl, historyQuery(BOOK.positionId, 25)));
@@ -102,9 +106,41 @@ for (const leg of chosen) {
   await pause(1500);
 }
 
+// The maker's wallet, over RPC only: no indexer allowance is spent on it, and it is the one part of
+// the recorded moment the screen has never drawn from anything real. Recorded whole rather than per
+// leg, because "held, committed, free" is a statement about one wallet across three chains.
+if (chosen.length === LEGS.length || walletOnly) {
+  const wallet = await fetchWallet(LEGS, BOOK.maker);
+  write("wallet", {
+    maker: wallet.maker,
+    chains: wallet.chains.map((chain) => ({
+      chainId: chain.chainId,
+      chain: chain.chain,
+      gas: String(chain.gas),
+      // Recorded as what was read, not as what was derived: free, shortfall and whether the approval
+      // still covers the commitment are recomputed by the same function the live path uses.
+      tokenA: {
+        symbol: chain.tokenA.symbol,
+        decimals: chain.tokenA.decimals,
+        held: String(chain.tokenA.held),
+        committed: String(chain.tokenA.committed),
+        allowance: String(chain.tokenA.allowance),
+      },
+      tokenB: {
+        symbol: chain.tokenB.symbol,
+        decimals: chain.tokenB.decimals,
+        held: String(chain.tokenB.held),
+        committed: String(chain.tokenB.committed),
+        allowance: String(chain.tokenB.allowance),
+      },
+    })),
+  });
+  for (const caveat of wallet.caveats) console.log(`  wallet: ${caveat}`);
+}
+
 // Only stamped when every leg was refreshed: a partial run leaves the previous stamp, so the
 // fixtures never claim to be more recent than their oldest part.
-if (chosen.length === LEGS.length) {
+if (chosen.length === LEGS.length && !walletOnly) {
   write("recorded-at", { seconds: Math.floor(Date.now() / 1000) });
 } else {
   console.log("partial run: recorded-at left as it was");
@@ -119,6 +155,16 @@ if (chosen.length === LEGS.length) {
  * would surface as a broken test the next morning with no clue which leg was at fault.
  */
 const problems: string[] = [];
+if (walletOnly) {
+  const recorded = JSON.parse(readFileSync(join(dir, "wallet.json"), "utf8")) as { chains?: unknown[] };
+  if ((recorded.chains ?? []).length !== LEGS.length) problems.push("wallet: not every chain answered");
+  if (problems.length > 0) {
+    console.error(`FAILED: ${problems.join("; ")}`);
+    process.exit(1);
+  }
+  console.log(`OK: recorded the maker's wallet on ${LEGS.length} chain(s)`);
+  process.exit(0);
+}
 for (const leg of chosen) {
   for (const [name, expect] of [
     [`pool-${leg.name}`, (d: Record<string, unknown>) => Array.isArray(d["swaps"]) && (d["swaps"] as unknown[]).length > 0],

@@ -1,5 +1,6 @@
 import type { Snapshot } from "@zentis/console-data";
-import { ASSUMED_GAINS, BOOK, LEGS, PAIR, bookTotals, holdingOf, walletCaveats, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
+import { ASSUMED_GAINS, BOOK, LEGS, PAIR, bookTotals, parseWalletFixture, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
+import recordedWallet from "../../../packages/console-data/fixtures/wallet.json" with { type: "json" };
 import historySepolia from "../../../packages/console-data/fixtures/history-sepolia.json" with { type: "json" };
 import historyArbitrum from "../../../packages/console-data/fixtures/history-arbitrum-sepolia.json" with { type: "json" };
 import historyBase from "../../../packages/console-data/fixtures/history-base-sepolia.json" with { type: "json" };
@@ -141,14 +142,6 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
   });
 
   /**
-   * The maker's wallet, built from the same positions the legs above carry.
-   *
-   * Aqua records a balance against the strategy and pulls from the wallet at settlement, so the
-   * committed inventory is still in the wallet's own balance. The fake world holds a multiple of
-   * what it committed, which is the ordinary case; the shortfall and short-allowance cases are what
-   * `walletCaveats` exists to say, and they are constructed in the tests that are about them.
-   */
-  /**
    * A week of the book's market, hourly, walked deterministically around the mark the legs are
    * valued at. Constructed rather than recorded: the shape of the line is what the chart's layout is
    * tested against, and a recorded week would make every re-record a rendering change.
@@ -167,30 +160,16 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     error: null,
   };
 
-  const wallet = {
-    maker: BOOK.maker,
-    chains: legs.map((leg) => {
-      const committedA = leg.position?.balanceA ?? 0n;
-      const committedB = leg.position?.balanceB ?? 0n;
-      return {
-        chainId: leg.config.chainId,
-        chain: leg.config.name,
-        gas: 10n ** 17n,
-        tokenA: holdingOf(leg.config.tokenA, committedA * 3n, committedA, committedA * 10n),
-        tokenB: holdingOf(leg.config.tokenB, committedB * 3n, committedB, committedB * 10n),
-      };
-    }),
-    caveats: walletCaveats([]),
-  };
-
   /**
-   * A leg whose reserves sit off the published mid, in both directions.
+   * The maker's wallet, as the chains really answered when it was recorded.
    *
-   * `pinned` halves Sepolia's tokenB so its own curve prices tokenA above the mid and a top-up can
-   * put it back; `long` doubles Arbitrum's so no top-up can, because `push()` only adds. Constructed
-   * rather than recorded: whether a leg is off the mid on the day the tests run is the market's
-   * business, and both cases have to be renderable on the day it is not.
+   * It was synthetic until now — a multiple of what each leg committed — which meant the two cases
+   * the page exists to warn about, a balance below the commitment and an approval that no longer
+   * covers it, were never drawn from anything real. The recording carries the second of them on all
+   * three legs.
    */
+  const wallet = parseWalletFixture(recordedWallet as never);
+
   if (scenario === "pinned" || scenario === "long") {
     const target = scenario === "pinned" ? "sepolia" : "arbitrum-sepolia";
     const moved = legs.map((leg) =>

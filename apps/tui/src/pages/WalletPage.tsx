@@ -128,12 +128,16 @@ export function WalletPage({
         </Text>,
       );
     }
+    // Wrapped, never cut: "the next fill would revert on the a…" is the half of the sentence that
+    // says there is a problem without saying what to do about it.
     for (const [i, caveat] of wallet.caveats.entries()) {
-      rows.push(
-        <Text key={`cav${i}`} color={UI.caveat}>
-          {trunc(`! ${caveat}`, width)}
-        </Text>,
-      );
+      for (const [j, text] of wrapLines(caveat, width - 2, 3).entries()) {
+        rows.push(
+          <Text key={`cav${i}-${j}`} color={UI.caveat}>
+            {j === 0 ? `! ${text}` : `  ${text}`}
+          </Text>,
+        );
+      }
     }
   }
 
