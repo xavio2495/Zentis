@@ -145,6 +145,72 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
     }
   }
 
+  // What the totals are made of, in whatever room is left. A page whose lower half is blank has
+  // spent it on nothing; the fills are the only thing on this screen that actually moved value, and
+  // each one is scored twice — against the reference it was quoted from, and against the next one
+  // published after it, which is the adverse selection the spread charges for.
+  const perFill = legs
+    .flatMap((leg) => (leg.pnl?.perFill ?? []).map((fill) => ({ leg, fill })))
+    .sort((a, b) => Number(b.fill.timestamp - a.fill.timestamp));
+  const room = height - rows.length - 2;
+  if (perFill.length > 0 && room >= 3) {
+    const shown = perFill.slice(0, room - 1);
+    rows.push(<Text key="pfsp"> </Text>);
+    rows.push(
+      <Text key="pfhead" color={UI.heading} bold>
+        {trunc("per fill", width)}
+      </Text>,
+    );
+    const table = columns(
+      [
+        {
+          header: "when",
+          align: "right",
+          cells: shown.map(({ fill }) => [
+            { text: `${humanDuration(Math.max(0, snapshot.takenAtSeconds - Number(fill.timestamp)))} ago`, color: UI.muted },
+          ]),
+        },
+        {
+          header: "leg",
+          cells: shown.map(({ leg }) => [
+            { text: leg.config.label.split(" ")[0] ?? leg.config.name, color: legColour(leg.config.chainId), bold: true },
+          ]),
+        },
+        {
+          header: "side",
+          optional: true,
+          cells: shown.map(({ leg, fill }) => [
+            {
+              text: fill.isAToB
+                ? `${leg.config.tokenA.symbol} → ${leg.config.tokenB.symbol}`
+                : `${leg.config.tokenB.symbol} → ${leg.config.tokenA.symbol}`,
+              color: UI.muted,
+            },
+          ]),
+        },
+        {
+          header: `size ${symbol}`,
+          align: "right",
+          cells: shown.map(({ fill }) => [{ text: tokenAmount(fill.sizeA, decimals), color: UI.heading }]),
+        },
+        {
+          header: "edge",
+          align: "right",
+          cells: shown.map(({ fill }) => signedAmount(fill.edgeA, decimals)),
+        },
+        {
+          header: "markout",
+          align: "right",
+          cells: shown.map(({ fill }) => signedAmount(fill.markoutA, decimals)),
+        },
+      ],
+      width,
+      shown.length,
+    );
+    rows.push(<Segments key="pfth" segs={table.header} />);
+    for (const [i, segs] of table.rows.entries()) rows.push(<Segments key={`pf${i}`} segs={segs} />);
+  }
+
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       {padRows(rows, height, null).map((row, i) => (
