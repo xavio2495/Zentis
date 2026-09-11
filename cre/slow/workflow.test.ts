@@ -4,7 +4,8 @@ import type { TeeRuntime } from '@chainlink/cre-sdk'
 
 import { sigmaOverHorizonBps, volatilitySpreadBps } from '@zentis/strategy-sdk'
 
-import { bandEdgeFromQuote, marketSamples, readMarkout, type Config } from './workflow'
+import { bandEdgeFromQuote, configSchema, marketSamples, readMarkout, restrictions, type Config } from './workflow'
+import staging from './config.staging.json'
 import vectors from './volatility_vectors.json'
 
 describe('bandEdgeFromQuote', () => {
@@ -153,5 +154,64 @@ describe('a leg whose fills subgraph cannot be read', () => {
 			markoutBps: 0n,
 			mid: 404784606639443958798733096n,
 		})
+	})
+})
+
+describe('the capability budget', () => {
+	// The fast workflow publishes one; this workflow published none at all, so the checklist item
+	// "pre-hook capability restrictions with headroom" was met on one of the two. Like the fast one it
+	// is deliberately NOT wired as a `preHook`, because any workflow supplying one fails to execute on
+	// cre-sdk 1.20.0 / CLI 1.32.0 — so it is built and tested here, ready to wire in one line once the
+	// SDK accepts hooks, and an untested budget would be worse than none when that day comes.
+	const config = configSchema.parse(staging)
+	const legs = config.legs.length
+	const budget = restrictions(config)
+	const allowed = (method: string) =>
+		budget.capabilities.restrictions
+			.filter((r) => r.method?.method === method)
+			.reduce((sum, r) => sum + (r.method?.maxCalls ?? 0), 0)
+
+	// Per run: one Fusion+ quote and one volatility series for the whole book, then per leg a markout
+	// read, a mainnet mid and a crowding read. Plus one slot read and one report write per leg.
+	const sendRequests = 2 + 3 * legs
+	const contractReads = legs
+	const reportWrites = legs
+
+	test('it covers the worst single execution, doubled', () => {
+		// Sized for the worst run rather than the average, and doubled so one retry does not take the
+		// workflow down — the audit-firewall template budgets exactly 8 against exactly 8 calls.
+		expect(allowed('SendRequest')).toBeGreaterThanOrEqual(2 * sendRequests)
+		expect(allowed('CallContract')).toBeGreaterThanOrEqual(2 * contractReads)
+		expect(allowed('WriteReport')).toBeGreaterThanOrEqual(2 * reportWrites)
+	})
+
+	test('the total covers the sum of the parts', () => {
+		expect(budget.capabilities.maxTotalCalls).toBeGreaterThanOrEqual(
+			2 * (sendRequests + contractReads + reportWrites),
+		)
+	})
+
+	test('it grows with the book rather than being pinned to three legs', () => {
+		// A budget that happened to fit today's three legs and silently throttled a fourth would fail
+		// in the least debuggable way possible: mid-run, on the leg that was added last.
+		const four = { ...config, legs: [...config.legs, config.legs[0]!] }
+		expect(restrictions(four).capabilities.maxTotalCalls).toBeGreaterThan(
+			budget.capabilities.maxTotalCalls,
+		)
+		expect(
+			restrictions(four).capabilities.restrictions.filter((r) => r.method?.method === 'CallContract').length,
+		).toBe(4)
+	})
+
+	test('every leg gets its own chain restrictor', () => {
+		// The EVM restrictors are per chain selector, so a shared budget would let one busy leg spend
+		// another leg's allowance.
+		for (const method of ['CallContract', 'WriteReport']) {
+			expect(
+				budget.capabilities.restrictions.filter((r) => r.method?.method === method).length,
+			).toBe(legs)
+		}
+		// The HTTP one is not per chain: the enclave makes those calls, not a chain client.
+		expect(budget.capabilities.restrictions.filter((r) => r.method?.method === 'SendRequest').length).toBe(1)
 	})
 })
