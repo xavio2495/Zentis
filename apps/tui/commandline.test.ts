@@ -65,3 +65,20 @@ test("typing never makes the frame taller than the terminal, at either size", as
     expect(frame.width).toBeLessThanOrEqual(cols);
   }
 }, 120_000);
+
+test("rebalance opens the positions page, where the panel that answers it lives", async () => {
+  const frame = await drive(150, 44, { keys: [":", ...typed("rebalance sepolia"), "ENTER"], scenario: "pinned" });
+  const text = frame.lines.join("\n");
+  expect(text).toContain("positions");
+  expect(text).toContain("rebalance");
+  expect(text).not.toContain("not built yet");
+}, 60_000);
+
+test("push names the script that performs it rather than claiming nothing can", async () => {
+  // The move is scripts/rebalance.py, which sizes the top-up from the chain itself. The console
+  // names it and never runs it: a push moves the maker's money.
+  const frame = await drive(150, 44, { keys: [":", ...typed("push sepolia weth 0.0002"), "ENTER"], armed: true });
+  const text = frame.lines.join("\n");
+  expect(text).toContain("scripts/rebalance.py");
+  expect(text).not.toContain("Push.s.sol");
+}, 60_000);
