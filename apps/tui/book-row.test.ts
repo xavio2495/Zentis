@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { tokenAmount, weightPercent } from "@zentis/console-data";
+import { weightPercent } from "@zentis/console-data";
+import { tokenAmount } from "./src/format.js";
 import { drive } from "./sandbox/drive.js";
 import { fakeSnapshot } from "./sandbox/world.js";
 
@@ -66,4 +67,26 @@ test("the overall view's numbers survive the narrowest terminal whole", async ()
     expect(row).not.toMatch(/book\d/);
     expect(row).not.toMatch(/\d{4}\.\d/);
   }
+}, 60_000);
+
+test("with legs unread the overall view says the split is unknown and how much of the book it valued", async () => {
+  // A split computed from the legs that answered is not the book's split, and an inventory summed
+  // over one leg of three is not the book's inventory. Both say so rather than reading as the whole.
+  const snapshot = fakeSnapshot("partial");
+  const unread = snapshot.legs.filter((l) => l.sources.fills !== null).length;
+  expect(unread).toBeGreaterThan(0);
+  const row = rowWith((await drive(190, 50, {})).lines, "book")!;
+  expect(row).toContain("split unknown");
+  expect(row).not.toMatch(/\d+% USDC/);
+  expect(row).toContain(`${snapshot.book.legs - unread} of ${snapshot.book.legs} legs`);
+}, 60_000);
+
+test("the state row leaves the book's facts to the book row rather than repeating them", async () => {
+  // Two rows both carrying the split showed 64.8% above 50%: the same word for two different marks.
+  const lines = (await drive(190, 50, { armed: true })).lines;
+  const book = rowWith(lines, "book")!;
+  const state = rowWith(lines, "reference fresh")!;
+  expect(book).not.toBe(state);
+  expect(state).not.toMatch(/% USDC/);
+  expect(state).not.toContain("armed");
 }, 60_000);
