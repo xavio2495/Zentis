@@ -67,3 +67,12 @@ test("an unread card does not name a source the book no longer prices from", asy
   const text = (await drive(120, 40, { scenario: "outage" })).lines.join("\n");
   expect(text).not.toContain("pool price from RPC");
 }, 60_000);
+
+test("an unread leg shows no fills count, since the source those came from is what is down", async () => {
+  // The card read "3 fills · traded +0.28 USDC" beside "waiting on fills": the count and the profit
+  // are computed from the fills history, which is the very thing that did not answer.
+  const snapshot = fakeSnapshot("outage");
+  expect(snapshot.legs.every((l) => l.pnl === null)).toBe(true);
+  const text = (await drive(120, 40, { scenario: "outage" })).lines.join("\n");
+  expect(text).not.toMatch(/\d+ fills/);
+}, 60_000);
