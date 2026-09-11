@@ -100,15 +100,20 @@ def plan_leg(name, rpc, fast):
     held = call(leg["tokenB"], "balanceOf(address)(uint256)", maker, rpc=rpc)[0]
     committed = balance_b
     free = max(0, held - committed)
-    # Shipping approves Aqua for the leg's whole tokenB side and ship() moves nothing, so that
-    # allowance is usually still standing and large enough. Approving again costs a transaction and
-    # an extra nonce for no effect.
+    # The allowance has to do two jobs: push() is a safeTransferFrom that consumes topUp of it now,
+    # and every later fill that takes tokenB from the maker is settled by Aqua pulling against what
+    # is left, up to the whole committed balance. So after the push the allowance must still cover
+    # balanceB + topUp, which means approving topUp + wantedB whenever the standing allowance is
+    # less than that. The first version approved topUp alone, the push consumed it, and the WETH
+    # allowance on every leg was left at zero with the commitment intact (found by the console's
+    # wallet page, 2026-09-11); scripts/approve.py repairs a leg that is already in that state.
     allowance = call(leg["tokenB"], "allowance(address,address)(uint256)", maker, leg["aqua"], rpc=rpc)[0]
+    approval = top_up + wanted_b
     return {
         "name": name, "rpc": rpc, "leg": leg, "maker": maker,
         "mid": mid, "balanceA": balance_a, "balanceB": balance_b,
         "wantedB": wanted_b, "topUp": top_up, "free": free, "wrap": max(0, top_up - free),
-        "allowance": allowance,
+        "allowance": allowance, "approval": approval,
     }, None
 
 
@@ -131,7 +136,7 @@ def main():
         if plan["topUp"] <= 0:
             print(f"   holds {-plan['topUp'] / 1e18:.6f} WETH more than the mid wants; a top-up cannot fix that, skipping")
             continue
-        approving = "approving" if plan["allowance"] < plan["topUp"] else "allowance already covers it"
+        approving = "approving" if plan["allowance"] < plan["approval"] else "allowance already covers it"
         print(f"   top up {plan['topUp'] / 1e18:.6f} WETH (free {plan['free'] / 1e18:.6f}, "
               f"wrapping {plan['wrap'] / 1e18:.6f}, {approving})")
         if dry_run:
@@ -150,8 +155,8 @@ def main():
                 continue
             print(f"   wrapped: {receipt['transactionHash']}")
             nonce += 1
-        if plan["allowance"] < plan["topUp"]:
-            receipt, error = send(leg["tokenB"], "approve(address,uint256)", leg["aqua"], plan["topUp"],
+        if plan["allowance"] < plan["approval"]:
+            receipt, error = send(leg["tokenB"], "approve(address,uint256)", leg["aqua"], plan["approval"],
                                   rpc=rpc, private_key=private_key, nonce=nonce)
             if error:
                 print(f"   approve FAILED: {error}")
