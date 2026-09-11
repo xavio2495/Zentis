@@ -11,7 +11,7 @@ import { type SimReport, loadSimReport } from "./sim.js";
 import { ok } from "./graphql.js";
 import { humanDuration } from "./duration.js";
 import { type Mark, fetchMarks } from "./mark.js";
-import { type MarkHistory, fetchMarkHistory } from "./market.js";
+import { type MarkHistory, fetchMarkHistory, marketCacheKey } from "./market.js";
 import { type LegPnl, legPnl } from "./pnl.js";
 import { type Wallet, fetchWallet } from "./wallet.js";
 import { type BookTotals, bookTotals } from "./book.js";
@@ -81,10 +81,15 @@ export const FEED_HISTORY = 120;
  * and calling it one. A whole snapshot is either the state at a moment or it says which part of it
  * could not be read.
  */
+/** A week, which is the longest window the chart offers and the series the service caches whole. */
+export const DEFAULT_MARKET_HOURS = 168;
+
 export async function takeSnapshot(
   quoteSize = QUOTE_SIZE_A,
   cache: Cache = createCache(),
   prices: PriceReader = createPriceReader(),
+  /** the chart's window, so a short one is drawn from swaps rather than from hourly closes */
+  marketHours: number = DEFAULT_MARKET_HOURS,
 ): Promise<Snapshot> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -120,7 +125,7 @@ export async function takeSnapshot(
   const [marks, wallet, market] = await Promise.all([
     cache.get("mark", CADENCE_MS.fills, () => fetchMarks()),
     cache.get<Wallet>("wallet", CADENCE_MS.fills, async () => ok(await fetchWallet(LEGS, BOOK.maker))),
-    cache.get<MarkHistory>("market", CADENCE_MS.market, () => fetchMarkHistory()),
+    cache.get<MarkHistory>(marketCacheKey(marketHours), CADENCE_MS.market, () => fetchMarkHistory(marketHours)),
   ]);
 
   const caveats: string[] = [];

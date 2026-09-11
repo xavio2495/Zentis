@@ -83,7 +83,10 @@ export function Graphs({
           .filter((part): part is string => part !== null)
           .join("   ");
   const left = p.from === null || p.to === null ? "" : `${duration(Number(p.to - p.from))} ago`;
-  const span = `${left}    ${legend}`;
+  // How the series was drawn belongs beside it: a week of hourly closes and an hour of individual
+  // swaps are different pictures, and the line alone does not say which one is on screen.
+  const drawn = market.granularity === "swaps" ? "per swap" : "hourly";
+  const span = `${left}    ${legend}    ${drawn}`;
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">

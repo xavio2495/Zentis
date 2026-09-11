@@ -163,6 +163,7 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     }),
     source: "Uniswap v3 mainnet USDC/WETH, via The Graph",
     hours: 168,
+    granularity: "hours" as const,
     error: null,
   };
 

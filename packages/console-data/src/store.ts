@@ -1,6 +1,6 @@
 import { FORCED_ON_REFRESH, type Cache, createCache } from "./cache.js";
 import { createPriceReader } from "./prices.js";
-import { type Snapshot, QUOTE_SIZE_A, takeSnapshot } from "./snapshot.js";
+import { DEFAULT_MARKET_HOURS, type Snapshot, QUOTE_SIZE_A, takeSnapshot } from "./snapshot.js";
 
 /**
  * One poll loop, with no view framework in it.
@@ -24,6 +24,11 @@ export interface Store {
   /** poll now, e.g. because the operator asked for a re-quote */
   /** `force` re-reads the cheap sources regardless of cadence; the background poll does not */
   refresh(force?: boolean): Promise<void>;
+  /**
+   * The chart's window, in hours. The service draws a short window from individual swaps and a long
+   * one from hourly closes, so the window has to be asked for rather than cut from a week here.
+   */
+  setMarketHours(hours: number): void;
   start(): void;
   stop(): void;
 }
@@ -42,6 +47,7 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
   // Lives as long as the store: it holds each leg's history and the last block read, which is what
   // makes every read after the first a single small `eth_getLogs` rather than a week-long backfill.
   const prices = createPriceReader();
+  let marketHours = DEFAULT_MARKET_HOURS;
   let state: StoreState = { snapshot: null, loading: false, error: null, lastPollSeconds: null };
   const listeners = new Set<() => void>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -58,7 +64,7 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
     // held down would fan out into overlapping snapshots that finish out of order.
     if (inFlight !== null) return inFlight;
     set({ loading: true });
-    inFlight = takeSnapshot(quoteSize, cache, prices)
+    inFlight = takeSnapshot(quoteSize, cache, prices, marketHours)
       .then((snapshot) => {
         set({ snapshot, error: null, loading: false, lastPollSeconds: Math.floor(Date.now() / 1000) });
       })
@@ -78,6 +84,13 @@ export function createStore(quoteSize = QUOTE_SIZE_A, intervalMs = POLL_INTERVAL
       return () => listeners.delete(listener);
     },
     refresh,
+    setMarketHours(hours) {
+      if (hours === marketHours) return;
+      marketHours = hours;
+      // Straight to a poll: the operator pressed a key and expects the chart to change, and each
+      // window is cached under its own key both here and at the service, so this is cheap.
+      void refresh();
+    },
     start() {
       if (timer !== null) return;
       void refresh();

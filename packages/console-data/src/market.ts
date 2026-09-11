@@ -19,12 +19,21 @@ export interface MarketPoint {
   readonly mid: bigint;
 }
 
+/** How the service drew the series: from individual swaps, or from hourly closes. */
+export type Granularity = "swaps" | "hours";
+
 export interface MarkHistory {
   /** oldest first, so the line reads left to right as time moving forwards */
   readonly points: MarketPoint[];
   /** a sentence for the chart's title: which market this is and who indexed it */
   readonly source: string;
   readonly hours: number;
+  /**
+   * Short windows come back per swap and long ones hourly, and the chart says which: an hourly
+   * series drawn over one hour is two points and a straight line between them, which is not what the
+   * market did.
+   */
+  readonly granularity: Granularity;
   /** set when the series is stale; the points are still the last good ones */
   readonly error: string | null;
 }
@@ -33,8 +42,15 @@ interface RawHistory {
   points: { t: number; mid: string | null }[] | null;
   source?: string;
   hours?: number;
+  granularity?: string;
   error?: string | null;
 }
+
+/** The window's own endpoint. The service cuts and caches each window, so switching costs nothing. */
+export const markHistoryUrl = (hours: number): string => `${QUOTE_API_URL}/mark/history?hours=${hours}`;
+
+/** One cache entry per window, or flipping back would redraw the window before it. */
+export const marketCacheKey = (hours: number): string => `market:${hours}`;
 
 /** The payload as a series, or null when there is no series in it to draw. */
 export function parseMarkHistory(raw: RawHistory): MarkHistory | null {
@@ -48,12 +64,14 @@ export function parseMarkHistory(raw: RawHistory): MarkHistory | null {
     points,
     source: raw.source ?? "the market the book prices from",
     hours: raw.hours ?? 0,
+    // An older service that does not say drew the hourly series it always used to return.
+    granularity: raw.granularity === "swaps" ? "swaps" : "hours",
     error: raw.error ?? null,
   };
 }
 
-export async function fetchMarkHistory(): Promise<Read<MarkHistory>> {
-  const read = await json<RawHistory>(`${QUOTE_API_URL}/mark/history`);
+export async function fetchMarkHistory(hours: number): Promise<Read<MarkHistory>> {
+  const read = await json<RawHistory>(markHistoryUrl(hours));
   if (read.value === null) return failed(read.error ?? "the quote service returned no market history");
   const history = parseMarkHistory(read.value);
   if (history === null) return failed(read.value.error ?? "the market series came back empty");

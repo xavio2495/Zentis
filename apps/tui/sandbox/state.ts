@@ -17,6 +17,8 @@ export const fixedStore = (snapshot: Snapshot) => {
     getState: () => state,
     subscribe: () => () => undefined,
     refresh: async () => undefined,
+    // The fixed world has one recorded series, so a window change asks it for nothing.
+    setMarketHours: () => undefined,
     start: () => undefined,
     stop: () => undefined,
   };

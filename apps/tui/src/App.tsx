@@ -37,6 +37,9 @@ import { WINDOWS, autoWindow } from "./window.js";
 /** Fifteen seconds a leg, as asked: long enough to read a line, short enough to see all three. */
 export const ROTATE_MS = 15_000;
 
+/** What the chart asks for before the operator has chosen a window: the longest one. */
+const MARKET_HOURS_DEFAULT = 168;
+
 /** The pages, and the word the status bar names each one by. */
 export type Page = "live" | "positions" | "pnl" | "wallet" | "simulation";
 const PAGE_OF: Record<string, Page> = { positions: "positions", pnl: "pnl", wallet: "wallet", sim: "simulation" };
@@ -97,6 +100,17 @@ export function App({
   const [answer, setAnswer] = useState<{ text: string; bad: boolean } | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [recalled, setRecalled] = useState(0);
+
+  // The window the chart is drawing, asked of the service rather than cut from a week here: a short
+  // window comes back per swap, and an hour of hourly closes is two points and a straight line.
+  // Automatic asks for the longest, which is the series every shorter one is a cut of anyway.
+  const marketHours =
+    windowChoice === null
+      ? MARKET_HOURS_DEFAULT
+      : Math.max(1, Math.round((WINDOWS[windowChoice]?.seconds ?? 0) / 3600));
+  useEffect(() => {
+    store.setMarketHours(marketHours);
+  }, [store, marketHours]);
 
   useEffect(() => {
     store.start();
