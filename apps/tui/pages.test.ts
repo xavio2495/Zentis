@@ -99,3 +99,23 @@ test("the simulation moved out of the help overlay, which keeps its disclosures"
   expect(help).toContain("uncalibrated");
   expect(help).toContain("gains");
 }, 60_000);
+
+test("the positions page offers a rebalance for a leg whose reserves sit off the mid", async () => {
+  // Constructed rather than borrowed from the fixtures: whether a leg is off the mid on any given
+  // day is the market's business, and the panel has to be testable on the day it is not.
+  const frame = await drive(190, 50, { keys: ["p"], scenario: "pinned" });
+  const text = frame.lines.join("\n");
+  expect(text).toContain("rebalance");
+  // The move, sized from the leg's own balances against the mid, with the command to make it.
+  expect(text).toMatch(/push .*WETH|top up .*WETH/);
+  expect(text).toContain("scripts/rebalance.py");
+  expect(text).toContain("--only");
+  expect(frame.overflows).toBe(false);
+}, 60_000);
+
+test("a leg long of tokenB is told a top-up cannot fix it, and is offered no command", async () => {
+  const frame = await drive(190, 50, { keys: ["p"], scenario: "long" });
+  const text = frame.lines.join("\n");
+  expect(text).toMatch(/only adds|cannot/);
+  expect(text).not.toContain("scripts/rebalance.py --only arbitrum");
+}, 60_000);
