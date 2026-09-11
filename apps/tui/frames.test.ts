@@ -1,5 +1,16 @@
 import { expect, test } from "bun:test";
 import { drive } from "./sandbox/drive.js";
+import { SANDBOX_SEQ } from "./sandbox/world.js";
+
+import historySepolia from "../../packages/console-data/fixtures/history-sepolia.json" with { type: "json" };
+
+// Read from the fixtures rather than written down. Which publishes the feed shows changes every
+// time the fixtures are re-recorded, and a seq typed into a test turns an ordinary re-record into a
+// failure that looks like a rendering bug. What is asserted is that whatever seq the feed carries
+// arrives with all of its digits, not that it is any particular number.
+const FIXTURE_SEQS = [
+  ...new Set((historySepolia as { references: { seq: number }[] }).references.map((r) => String(r.seq))),
+];
 
 const SIZES: [number, number][] = [
   [190, 50],
@@ -31,10 +42,11 @@ test("numbers survive every width whole, which is what Ink's squeezing destroys"
     const text = (await drive(cols, rows, { armed: true })).lines.join("\n");
     // The seq is the cross-chain claim; a seq missing a digit is a different seq that still looks
     // like one. Same for a leg's shift in the feed.
-    // The status bar's seq is shed at the narrowest width, which is correct degradation; the feed's
-    // is not, so that is the one asserted everywhere.
-    expect(text).toContain("1789029519");
-    if (cols >= 120) expect(text).toContain("1789049382");
+    // Which seq the feed shows is not pinned: unchanged publishes fold into one row, so the newest
+    // one is usually inside a fold and the visible seq is whichever publish last moved a shift.
+    // What is pinned is that a seq the frame does show is one the fixtures contain, whole.
+    expect(FIXTURE_SEQS.some((seq) => text.includes(seq))).toBe(true);
+    if (cols >= 120) expect(text).toContain(String(SANDBOX_SEQ));
     // Squeezing eats the separators first, so a label running straight into its number is the
     // signature. Then: every seq in the frame is one the fixtures actually contain — a seq missing
     // a digit is a different seq that still looks like one.

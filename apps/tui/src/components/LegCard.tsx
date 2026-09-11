@@ -5,7 +5,7 @@ import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weig
 import { plot } from "../chart.js";
 import { quoted } from "../quoted.js";
 import { Panel, panelInner } from "./Panel.js";
-import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
+import { type Seg, fitSegments, fitTogether, padRows, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
 import { STATE, TERM, UI, legColour } from "../theme.js";
 
@@ -52,7 +52,7 @@ const REFUSAL_NAMES: Record<string, string> = {
   ZentisSeqMismatch: "seq moved",
 };
 
-function side(leg: LegSnapshot, isAToB: boolean, width: number): Seg[] | null {
+function sideVariants(leg: LegSnapshot, isAToB: boolean): Seg[][] | null {
   const quote = isAToB ? leg.quoteAToB : leg.quoteBToA;
   const [from, to] = isAToB ? [leg.config.tokenA, leg.config.tokenB] : [leg.config.tokenB, leg.config.tokenA];
   if (quote === null) return null;
@@ -63,8 +63,7 @@ function side(leg: LegSnapshot, isAToB: boolean, width: number): Seg[] | null {
     const refused = quote.refusal !== null || quote.caveats.some((c) => c.includes("refused"));
     const reason = quote.refusal === null ? null : (REFUSAL_NAMES[quote.refusal.error] ?? null);
     const pair = `${from.symbol} → ${to.symbol}`;
-    return fitSegments(
-      [
+    return [
         ...(reason === null
           ? []
           : [
@@ -81,30 +80,33 @@ function side(leg: LegSnapshot, isAToB: boolean, width: number): Seg[] | null {
           { text: `${pair}  `, color: UI.muted },
           { text: refused ? "refused by the router" : "not priced", color: UI.caveat },
         ],
-        [{ text: `${pair} ${refused ? "refused" : "unpriced"}`, color: UI.caveat }],
-      ],
-      width,
-    );
+      [{ text: `${pair} ${refused ? "refused" : "unpriced"}`, color: UI.caveat }],
+    ];
   }
   const inText = `${tokenAmount(quote.amountIn, from.decimals)} ${from.symbol}`;
   const outText = `${tokenAmount(quote.amountOut, to.decimals)} ${to.symbol}`;
   const off = offMidBps(quote, isAToB);
   const away = off === null ? "" : `  ${signed(off)} bps`;
-  return fitSegments(
+  // A tighter spelling before the distance is dropped altogether. The two sides differ by a couple
+  // of characters, and at a third of a 120-column terminal the longer one missed by exactly one, so
+  // without this step the pair loses the number that says how far off the mid the quote really is.
+  const tight = off === null ? "" : ` ${signed(off)} bps`;
+  return [
     [
-      [
-        { text: `${inText} → ${outText}`, color: UI.heading },
-        { text: away, color: UI.muted },
-      ],
-      [{ text: `${inText} → ${outText}`, color: UI.heading }],
-      [
-        { text: `→ ${outText}`, color: UI.heading },
-        { text: away, color: UI.muted },
-      ],
-      [{ text: `→ ${outText}`, color: UI.heading }],
+      { text: `${inText} → ${outText}`, color: UI.heading },
+      { text: away, color: UI.muted },
     ],
-    width,
-  );
+    [
+      { text: `${inText} → ${outText}`, color: UI.heading },
+      { text: tight, color: UI.muted },
+    ],
+    [{ text: `${inText} → ${outText}`, color: UI.heading }],
+    [
+      { text: `→ ${outText}`, color: UI.heading },
+      { text: tight, color: UI.muted },
+    ],
+    [{ text: `→ ${outText}`, color: UI.heading }],
+  ];
 }
 
 export function LegCard({
@@ -191,9 +193,11 @@ export function LegCard({
     }
   }
 
-  for (const isAToB of [true, false]) {
-    const segs = side(leg, isAToB, inner);
-    if (segs !== null) rows.push(<Segments segs={segs} />);
+  // Both sides are fitted against one another, so the pair never degrades unevenly: a card showing
+  // one side's distance from the mid and not the other's reads as the second side having none.
+  const sides = [true, false].map((isAToB) => sideVariants(leg, isAToB)).filter((v): v is Seg[][] => v !== null);
+  for (const segs of sides.length === 0 ? [] : fitTogether(sides, inner)) {
+    rows.push(<Segments segs={segs} />);
   }
   if (leg.sources.fills === null && leg.quoteAToB?.amountOut == null && position !== null) {
     const reason = spread?.tooStaleToQuote === true ? "reference too stale to quote" : "not priced";

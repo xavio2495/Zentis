@@ -28,7 +28,7 @@ interface TableRow {
 }
 
 /** A shift, and whether it is sitting on the leg's signed cap — where −500 is a limit, not a size. */
-function shiftCell(leg: LegSnapshot, tiltBps: number): Cell {
+export function shiftCell(leg: LegSnapshot, tiltBps: number): Cell {
   const cap = leg.position?.maxTiltBps ?? BOOK.maxTiltBps;
   const number: Seg = { text: signed(tiltBps), color: UI.heading };
   if (Math.abs(tiltBps) < cap) return [[number]];

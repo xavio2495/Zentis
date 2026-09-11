@@ -1,5 +1,5 @@
 import type { Snapshot } from "@zentis/console-data";
-import { ASSUMED_GAINS, BOOK, LEGS, PAIR, decomposeBook, loadSimReport, parseHistory, collapseFeed, mergeFeed, spreadStack, midOf, parseSeries, recomputeVolatility } from "@zentis/console-data";
+import { ASSUMED_GAINS, BOOK, LEGS, PAIR, bookTotals, collapseFeed, decomposeBook, legPnl, loadSimReport, mergeFeed, midOf, parseHistory, parseSeries, recomputeVolatility, spreadStack, type LegSnapshot } from "@zentis/console-data";
 import historySepolia from "../../../packages/console-data/fixtures/history-sepolia.json" with { type: "json" };
 import historyArbitrum from "../../../packages/console-data/fixtures/history-arbitrum-sepolia.json" with { type: "json" };
 import historyBase from "../../../packages/console-data/fixtures/history-base-sepolia.json" with { type: "json" };
@@ -39,12 +39,15 @@ const storedRef = (chainId: number, seq: number, updatedAt: bigint) => {
   };
 };
 
+/** The sandbox's own reference seq, exported so a test can name it without writing it down twice. */
+export const SANDBOX_SEQ = 1789049382;
+
 export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
   // Ages are what most of the scenarios differ by, so they are set here rather than baked into the
   // fixtures: the same recorded chain state, seen at a different moment.
   const ageSeconds = scenario === "stale" ? 4 * 3600 + 16 * 60 : 3 * 60;
   const updatedAt = BigInt(now - ageSeconds);
-  const seq = 1789049382;
+  const seq = SANDBOX_SEQ;
 
   const parsed = LEGS.map((leg) => ({
     leg,
@@ -114,6 +117,12 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
         };
       })(),
       finality: { head: 11_674_000n, finalized: 11_673_920n },
+      // A mainnet mark near the real one, so the sandbox's book is a plausible size rather than a
+      // testnet pool's fantasy. The hold effect is deliberately unknown here: the legs this world
+      // stands in for were shipped before the mark was recorded, and a sandbox that quietly had a
+      // number the live console cannot have would hide the case the screen has to render.
+      mark: { mainnetChainId: 1, mid: 405_837_064_044_766_950_299_015_618n, source: "1inch spot", readAtSeconds: now, error: null },
+      pnl: legPnl(entry.history, entry.leg.shipped, 405_837_064_044_766_950_299_015_618n, null),
       // Every source answered in the fake world; the outage scenario is the one that sets these.
       sources: { fills: null, registry: null, pool: null },
       caveats: spread.tooStaleToQuote
@@ -175,7 +184,9 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
               spread: null,
               quoteAToB: null,
               quoteBToA: null,
-              sources: { fills: refusal, registry: null, pool: null },
+              mark: null,
+        pnl: null,
+        sources: { fills: refusal, registry: null, pool: null },
             },
       ),
       feed: collapseFeed(mergeFeed(sepoliaOnly, 200), 40),
@@ -213,6 +224,8 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
       })),
       feed: [],
       sim: loadSimReport(),
+      book: bookTotals([]),
+      wallet: null,
       caveats: [],
     } as unknown as Snapshot;
   }
@@ -227,6 +240,10 @@ export function fakeSnapshot(scenario: Scenario, now = 1789050000): Snapshot {
     legs,
     feed: collapseFeed(mergeFeed(active.map((e) => e.history), 200), 40),
     sim: loadSimReport(),
+    // Derived, not written down: the sandbox's book has to be the one the legs above add up to, or
+    // a scenario would assert against a total no arrangement of its own legs could produce.
+    book: bookTotals(legs as LegSnapshot[]),
+    wallet: null,
     caveats: [],
   } as Snapshot;
 }

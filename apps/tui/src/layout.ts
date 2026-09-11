@@ -170,6 +170,26 @@ export const segWidth = (segs: Seg[]): number => segs.reduce((n, s) => n + s.tex
  * the floor, and it cuts at the end where an ellipsis is visible, rather than in the middle where a
  * deletion is not.
  */
+/**
+ * The first variant that fits every row, as an index into each row's own variant list.
+ *
+ * Rows that belong together have to degrade together. The card's two quote sides are the case:
+ * one is longer than the other, so fitting each on its own left the shorter side carrying its
+ * distance from the mid and the longer side not, and a reader comparing a number against a blank
+ * concludes the second side has no distance rather than that the card ran out of room.
+ *
+ * Falls back to the last index, where `fitSegments` truncates, exactly as fitting one row does.
+ */
+export function fitTogether(rows: Seg[][][], width: number): Seg[][] {
+  const depth = Math.min(...rows.map((variants) => variants.length))
+  for (let i = 0; i < depth; i += 1) {
+    if (rows.every((variants) => segWidth(variants[i]!) <= width)) {
+      return rows.map((variants) => variants[i]!)
+    }
+  }
+  return rows.map((variants) => fitSegments(variants.slice(depth - 1), width))
+}
+
 export function fitSegments(variants: Seg[][], width: number): Seg[] {
   for (const variant of variants) {
     if (segWidth(variant) <= width) return variant;

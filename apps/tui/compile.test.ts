@@ -17,6 +17,13 @@ const drive = (binary: string, keys: string) =>
     ],
     stdout: "pipe",
     stderr: "pipe",
+    // Colour depth is negotiated with the terminal, and the one a test runner inherits is whatever
+    // the machine happens to advertise: the same binary emits 24-bit codes under a truecolour
+    // terminal and 256-colour codes without COLORTERM, which made this assertion pass on one
+    // machine and fail on the next with nothing about the build having changed. The terminal is
+    // therefore stated rather than inherited, and what is proven is that the compile keeps the
+    // colour the terminal offers.
+    env: { ...process.env, COLORTERM: "truecolor", TERM: "xterm-256color" },
     timeout: 30_000,
   });
 
@@ -42,7 +49,7 @@ test("the compiled binary renders Ink and reads raw-mode input", () => {
     expect(screen).toContain("reading three chains"); // the app's own first frame
     expect(screen).toContain("[?25l"); // the cursor was hidden, i.e. Ink took the terminal
     expect(screen).not.toContain("Raw mode is not supported"); // stdin arrived as a tty
-    expect(screen).toContain("38;2;"); // truecolour survives the compile
+    expect(screen).toContain("38;2;"); // 24-bit colour survives the compile, given a terminal for it
     expect(run.exitCode).toBe(0); // and `x` unwound raw mode cleanly
   } finally {
     rmSync(dir, { recursive: true, force: true });
