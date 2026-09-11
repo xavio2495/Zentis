@@ -33,16 +33,19 @@
   },
   "position": {
     "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "strategyHash": "0xa590c4c406170f9b370530122499c23f429878c6acb6b3ff0a02431ac21747d7",
+    "strategyHash": "0xd37a493e8ba6bd3890c52520c0cfabb2e7a3026ee0eb57ecdc693e4830825190",
     "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
     "deadline": 1791500000,
-    "shipTx": "0x232afe34e7269e8c2461a3d6579139a0f1c7fc88a80705281fe0722c213fcb81",
-    "shipBlock": 307360558,
+    "shipTx": "0x06ea00dd6715866fcf51939fb765e010775547509462b1af381a4ab1f4f088c0",
+    "shipBlock": 307647451,
     "shippedBalanceA": "15000000",
+    "shippedBalanceB": "5807158169488297",
     "shippedAgainstRef": {
-      "seq": 1789027836
+      "mid": "387143877965886497353059054",
+      "seq": 1789099204
     },
     "widenBpsPerMinute": 2,
+    "maxTiltBps": 5000,
     "note": "Balances here are the shipped amounts; live balances come from the fills subgraph."
   },
   "fills": [
@@ -104,6 +107,22 @@
       "dockTx": "0x71a4a1cb4eadaddcf52b9d92946adbc68eb398badde81bc5a72240f5321ac9c0",
       "supersededBy": "0xa590c4c406170f9b370530122499c23f429878c6acb6b3ff0a02431ac21747d7",
       "reason": "re-shipped with widenBpsPerMinute 2 instead of 10"
+    },
+    {
+      "positionId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "strategyHash": "0xa590c4c406170f9b370530122499c23f429878c6acb6b3ff0a02431ac21747d7",
+      "maker": "0x4887B4695dEe830A341304bFEb14538E2442DD55",
+      "deadline": 1791500000,
+      "shipTx": "0x232afe34e7269e8c2461a3d6579139a0f1c7fc88a80705281fe0722c213fcb81",
+      "shipBlock": 307360558,
+      "shippedBalanceA": "15000000",
+      "shippedAgainstRef": {
+        "seq": 1789027836
+      },
+      "widenBpsPerMinute": 2,
+      "note": "Balances here are the shipped amounts; live balances come from the fills subgraph.",
+      "dockTx": "0x18c4bfabfa0024761414690f73b9e403fce2ef9a74fe90bffe0ddd4c87448fbb",
+      "supersededReason": "re-shipped sized to the reference mid with the testnet shift cap raised to 5000 bps"
     }
   ]
 }

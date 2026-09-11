@@ -14,7 +14,7 @@
       "pool": "0x46880b404CD35c165EDdefF7421019F8dD25F4Ad",
       "aqua": "0xb8790fd154f3c36c4d83e6e59f0550bae7cceff9",
       "app": "0xdd9752b377870bd9e41cd041f4a0e90770d0fb41",
-      "strategyHash": "0x0fdabb48ec2d0b5c4840cc8933bed9f2ba7f201b4e1f936f1d52b7becf401950",
+      "strategyHash": "0x6c034027e9e42b1c0aa9a1d3aa21e5dc08cf94e0322ea539ea78e5ea707f18db",
       "tokenA": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
       "tokenB": "0x4200000000000000000000000000000000000006",
       "registry": "0x2FE4cCe316287505ce114101b9d58c1f56d8E910"
@@ -24,7 +24,7 @@
       "pool": "0x66EEAB70aC52459Dd74C6AD50D578Ef76a441bbf",
       "aqua": "0x8F4f807C72a2BfAB4024e783f68Fc714d0Ce2bbe",
       "app": "0xfc603336a7b797f2d7eba03ed69734fad9ea521b",
-      "strategyHash": "0xa590c4c406170f9b370530122499c23f429878c6acb6b3ff0a02431ac21747d7",
+      "strategyHash": "0xd37a493e8ba6bd3890c52520c0cfabb2e7a3026ee0eb57ecdc693e4830825190",
       "tokenA": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
       "tokenB": "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73",
       "registry": "0xB7e37E396bBB785c346D1909231a9B3D2707Cd32"
@@ -34,7 +34,7 @@
       "pool": "0x6418eec70f50913ff0d756b48d32ce7c02b47c47",
       "aqua": "0xF86CdAeE90DB9901a5F104172294161085070C5A",
       "app": "0x57706A10f41d4649fE65de6D38c3eCe429D2d147",
-      "strategyHash": "0xc546fefc7855bf162c02c95bb5a125cf27cdec3d483b2c4c73c63c4b21333b7b",
+      "strategyHash": "0x212fec3f6b034be64fe532eab6585d962348c9d3900f828d10e493dd4407399b",
       "tokenA": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
       "tokenB": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
       "registry": "0xA5dCB9B329b17253FF35202dEb7a2093d06fd7b0"
