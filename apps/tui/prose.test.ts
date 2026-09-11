@@ -54,3 +54,17 @@ test("help gains a heading for each page it now explains", async () => {
     expect(help).toContain(heading);
   }
 }, 60_000);
+
+test("help scrolls rather than hiding what it could not fit", async () => {
+  // It explains five pages, the terms and how to arm the console, and at a hundred and twenty
+  // columns that is more rows than the region has. Trimming it until it fits would be trimming the
+  // explanation; the page moves instead, and says when there is more below it.
+  const first = (await drive(120, 40, { keys: ["?"] })).lines.join("\n");
+  expect(first).toMatch(/more below|↓/);
+  const scrolled = (await drive(120, 40, { keys: ["?", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN"] })).lines.join("\n");
+  expect(scrolled).toContain("leg detail");
+  expect(scrolled).toContain("terms");
+  // And back up again, to what it opened on.
+  const returned = (await drive(120, 40, { keys: ["?", "DOWN", "DOWN", "UP", "UP", "UP"] })).lines.join("\n");
+  expect(returned).toContain("what this is");
+}, 120_000);
