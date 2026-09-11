@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { SPINNER, spinnerFrame } from "./src/spinner.js";
+import { fakeSnapshot } from "./sandbox/world.js";
 import { drive } from "./sandbox/drive.js";
 
 /**

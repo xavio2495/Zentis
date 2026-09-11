@@ -357,10 +357,14 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
         // The quote service reads the same fills subgraph, so its quotes go with the position.
         quoteAToB: null,
         quoteBToA: null,
+        // The fills are where the count, the volume and the trading profit all come from, so they go
+        // with the position. A card reading "3 fills" beside "waiting on fills" was reporting the
+        // very thing that had not answered.
+        pnl: null,
         // The pool price is read over RPC, not from Studio, so a subgraph outage leaves it standing.
         // This scenario used to blank it too, which was true before the price moved off the subgraph
         // and is now an outage worse than the real one.
-        sources: { fills: refusal, registry: null, pool: null },
+        sources: { fills: refusal, registry: null, pool: null, fillsQuota: { remaining: 0, resetsAtSeconds: now + 3600 } },
         caveats: [`fills subgraph unavailable (${refusal})`],
       })),
       feed: [],
