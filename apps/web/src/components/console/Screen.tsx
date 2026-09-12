@@ -7,7 +7,10 @@ import { useLegAt, useReplay } from "@/lib/store";
 import { FillsPanel } from "./FillsPanel";
 import { ShiftPanel } from "./ShiftPanel";
 import { SimPanel, type SimSeed } from "./SimPanel";
+import { BookRow } from "./BookRow";
+import { FeedPanel } from "./FeedPanel";
 import { LegCard } from "./LegCard";
+import { PnlPanel } from "./PnlPanel";
 import { MarketPanel } from "./MarketPanel";
 import { MarkGlyph } from "./MarkGlyph";
 import { Transport } from "./Transport";
@@ -78,6 +81,8 @@ export function Screen() {
         />
       </div>
 
+      <BookRow book={replay?.book} providers={replay?.providers ?? []} />
+
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-12">
         <div className="grid min-h-0 grid-rows-[0.9fr_1fr_0.9fr] gap-2 xl:col-span-8">
           <MarketPanel legs={replay?.legs ?? []} market={replay?.market} playedTo={now?.atSeconds ?? null} />
@@ -105,6 +110,11 @@ export function Screen() {
           <SimPanel sim={sim} />
         </div>
       </main>
+
+      <section className="grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 lg:grid-cols-2">
+        <FeedPanel legs={replay?.legs ?? []} untilSeconds={now?.atSeconds ?? null} />
+        <PnlPanel legs={replay?.legs ?? []} book={replay?.book} />
+      </section>
 
       {/* The three legs across, below the charts: one position, said three times. */}
       <section className="grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 lg:grid-cols-3">
