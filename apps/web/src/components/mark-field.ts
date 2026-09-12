@@ -67,6 +67,9 @@ uniform float uCalmOn;
 uniform float uAspect;
 /** xyz: the cursor in this object's own space. w: the radius it clears. */
 uniform vec4 uDisperse;
+/** xy: where the light is. z: how far it carries. w: how much of the cloud is
+    held back to it — 0 leaves the whole cloud lit. */
+uniform vec4 uReveal;
 uniform float uDisperseAmount;
 varying vec3 vColor;
 varying float vAlpha;
@@ -113,6 +116,13 @@ void main() {
     float lit = aStain * uStain.w * near;
     vColor = mix(vColor, vec3(0.0, 0.929, 0.392), lit);
     vAlpha *= 1.0 + lit * 1.5;
+  }
+
+  // Some clouds are only there where the cursor is: the rest of them is not
+  // dimmed, it is simply not drawn.
+  if (uReveal.w > 0.0) {
+    float near = 1.0 - smoothstep(0.0, uReveal.z, length(p.xy - uReveal.xy));
+    vAlpha *= mix(1.0, near, uReveal.w);
   }
 
   // Type keeps a quiet around itself: points behind it are dimmed where they
@@ -239,6 +249,7 @@ function makeMaterial(reduced: boolean, door: { bottom: number; height: number }
       uCalmOn: { value: 0 },
       uAspect: { value: 1 },
       uDisperse: { value: new Vector4(0, 0, 0, 1) },
+      uReveal: { value: new Vector4(0, 0, 1, 0) },
       uDisperseAmount: { value: 0 },
     },
   });
@@ -385,7 +396,7 @@ function buildBorder(): { cloud: Cloud; along: Float32Array; offset: Float32Arra
     along[i] = (i + Math.random() * 0.9) / BORDER_POINTS;
     // a spray either side of the line rather than a rule drawn along it: packed
     // tightly enough and small enough, points stop reading as points
-    offset[i] = (Math.random() * 2 - 1) * Math.abs(Math.random()) * 0.24;
+    offset[i] = (Math.random() * 2 - 1) * Math.abs(Math.random()) * 0.17;
 
     const shade = 0.72 + Math.random() * 0.28;
     cloud.colors[i * 3] = shade;
@@ -394,7 +405,7 @@ function buildBorder(): { cloud: Cloud; along: Float32Array; offset: Float32Arra
     cloud.stain[i] = 1;
 
     const spot = bokehFocus();
-    cloud.sizes[i] = spot.size * 0.85;
+    cloud.sizes[i] = spot.size * 0.7;
     cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
   }
@@ -642,7 +653,14 @@ export function mountMarkField(host: HTMLElement): () => void {
       // the cursor comes to it, and it goes again when the cursor leaves.
       const wanted = dockRect.hovered ? 1 : 0;
       borderGlow += (wanted - borderGlow) * settle(dockRect.hovered ? 7 : 4);
-      borderMaterial.uniforms.uOpacity.value = 0.52 * borderGlow;
+      borderMaterial.uniforms.uOpacity.value = 0.62 * borderGlow;
+      // only the stretch of border the cursor is beside comes up
+      borderMaterial.uniforms.uReveal.value.set(
+        state.pointerWorldX,
+        state.pointerWorldY,
+        Math.max(halfHeight * 3.4, halfWidth * 0.5),
+        1,
+      );
       borderMaterial.uniforms.uTime.value = time;
       // the cursor's light and the space it clears, in the same world units
       borderMaterial.uniforms.uStain.value.set(
