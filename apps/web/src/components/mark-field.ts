@@ -16,6 +16,7 @@ import { BAR, sampleMark } from "@/lib/mark-geometry";
 import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state";
 import { markPosition } from "@/lib/mark-position";
 import { scrollNow } from "@/lib/scroll";
+import { calmRect } from "@/lib/calm";
 
 /**
  * The field: a doorway, the mark, and the light behind both.
@@ -29,7 +30,7 @@ import { scrollNow } from "@/lib/scroll";
  * without a canvas; everything here only applies what it returns.
  */
 
-const COUNT = 6000;
+const COUNT = 9000;
 const MARK_SCALE = 9;
 
 /** The gate: an equilateral triangle standing on its point, the mark inside it. */
@@ -58,6 +59,10 @@ uniform float uGateBottom;
 uniform float uGateHeight;
 /** xy: where the cursor is, in this object's own space. z: reach. w: strength. */
 uniform vec4 uStain;
+/** xy: centre of the quiet the type keeps. zw: its half extents. */
+uniform vec4 uCalm;
+uniform float uCalmOn;
+uniform float uAspect;
 /** xyz: the cursor in this object's own space. w: the radius it clears. */
 uniform vec4 uDisperse;
 uniform float uDisperseAmount;
@@ -98,11 +103,23 @@ void main() {
   vAlpha = twinkle * fade * smoothstep(0.12, 1.1, depth) * (1.0 - uScatter * 0.55);
   gl_Position = projectionMatrix * mv;
 
-  // The green is the cursor's own light: it falls on what is near it and
-  // nothing else.
+  // The green is the cursor's own light: it falls on what is near it, and what
+  // it falls on burns a little brighter, so the lit part reads as a glow rather
+  // than as a patch of different paint.
   if (uStain.w > 0.0) {
     float near = 1.0 - smoothstep(0.0, uStain.z, length(p.xy - uStain.xy));
-    vColor = mix(vColor, vec3(0.0, 0.929, 0.392), aStain * uStain.w * near);
+    float lit = aStain * uStain.w * near;
+    vColor = mix(vColor, vec3(0.0, 0.929, 0.392), lit);
+    vAlpha *= 1.0 + lit * 1.5;
+  }
+
+  // Type keeps a quiet around itself: points behind it are dimmed where they
+  // are rather than moved out of the way.
+  if (uCalmOn > 0.0) {
+    vec2 sp = gl_Position.xy / max(gl_Position.w, 1e-4);
+    sp.x *= uAspect;
+    vec2 away = max(abs(sp - uCalm.xy) - uCalm.zw, vec2(0.0));
+    vAlpha *= 1.0 - uCalmOn * 0.78 * (1.0 - smoothstep(0.0, 0.42, length(away)));
   }
 }
 `;
@@ -152,9 +169,11 @@ interface Cloud {
  */
 function fineFocus(): { size: number; soft: number } {
   const roll = Math.random();
-  if (roll < 0.72) return { size: 0.045 + Math.random() * 0.045, soft: 0.08 };
-  if (roll < 0.93) return { size: 0.1 + Math.random() * 0.08, soft: 0.4 };
-  return { size: 0.2 + Math.random() * 0.2, soft: 1 };
+  // a core of small sharp points, then a halo tier: without the soft ones the
+  // mark reads as a stipple rather than as a body of light
+  if (roll < 0.58) return { size: 0.045 + Math.random() * 0.045, soft: 0.08 };
+  if (roll < 0.85) return { size: 0.1 + Math.random() * 0.09, soft: 0.45 };
+  return { size: 0.24 + Math.random() * 0.3, soft: 1 };
 }
 
 function bokehFocus(): { size: number; soft: number } {
@@ -166,9 +185,9 @@ function bokehFocus(): { size: number; soft: number } {
 
 function distantFocus(): { size: number; soft: number } {
   const roll = Math.random();
-  if (roll < 0.74) return { size: 0.05 + Math.random() * 0.06, soft: 0.12 };
-  if (roll < 0.93) return { size: 0.14 + Math.random() * 0.12, soft: 0.6 };
-  return { size: 0.34 + Math.random() * 0.4, soft: 1 };
+  if (roll < 0.62) return { size: 0.08 + Math.random() * 0.08, soft: 0.15 };
+  if (roll < 0.88) return { size: 0.2 + Math.random() * 0.16, soft: 0.65 };
+  return { size: 0.46 + Math.random() * 0.5, soft: 1 };
 }
 
 function emptyCloud(count: number): Cloud {
@@ -214,6 +233,9 @@ function makeMaterial(reduced: boolean, door: { bottom: number; height: number }
       uGateBottom: { value: door.bottom },
       uGateHeight: { value: door.height },
       uStain: { value: new Vector4(0, 0, 1, 0) },
+      uCalm: { value: new Vector4(0, 0, 0, 0) },
+      uCalmOn: { value: 0 },
+      uAspect: { value: 1 },
       uDisperse: { value: new Vector4(0, 0, 0, 1) },
       uDisperseAmount: { value: 0 },
     },
@@ -528,6 +550,19 @@ export function mountMarkField(host: HTMLElement): () => void {
       MARK_CLEARS,
     );
     markMaterial.uniforms.uDisperseAmount.value = disperse;
+
+    // The type's quiet applies to everything drawn behind it.
+    const aspect = innerWidth / innerHeight;
+    for (const material of [markMaterial, doorMaterial, starMaterial]) {
+      material.uniforms.uCalm.value.set(
+        calmRect.x,
+        calmRect.y,
+        calmRect.halfWidth,
+        calmRect.halfHeight,
+      );
+      material.uniforms.uCalmOn.value = calmRect.on ? 1 : 0;
+      material.uniforms.uAspect.value = aspect;
+    }
 
     doorGroup.scale.setScalar(state.doorScale);
     doorMaterial.uniforms.uOpacity.value = state.doorOpacity;

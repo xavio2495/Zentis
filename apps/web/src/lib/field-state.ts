@@ -239,7 +239,7 @@ export function fieldState({
 
   // The far field is faint behind the closed gate and opens up as it goes. It
   // never leaves: it is the room the rest of the page happens in.
-  const starfieldOpacity = 0.12 + 0.43 * eased;
+  const starfieldOpacity = 0.34 + 0.34 * eased;
 
   // While the gate stands, the mark answers the cursor — held inside the gate,
   // so it can be led anywhere within the frame without escaping it. The hold

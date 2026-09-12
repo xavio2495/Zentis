@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { markPosition } from "@/lib/mark-position";
+import { calmRect, toNdcRect } from "@/lib/calm";
 
 /**
  * The two lines under the wordmark, each with a transparent copy behind it that
@@ -28,6 +29,22 @@ export function HeroLines({
     const painted = nodes.map(() => -1);
 
     const frame = () => {
+      // the block the two lines occupy, reported so the field can keep quiet
+      // behind it
+      const first = nodes[0].getBoundingClientRect();
+      const last = nodes[nodes.length - 1].getBoundingClientRect();
+      const left = Math.min(first.left, last.left);
+      const right = Math.max(first.right, last.right);
+      const box = {
+        left,
+        top: first.top,
+        width: right - left,
+        height: last.bottom - first.top,
+      };
+      const onScreen = box.height > 0 && first.top < innerHeight && last.bottom > 0;
+      if (onScreen) Object.assign(calmRect, toNdcRect(box, innerWidth, innerHeight));
+      calmRect.on = onScreen;
+
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         const box = node.getBoundingClientRect();
@@ -59,7 +76,10 @@ export function HeroLines({
     };
 
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      calmRect.on = false;
+    };
   }, []);
 
   return (
