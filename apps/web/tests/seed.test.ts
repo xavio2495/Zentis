@@ -20,8 +20,15 @@ const seed = <T,>(name: string): T =>
   JSON.parse(readFileSync(join(import.meta.dir, "..", "public", "seed", name), "utf8")) as T;
 const source = <T,>(path: string): T => JSON.parse(readFileSync(join(root, path), "utf8")) as T;
 
-interface Round { seq: number; atSeconds: number; tiltBps: number; mid: string }
-interface Fill { atSeconds: number; transaction: string; amountIn: string; amountOut: string; isAToB: boolean }
+interface Round { seq: number; atSeconds: number; tiltBps: number; mid: string; referenceChanged: boolean }
+interface Fill {
+  atSeconds: number;
+  transaction: string;
+  amountIn: string;
+  amountOut: string;
+  isAToB: boolean;
+  thisGeneration: boolean;
+}
 interface Leg {
   chainId: number;
   name: string;
@@ -113,9 +120,7 @@ test("the seed says which fills belong to the generation now shipped, as the con
   // The two surfaces must agree about the span a number covers. The console's totals are this
   // generation's because hold is; the replay marks each fill the same way rather than leaving the
   // web to invent its own rule.
-  const replay = seed<Replay & { legs: (Leg & { shippedAtSeconds: number | null; fills: (Fill & { thisGeneration: boolean })[] })[] }>(
-    "replay.json",
-  );
+  const replay = seed<Replay & { legs: (Leg & { shippedAtSeconds: number | null })[] }>("replay.json");
   for (const leg of replay.legs) {
     expect(leg.shippedAtSeconds).toBeGreaterThan(0);
     for (const fill of leg.fills) {
@@ -131,7 +136,7 @@ test("a round where the reference changed source is marked, because its shift is
   // On 2026-09-11 the fast workflow moved from per-leg pool mids to one mainnet mid, and the
   // published mid jumped twelvefold in a single round. The shifts slammed into the band, which
   // reads as a market event and was not one.
-  const replay = seed<Replay & { legs: (Leg & { rounds: (Round & { referenceChanged: boolean })[] })[] }>("replay.json");
+  const replay = seed<Replay>("replay.json");
   const marked = replay.legs.flatMap((leg) => leg.rounds.filter((round) => round.referenceChanged));
   expect(marked.length).toBeGreaterThan(0);
   // One cutover, not a flag on every other round.

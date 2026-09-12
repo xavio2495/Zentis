@@ -201,7 +201,7 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
       // stopped being the case the live console shows the moment the records were backfilled. The
       // outage scenario is where an unvaluable book is still drawn.
       mark: { mainnetChainId: 1, mid: MARK_MID, source: "1inch spot", readAtSeconds: now, error: null },
-      pnl: legPnl(entry.history, entry.leg.shipped, MARK_MID, entry.leg.shipped.markAtShip),
+      pnl: legPnl(entry.history, entry.leg.shipped, MARK_MID, entry.leg.shipped.markAtShip, entry.leg.generations),
       // Every source answered in the fake world, except a venue that no longer exists to answer:
       // the outage scenario is the one that sets the others.
       sources: {

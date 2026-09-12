@@ -16,6 +16,14 @@ export interface Round {
   readonly tiltBps: number;
   /** raw token-B per 1e18 raw token-A, as a decimal string */
   readonly mid: string;
+  /**
+   * True where the published mid changed source rather than moved.
+   *
+   * The fast workflow moved from per-leg pool mids to one mainnet mid on 2026-09-11 and the mid
+   * jumped twelvefold in a single round, taking every leg's shift into its band. On a chart that
+   * reads as a market event; it was not one, and no statistic should be computed across it.
+   */
+  readonly referenceChanged?: boolean;
 }
 
 export interface Fill {
@@ -26,6 +34,8 @@ export interface Fill {
   readonly isAToB: boolean;
   /** what the leg was quoting when it was taken */
   readonly refTiltBps: number;
+  /** whether this fill belongs to the generation now shipped, as the console counts it */
+  readonly thisGeneration?: boolean;
 }
 
 export interface Leg {
@@ -38,6 +48,8 @@ export interface Leg {
   /** what the position committed, as raw amounts, from the deployment record */
   readonly balanceA: string;
   readonly balanceB: string;
+  /** when the generation now shipped was shipped */
+  readonly shippedAtSeconds?: number | null;
   readonly rounds: Round[];
   readonly fills: Fill[];
   readonly rejections: { atSeconds: number; transaction: string; reason: string }[];

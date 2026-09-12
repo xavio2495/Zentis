@@ -230,7 +230,15 @@ export async function takeSnapshot(
       pnl:
         history.value === null
           ? null
-          : legPnl(history.value, config.shipped, mark?.mid ?? null, config.shipped.markAtShip),
+          : legPnl(
+              history.value,
+              config.shipped,
+              mark?.mid ?? null,
+              config.shipped.markAtShip,
+              // How many generations the lifetime figures cover, so the line that reports them can
+              // say what span it is talking about.
+              config.generations,
+            ),
       sources: {
         fills: history.value === null ? history.error : null,
         registry: ref.value === null ? ref.error : null,

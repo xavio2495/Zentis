@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { BOOK, type FoldedRow, type LegSnapshot, type Snapshot, foldRounds } from "@zentis/console-data";
+import { BOOK, type FoldedRow, type LegSnapshot, type Snapshot, foldRounds, referenceChanges } from "@zentis/console-data";
 import { duration, signed, tokenAmount } from "../format.js";
 import { type Seg, fitSegments, padRows, segWidth, trunc } from "../layout.js";
 import { Segments } from "./Segments.js";
@@ -49,7 +49,13 @@ function absentCell(leg: LegSnapshot): Cell {
   return leg.sources.fills !== null ? cell("unread", UI.caveat) : cell("–", UI.muted);
 }
 
-function tableRow(row: FoldedRow, snapshot: Snapshot, ordered: LegSnapshot[]): TableRow {
+function tableRow(
+  row: FoldedRow,
+  snapshot: Snapshot,
+  ordered: LegSnapshot[],
+  /** seqs where the published mid changed source rather than moved */
+  changed: Set<number> = new Set(),
+): TableRow {
   const ago = (t: bigint) => duration(snapshot.takenAtSeconds - Number(t));
 
   if (row.kind === "round" || row.kind === "fold") {
@@ -67,7 +73,16 @@ function tableRow(row: FoldedRow, snapshot: Snapshot, ordered: LegSnapshot[]): T
           [{ text: String(row.seq), color: UI.heading }],
         ],
         legs,
-        note: [],
+        // A round where the mid came from somewhere else than the one before it. Every leg's shift
+        // jumps at that round and none of it is a price move; a reader looking at the row without
+        // this note is looking at a market event that did not happen.
+        note: changed.has(row.seq)
+          ? [
+              [{ text: "the reference changed source here", color: UI.caveat }],
+              [{ text: "reference changed source", color: UI.caveat }],
+              [{ text: "new reference", color: UI.caveat }],
+            ]
+          : [],
       };
     }
     return {
@@ -212,9 +227,12 @@ function table(
     ...LEG_ORDER.flatMap((id) => snapshot.legs.filter((l) => l.config.chainId === id)),
     ...snapshot.legs.filter((l) => !(LEG_ORDER as readonly number[]).includes(l.config.chainId)),
   ];
+  // Computed over the whole feed rather than the visible slice: a cutover falls where it falls, and
+  // whether its row is on screen must not change what the row says.
+  const changed = referenceChanges(snapshot.feed);
   const groups = mergeRefusals(rows).slice(0, limit);
   const built = groups.map((group) =>
-    group.length > 1 ? refusalRow(group, snapshot, ordered) : tableRow(group[0]!, snapshot, ordered),
+    group.length > 1 ? refusalRow(group, snapshot, ordered) : tableRow(group[0]!, snapshot, ordered, changed),
   );
   const headers: TableRow = {
     when: cell("when", UI.muted),

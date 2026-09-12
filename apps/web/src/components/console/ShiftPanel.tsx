@@ -82,6 +82,22 @@ export function ShiftPanel({ leg }: { leg: Leg | null }) {
             stroke="var(--color-em)"
             strokeWidth="2"
           />
+          {/* Where the reference changed source. The shift either side of it was quoted against a
+              different mid, so the step is not a price move and the line is not continuous. */}
+          {leg.rounds.map((round, index) =>
+            round.referenceChanged === true ? (
+              <line
+                key={`ref${round.seq}`}
+                x1={plot.points[index]?.x ?? 0}
+                y1="0"
+                x2={plot.points[index]?.x ?? 0}
+                y2={HEIGHT}
+                stroke="var(--color-warn)"
+                strokeWidth="1"
+                strokeDasharray="2 3"
+              />
+            ) : null,
+          )}
           {state.inWindow.map((fill) => (
             <g key={fill.transaction}>
               <line
@@ -101,6 +117,9 @@ export function ShiftPanel({ leg }: { leg: Leg | null }) {
         <p className="m-0 text-[10px] text-ink-faint">
           {plot.edgeVisible ? "dashed: this leg’s own cap · " : `the cap is ±${leg.maxTiltBps} bps, well outside this scale · `}
           vertical: a fill inside this window · the faint line is the rest of the recording
+          {leg.rounds.some((round) => round.referenceChanged === true)
+            ? " · dotted amber: the reference changed source here, so the step across it is not a price move"
+            : ""}
         </p>
       </div>
     </Panel>

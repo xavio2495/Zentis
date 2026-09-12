@@ -312,6 +312,35 @@ const sameShifts = (a: FeedRound, b: FeedRound): boolean =>
 	a.legs.length === b.legs.length &&
 	a.legs.every((leg) => b.legs.some((other) => other.chainId === leg.chainId && other.tiltBps === leg.tiltBps))
 
+/**
+ * The rounds where the published mid changed source rather than moved.
+ *
+ * On 2026-09-11 the fast workflow moved from per-leg pool mids to one mainnet mid: the published
+ * mid jumped twelvefold between two publishes and every leg's shift went into its band. On a feed
+ * or a chart that reads as a market event, and it was not one — the shift either side of it was
+ * quoted against a different number, so the series is not continuous across it and no statistic
+ * should be computed over it.
+ *
+ * A factor of three either way, which no market reaches between two publishes minutes apart, and
+ * which the twelvefold cutover clears easily. Returns the seqs, since that is what a row carries.
+ */
+export function referenceChanges(rows: readonly FeedRow[]): Set<number> {
+	const changed = new Set<number>()
+	// Newest first, as the feed is ordered: the row after each one in the list is the one before it
+	// in time.
+	const rounds = rows.filter((row): row is FeedRound => row.kind === 'round')
+	for (let i = 0; i < rounds.length - 1; i += 1) {
+		const now = rounds[i]!
+		const before = rounds[i + 1]!
+		for (const leg of now.legs) {
+			const previous = before.legs.find((other) => other.chainId === leg.chainId)
+			if (previous === undefined || previous.mid === 0n || leg.mid === 0n) continue
+			if (leg.mid > previous.mid * 3n || leg.mid * 3n < previous.mid) changed.add(now.seq)
+		}
+	}
+	return changed
+}
+
 export function foldRounds(rows: FeedRow[]): FoldedRow[] {
 	const out: FoldedRow[] = []
 	for (let i = 0; i < rows.length; ) {

@@ -39,6 +39,37 @@ interface History {
 
 const recordedAt = read<{ seconds: number }>("packages/console-data/fixtures/recorded-at.json");
 
+/**
+ * When each leg's current generation was shipped, from its deployment record.
+ *
+ * The position keeps every fill it ever took, across re-ships. The console's totals cover the
+ * generation now shipped — they have to, because hold values what *that* generation was shipped
+ * with — so the replay marks its fills the same way rather than inventing a second rule for the
+ * web.
+ */
+interface Deployment {
+  position: { markAtShipAt?: number | null; shipBlock?: number | null };
+}
+const shippedAt = (name: string): number | null =>
+  read<Deployment>(`contracts/deployments/${name}.json`).position.markAtShipAt ?? null;
+
+/**
+ * A round where the published mid changed by more than half again, either way.
+ *
+ * On 2026-09-11 the fast workflow moved from per-leg pool mids to one mainnet mid and the published
+ * mid jumped twelvefold in a single round; every leg's shift slammed into its band. That reads as a
+ * market event on a chart and was not one — it is the reference changing source — so the round is
+ * marked and the surface drawing it says so.
+ */
+const CHANGED_BY = BigInt(3); // a third or triple, which no market move between two publishes will reach
+const referenceChanged = (mid: string, previous: string | null): boolean => {
+  if (previous === null) return false;
+  const now = BigInt(mid);
+  const before = BigInt(previous);
+  if (before === BigInt(0) || now === BigInt(0)) return false;
+  return now > before * CHANGED_BY || now * CHANGED_BY < before;
+};
+
 const legs = LEGS.map((leg) => {
   const history = read<History>(leg.file);
   return {
@@ -51,9 +82,14 @@ const legs = LEGS.map((leg) => {
     balanceA: history.position.balanceA,
     balanceB: history.position.balanceB,
     // Oldest first: the indexer answers newest first and a replay plays forwards.
+    shippedAtSeconds: shippedAt(leg.name),
     rounds: [...history.references]
       .map((r) => ({ seq: r.seq, atSeconds: Number(r.timestamp), tiltBps: r.tiltBps, mid: r.mid }))
-      .sort((a, b) => a.atSeconds - b.atSeconds),
+      .sort((a, b) => a.atSeconds - b.atSeconds)
+      .map((round, index, all) => ({
+        ...round,
+        referenceChanged: referenceChanged(round.mid, index === 0 ? null : all[index - 1]!.mid),
+      })),
     fills: [...history.fills]
       .map((f) => ({
         atSeconds: Number(f.timestamp),
@@ -64,6 +100,7 @@ const legs = LEGS.map((leg) => {
         // What the leg was quoting when it was taken, which is the whole point of showing the fill
         // on the same axis as the shift.
         refTiltBps: f.refTiltBps,
+        thisGeneration: shippedAt(leg.name) !== null && Number(f.timestamp) >= shippedAt(leg.name)!,
       }))
       .sort((a, b) => a.atSeconds - b.atSeconds),
     rejections: [...history.rejections]

@@ -106,6 +106,27 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
       ]}
     />,
   );
+  // The position's whole life, on its own line under the book. The table above is this generation's
+  // — it has to be, because hold is — and a reader who remembers six fills where the table says
+  // three is owed the other number rather than left to wonder which is wrong.
+  const lives = legs.map((leg) => leg.pnl?.lifetime).filter((life): life is NonNullable<typeof life> => life != null);
+  if (lives.length > 0 && lives.some((life) => life.fills > 0)) {
+    const lifeTrading = lives.every((life) => life.tradingA !== null)
+      ? lives.reduce((sum, life) => sum + (life.tradingA ?? 0n), 0n)
+      : null;
+    const lifeFills = lives.reduce((sum, life) => sum + life.fills, 0);
+    const generations = lives.reduce((sum, life) => sum + (life.generations ?? 0), 0);
+    const tokenA = legs[0]?.config.tokenA ?? null;
+    const said =
+      `since first ship: ${lifeTrading === null || tokenA === null ? "—" : `${lifeTrading > 0n ? "+" : ""}${tokenAmount(lifeTrading, tokenA.decimals)} ${tokenA.symbol}`}` +
+      ` over ${lifeFills} fills, ${generations} generations across ${lives.length} legs`;
+    rows.push(
+      <Text key="lifetime" color={UI.muted}>
+        {trunc(said, width)}
+      </Text>,
+    );
+  }
+
   rows.push(<Text key="sp"> </Text>);
 
   // What the book is marked at, and why hold is unknown, are in help under this page's heading. What
