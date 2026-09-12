@@ -144,3 +144,39 @@ describe("the scrollbars are ours", () => {
     expect(css.slice(note, css.indexOf("{", note))).toMatch(/\.tnum\s*$/);
   });
 });
+
+describe("the bars across the top", () => {
+  const screen = () => source("components", "console", "Screen.tsx");
+  const book = () => source("components", "console", "BookRow.tsx");
+
+  test("the header centres its middle group instead of leaving it to justify-between", () => {
+    // Three groups of unequal width under `justify-between` puts the middle one wherever the
+    // outer two leave it, which is never the middle.
+    expect(screen()).not.toMatch(/<header[^>]*justify-between/);
+    expect(screen()).toMatch(/<header[^>]*grid-cols-\[/);
+  });
+
+  test("no divider is drawn on the spacer that holds the two groups apart", () => {
+    // `divide-x` borders every child but the first — including a `flex-1` spacer, which then
+    // draws a rule floating in the empty middle of the bar.
+    const bar = screen().slice(screen().indexOf('<div className="flex'), screen().indexOf("<BookRow"));
+    if (bar.includes("flex-1")) expect(bar).not.toMatch(/divide-x/);
+  });
+
+  test("the stat bar can grow rather than clipping its own numbers", () => {
+    // A two-line Stat in a fixed h-9 clips the value at narrow widths — the unit goes first,
+    // which on this screen is the one part of a number that may not be dropped.
+    const bar = screen().slice(screen().indexOf("<header"), screen().indexOf("<BookRow"));
+    expect(bar).not.toMatch(/className="flex h-9 shrink-0/);
+  });
+
+  test("the two seqs on adjacent rows are not both called seq", () => {
+    // The stat bar's seq is the round the playhead is on; the book row's is the moment the
+    // snapshot was recorded. Two different numbers under one label on touching rows is the
+    // screen inviting a reader to think one of them moved.
+    const statLabels = [...screen().matchAll(/label="([^"]+)"/g)].map((m) => m[1]);
+    const bookLabels = [...book().matchAll(/label="([^"]+)"/g)].map((m) => m[1]);
+    const shared = statLabels.filter((label) => bookLabels.includes(label));
+    expect(shared).toEqual([]);
+  });
+});
