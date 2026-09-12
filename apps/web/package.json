@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "bun run ../tui/scripts/publish-console.ts && next build",
-    "start": "next start",
+    "start": "bun run scripts/serve.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
