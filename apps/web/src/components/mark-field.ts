@@ -40,7 +40,7 @@ const GATE_RISING = 320;
 /** How readily the gate takes the cursor's green. */
 const GATE_STAIN = 0.85;
 
-const BORDER_POINTS = 620;
+const BORDER_POINTS = 420;
 const STARS_NEAR = 700;
 const STARS_FAR = 900;
 
@@ -382,9 +382,10 @@ function buildBorder(): { cloud: Cloud; along: Float32Array; offset: Float32Arra
   const offset = new Float32Array(BORDER_POINTS);
 
   for (let i = 0; i < BORDER_POINTS; i++) {
-    along[i] = (i + Math.random() * 0.85) / BORDER_POINTS;
-    // most sit on the line, a few drift off it
-    offset[i] = (Math.random() * 2 - 1) * Math.abs(Math.random()) * 0.09;
+    along[i] = (i + Math.random() * 0.9) / BORDER_POINTS;
+    // a spray either side of the line rather than a rule drawn along it: packed
+    // tightly enough and small enough, points stop reading as points
+    offset[i] = (Math.random() * 2 - 1) * Math.abs(Math.random()) * 0.24;
 
     const shade = 0.72 + Math.random() * 0.28;
     cloud.colors[i * 3] = shade;
@@ -393,7 +394,7 @@ function buildBorder(): { cloud: Cloud; along: Float32Array; offset: Float32Arra
     cloud.stain[i] = 1;
 
     const spot = bokehFocus();
-    cloud.sizes[i] = spot.size * 0.55;
+    cloud.sizes[i] = spot.size * 0.85;
     cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
   }

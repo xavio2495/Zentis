@@ -63,32 +63,39 @@ export function InstallDock() {
 
   return (
     <div ref={host} className="install-dock">
-      <span
-        role="status"
-        className="pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 text-em text-fs-0 transition-opacity duration-300"
-        style={{ opacity: copied ? 1 : 0 }}
-      >
-        {COPY.installCopied}
-      </span>
-
       <button
         type="button"
         data-magnetic
+        title={COPY.installHint}
+        aria-label={COPY.installHint}
         onClick={() => {
           navigator.clipboard?.writeText(INSTALL_COMMAND).then(
             () => setCopied(true),
             () => setCopied(false),
           );
         }}
-        className="flex max-w-[92vw] items-center gap-3 px-6 py-4 text-left"
+        className="flex max-w-[92vw] items-center gap-4 px-6 py-4 text-left"
       >
         <span className="select-none text-ink-faint">$</span>
         <code className="overflow-hidden text-ellipsis whitespace-nowrap font-mono text-fs-0 text-ink">
           {INSTALL_COMMAND}
         </code>
+        <span className={`dock-icon ${copied ? "done" : ""}`} aria-hidden="true">
+          {copied ? (
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.6" stroke="currentColor">
+              <rect x="9" y="9" width="11" height="11" rx="2" />
+              <path
+                strokeLinecap="round"
+                d="M5 15V6a2 2 0 0 1 2-2h9"
+              />
+            </svg>
+          )}
+        </span>
       </button>
-
-      <p className="label-sm mt-2 text-center text-ink-faint">{COPY.installHint}</p>
     </div>
   );
 }
