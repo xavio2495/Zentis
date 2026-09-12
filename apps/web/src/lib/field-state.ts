@@ -168,6 +168,8 @@ export interface FieldState {
   depthRatio: number;
   /** 0 while the install line rides the foot of the page, 1 once it is centred. */
   installDock: number;
+  /** 0 while the mark is still a blob, 1 once it has gathered into the logo. */
+  markForm: number;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -206,6 +208,11 @@ export function fieldState({
   // rather than crossing it on the way.
   const traverse = clamp(scrollY / (viewportHeight * 1.5), 0, 1);
   const eased = easeOut(traverse);
+
+  // The mark arrives as a ball of light and gathers into the logo on the way
+  // through, finishing a little before the traverse does so the shape is
+  // settled rather than still moving when the reader arrives at it.
+  const markForm = easeOut(clamp(scrollY / (viewportHeight * 1.25), 0, 1));
 
   const positionZ = -34 + 34 * eased;
   const scale = 0.32 + 0.68 * eased;
@@ -293,6 +300,7 @@ export function fieldState({
     pointerPresent: !!pointer,
     depthRatio,
     installDock,
+    markForm,
     proseFrom,
     outroFrom,
   };

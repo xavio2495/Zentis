@@ -33,6 +33,8 @@ import { dockRect } from "@/lib/dock";
 
 const COUNT = 9000;
 const MARK_SCALE = 9;
+/** Half the width of the ball the mark arrives as, in the mark's own units. */
+const BLOB_RADIUS = 3.6;
 
 /** The gate: an equilateral triangle standing on its point, the mark inside it. */
 const GATE_EDGE = 1500;
@@ -52,6 +54,8 @@ attribute float aPhase;
 attribute float aRise;
 attribute float aStain;
 attribute vec3 aScatterDir;
+attribute vec3 aSphere;
+attribute float aFormDelay;
 uniform float uScale;
 uniform float uTime;
 uniform float uMotion;
@@ -70,6 +74,8 @@ uniform vec4 uDisperse;
 /** xy: where the light is. z: how far it carries. w: how much of the cloud is
     held back to it — 0 leaves the whole cloud lit. */
 uniform vec4 uReveal;
+/** 0 while this cloud is still a blob, 1 once it has gathered into its shape. */
+uniform float uForm;
 uniform float uDisperseAmount;
 varying vec3 vColor;
 varying float vAlpha;
@@ -78,7 +84,24 @@ varying float vSoft;
 void main() {
   vColor = aColor;
   vSoft = aSoft;
-  vec3 p = position + aScatterDir * uScatter;
+
+  // Every point has two homes: somewhere in the ball the mark arrives as, and
+  // its place in the shape. Each joins on its own beat, so the mark gathers
+  // rather than appearing all at once.
+  float join = smoothstep(aFormDelay * 0.45, 1.0, uForm);
+  vec3 p = mix(aSphere, position, join);
+
+  // While it is still a ball it breathes, and the breathing goes as it forms —
+  // the shape has to arrive still.
+  float loose = 1.0 - join;
+  if (loose > 0.001) {
+    float wobble = 0.36 * loose * uMotion;
+    p.x += sin(uTime * 0.9 + aPhase * 2.1) * wobble;
+    p.y += sin(uTime * 0.78 + aPhase * 3.3) * wobble;
+    p.z += sin(uTime * 0.63 + aPhase * 1.7) * wobble;
+  }
+
+  p += aScatterDir * uScatter;
 
   // Points with a rise drift up the gate and wrap, fading at both ends so they
   // are never seen to appear or to stop.
@@ -167,6 +190,10 @@ interface Cloud {
   rise: Float32Array;
   stain: Float32Array;
   scatter: Float32Array;
+  /** Where this point waits before the mark has gathered. */
+  sphere: Float32Array;
+  /** How late it joins, so the logo assembles rather than appearing. */
+  formDelay: Float32Array;
 }
 
 /**
@@ -212,6 +239,8 @@ function emptyCloud(count: number): Cloud {
     rise: new Float32Array(count),
     stain: new Float32Array(count),
     scatter: new Float32Array(count * 3),
+    sphere: new Float32Array(count * 3),
+    formDelay: new Float32Array(count),
   };
 }
 
@@ -225,6 +254,8 @@ function toGeometry(cloud: Cloud): BufferGeometry {
   geometry.setAttribute("aRise", new BufferAttribute(cloud.rise, 1));
   geometry.setAttribute("aStain", new BufferAttribute(cloud.stain, 1));
   geometry.setAttribute("aScatterDir", new BufferAttribute(cloud.scatter, 3));
+  geometry.setAttribute("aSphere", new BufferAttribute(cloud.sphere, 3));
+  geometry.setAttribute("aFormDelay", new BufferAttribute(cloud.formDelay, 1));
   return geometry;
 }
 
@@ -250,6 +281,7 @@ function makeMaterial(reduced: boolean, door: { bottom: number; height: number }
       uAspect: { value: 1 },
       uDisperse: { value: new Vector4(0, 0, 0, 1) },
       uReveal: { value: new Vector4(0, 0, 1, 0) },
+      uForm: { value: 1 },
       uDisperseAmount: { value: 0 },
     },
   });
@@ -282,6 +314,16 @@ function buildMark(): Cloud {
     cloud.sizes[i] = spot.size;
     cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
+
+    // Where this point waits before the mark gathers: a ball of light, filled
+    // a little toward its surface so it reads as a body rather than a haze.
+    const ballTheta = Math.random() * Math.PI * 2;
+    const ballPhi = Math.acos(2 * Math.random() - 1);
+    const ballRadius = BLOB_RADIUS * Math.pow(Math.random(), 1 / 2.4);
+    cloud.sphere[i * 3] = ballRadius * Math.sin(ballPhi) * Math.cos(ballTheta);
+    cloud.sphere[i * 3 + 1] = ballRadius * Math.sin(ballPhi) * Math.sin(ballTheta);
+    cloud.sphere[i * 3 + 2] = ballRadius * Math.cos(ballPhi);
+    cloud.formDelay[i] = Math.random();
 
     // outward direction for the scatter at the end of the page
     const theta = Math.random() * Math.PI * 2;
@@ -576,6 +618,7 @@ export function mountMarkField(host: HTMLElement): () => void {
     group.rotation.y = state.rotationY + (reduced ? 0 : time * 0.06);
     group.rotation.x = state.rotationX;
 
+    markMaterial.uniforms.uForm.value = state.markForm;
     markMaterial.uniforms.uOpacity.value = state.opacity;
     markMaterial.uniforms.uScatter.value = state.scatter;
     markMaterial.uniforms.uTime.value = time;
