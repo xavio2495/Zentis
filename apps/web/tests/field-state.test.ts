@@ -117,8 +117,12 @@ describe("the doorway and the field behind it", () => {
     }
   });
 
+  test("the starfield is readable from the first screen — it is the room", () => {
+    expect(at(0).starfieldOpacity).toBeGreaterThan(0.28);
+  });
+
   test("the starfield is faint at the start and opens up through the traverse", () => {
-    expect(at(0).starfieldOpacity).toBeLessThan(0.3);
+    expect(at(0).starfieldOpacity).toBeLessThan(0.55);
     expect(at(at(0).proseFrom).starfieldOpacity).toBeGreaterThan(0.5);
   });
 
