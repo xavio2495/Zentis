@@ -1,6 +1,8 @@
 import "./stubs/browser-globals.js";
 import { render } from "ink";
 import { App } from "./App.js";
+import { fixedStore } from "../sandbox/state.js";
+import { fakeSnapshot } from "../sandbox/world.js";
 import { emitter } from "./stubs/node-stream.js";
 import type { Action } from "./action-types.js";
 
@@ -16,6 +18,13 @@ import type { Action } from "./action-types.js";
  * There are no actions here, and that is structural rather than promised: this bundle contains no
  * child-process machinery to run one with. The keys are still shown, disabled, with the reason —
  * a visitor should see what the operator's screen actually offers.
+ *
+ * Neither is there a live read, for the same kind of reason. This screen used to build the ordinary
+ * store, which is twenty-six reads on mount: six of them Subgraph Studio queries against an
+ * allowance of three thousand per three hours, spent per visitor. A page that costs the maker money
+ * every time somebody looks at it is a page that comes down the week it works. It serves the
+ * recorded moment instead — real data, read from the real endpoints, committed — and says so on
+ * screen so a recording never passes for a live read.
  */
 export interface TerminalHandle {
   write(data: string): void;
@@ -71,6 +80,11 @@ function streams(terminal: TerminalHandle) {
   });
 
   const inp = emitter();
+  // Ink does not listen for `data`. It adds a `readable` listener and then calls `read()` until it
+  // answers null — the pull half of Node's stream interface rather than the push half. A shim that
+  // fired `data` and answered `read()` with null drew the screen perfectly and swallowed every
+  // keystroke, which is the kind of bug that only shows up when somebody presses something.
+  let pending = "";
   const stdin = Object.assign(inp, {
     // Every keystroke from xterm is already unbuffered and unechoed, so raw mode is not something
     // to switch on here — it is the only mode there is. Ink asks, and the honest answer is yes.
@@ -80,16 +94,28 @@ function streams(terminal: TerminalHandle) {
     setEncoding: () => stdin,
     resume: () => stdin,
     pause: () => stdin,
-    read: () => null,
+    read: () => {
+      if (pending === "") return null;
+      const chunk = pending;
+      pending = "";
+      return chunk;
+    },
   });
-  terminal.onData((data) => inp.fire("data", data));
+  terminal.onData((data) => {
+    pending += data;
+    inp.fire("readable");
+  });
 
   return { stdin, stdout };
 }
 
 export function mount(terminal: TerminalHandle) {
   const { stdin, stdout } = streams(terminal);
-  return render(<App actions={watchActions} runAction={null} />, {
+  const store = fixedStore({
+    ...fakeSnapshot("fresh"),
+    caveats: ["recorded testnet reads, not live: this public console asks no endpoint anything"],
+  });
+  return render(<App actions={watchActions} runAction={null} makeStore={store} />, {
     stdout: stdout as never,
     stdin: stdin as never,
     // Ink's console patch reaches for Node's console internals, and there is no terminal here to

@@ -163,6 +163,27 @@ export function Status({
     />,
   );
 
+  // What the whole reading is, when it is not a live one. Said in full here and as one word on the
+  // book row: `snapshot.caveats` was being set by the fixtures path and rendered nowhere, so a
+  // console running on a recording looked exactly like one running on the network.
+  if (snapshot.caveats.length > 0) {
+    rows.push(<Text key="sp5"> </Text>);
+    rows.push(
+      <Text key="cavhead" color={UI.caveat} bold>
+        {trunc("what this reading is", width)}
+      </Text>,
+    );
+    for (const [i, caveat] of snapshot.caveats.entries()) {
+      for (const [j, line] of wrapLines(caveat, width, 3).entries()) {
+        rows.push(
+          <Text key={`cav${i}-${j}`} color={UI.muted}>
+            {line}
+          </Text>,
+        );
+      }
+    }
+  }
+
   // Where the opening end of hold came from, quoted from the deployment record rather than
   // summarised. It was backfilled from a different series than the closing mark, and this is the
   // page that exists to say where a number came from.

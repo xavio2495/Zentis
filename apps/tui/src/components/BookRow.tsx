@@ -111,6 +111,11 @@ export function bookSegments(
       : profitLong;
 
   const mode: Seg[] = [{ text: armed ? "armed" : "watch-only", color: armed ? UI.heading : UI.muted }];
+  // Whether anything on this screen was read just now. A recorded moment is real data — it was read
+  // from the real endpoints and committed — but it is not this minute's, and a screen that does not
+  // say so is a screen quietly claiming to be live. It ranks with the mode and never drops: the
+  // status page carries the sentence in full.
+  const recorded: Seg[] = snapshot.caveats.length === 0 ? [] : [{ text: "recorded", color: UI.caveat }];
   const pulse: Seg[] = loading
     ? [{ text: "polling…", color: UI.muted }]
     : polledAgo === null
@@ -129,14 +134,14 @@ export function bookSegments(
   const seqShort: Seg[] = seq.length <= 1 ? seq : seq.slice(0, 2);
   return fitSegments(
     [
-      join([inventory, splitLong, legs, seq, profitLong, mode, pulse]),
-      join([inventory, splitLong, legs, seq, profitLong, mode]),
-      join([inventory, splitLong, seq, profitLong, mode]),
-      join([inventory, splitShort, seq, profitShort, mode]),
-      join([inventory, splitShort, seqShort, profitShort, mode]),
-      join([inventory, splitShort, seqShort, mode]),
-      join([inventory, splitShort, mode]),
-      join([inventory, mode]),
+      join([inventory, splitLong, legs, seq, profitLong, mode, recorded, pulse]),
+      join([inventory, splitLong, legs, seq, profitLong, mode, recorded]),
+      join([inventory, splitLong, seq, profitLong, mode, recorded]),
+      join([inventory, splitShort, seq, profitShort, mode, recorded]),
+      join([inventory, splitShort, seqShort, profitShort, mode, recorded]),
+      join([inventory, splitShort, seqShort, mode, recorded]),
+      join([inventory, splitShort, mode, recorded]),
+      join([inventory, mode, recorded]),
     ],
     width,
   );
