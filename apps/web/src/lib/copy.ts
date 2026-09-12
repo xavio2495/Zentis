@@ -78,7 +78,7 @@ export const COPY = {
   installCopied: "Copied",
 
   contactLine: "Read it for yourself.",
-  routesLine: "Or watch it run:",
+  tryItOut: "Try it out.",
   contactHint: "Click to copy",
   contactCopied: "Copied",
 

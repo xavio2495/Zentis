@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { COPY, ROUTES } from "@/lib/copy";
+import { COPY, REPO_URL, ROUTES } from "@/lib/copy";
 import { scrollToTarget } from "@/lib/scroll";
 
 const SECTIONS = [
   { id: "position", label: "Position" },
   { id: "built-on", label: "Built on" },
-  { id: "contact", label: "Source" },
+  { id: "contact", label: "Try it" },
 ];
 
 /**
@@ -70,6 +70,16 @@ export function Nav() {
             two are where it is running. A reader who wants the evidence rather than the pitch
             should not have to guess a URL. */}
         <span aria-hidden className="h-4 w-px self-center bg-stroke" />
+        {/* The repo, which the closing section no longer carries: a nav entry that leads nowhere
+            real is worse than one more link. */}
+        <a
+          href={REPO_URL}
+          data-magnetic
+          rel="noreferrer"
+          className="nav-link text-ink-soft no-underline hover:text-ink"
+        >
+          Source
+        </a>
         {ROUTES.map((route) => (
           <a
             key={route.href}

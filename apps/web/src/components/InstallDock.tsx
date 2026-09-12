@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { COPY, INSTALL_COMMAND } from "@/lib/copy";
-import { dockRect } from "@/lib/dock";
+import { dockLandingY, dockRect } from "@/lib/dock";
 import { fieldState } from "@/lib/field-state";
 import { scrollNow } from "@/lib/scroll";
 
@@ -38,7 +38,8 @@ export function InstallDock() {
 
       const height = node.offsetHeight || 1;
       const atFoot = innerHeight - 40 - height / 2;
-      const atCentre = innerHeight / 2;
+      // Where the closing section says its gap is, not where the viewport's middle happens to be.
+      const atCentre = dockLandingY(innerHeight);
       const y = atFoot + (atCentre - atFoot) * installDock;
       const scale = 1 + installDock * 0.14;
 

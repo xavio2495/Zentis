@@ -678,3 +678,40 @@ html {
     background: var(--color-ink-dim);
   }
 }
+
+/* The two ways into the running thing, at the foot of the landing page.
+
+   One size rather than two, so neither reads as the lesser of the pair: the console and the
+   replay are the same moment shown twice, not a primary and a fallback. Square, like every
+   other edge on this project, and no accent — they are doors, not signals. */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 12.5rem;
+  padding: 0.85rem 1.75rem;
+  border: 1px solid var(--color-stroke);
+  color: var(--color-ink);
+  font-size: var(--text-fs-0);
+  text-decoration: none;
+  transition:
+    border-color 0.25s var(--ease-out),
+    background-color 0.25s var(--ease-out);
+}
+
+.cta:hover {
+  border-color: var(--color-line2);
+  background: var(--color-inset);
+}
+
+/* The room the install line arrives in. The dock is fixed and eases to the middle of the
+   viewport as the page closes, so this is a hole kept open rather than a gap between things. */
+.dock-room {
+  height: 9rem;
+}
+
+@media (min-width: 768px) {
+  .dock-room {
+    height: 11rem;
+  }
+}

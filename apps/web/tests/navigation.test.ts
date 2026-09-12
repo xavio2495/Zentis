@@ -86,7 +86,7 @@ describe("the closing section is the install line and two ways in", () => {
   test("it leaves the middle of the viewport empty for the install line to arrive in", () => {
     // The dock is fixed and eases to `innerHeight / 2` as the page closes. Anything placed there
     // would be underneath it.
-    expect(contact()).toMatch(/dock-room/);
+    expect(contact()).toMatch(/<DockRoom/);
   });
 
   test("the two calls to action are the routes, and nothing is said about them beyond their names", () => {
@@ -95,12 +95,41 @@ describe("the closing section is the install line and two ways in", () => {
   });
 
   test("they are one size rather than two, so neither reads as the lesser", () => {
-    expect(contact()).toMatch(/basis-|min-w-|w-\[/);
+    // The size is carried by the `.cta` rule, not by a class on each link — two buttons sized
+    // separately are two buttons that will eventually differ.
+    expect(contact()).toMatch(/className="cta"/);
+    const css = readFileSync(join(import.meta.dir, "..", "src", "app", "globals.css"), "utf8");
+    const rule = css.slice(css.indexOf(".cta {"), css.indexOf("}", css.indexOf(".cta {")));
+    expect(rule).toMatch(/min-width:/);
+    expect(rule).toMatch(/justify-content:\s*center/);
   });
 
   test("the source is still reachable now that the section no longer carries it", () => {
     // The nav's own Source entry has to lead somewhere real, or removing the link from the page
     // quietly breaks a nav item rather than tidying a section.
     expect(source("components", "Nav.tsx")).toContain("REPO_URL");
+  });
+});
+
+describe("the last screen is one screen", () => {
+  test("the closing section and the footer together fit in a viewport", () => {
+    /*
+     * At the very bottom of the page the reader sees the last viewport-height of it, and that has
+     * to be the whole close: the title, the install line, the two buttons and the outro. When the
+     * section was a full screen tall and the footer another 40% on top, the last viewport began
+     * below the title — so the section's own heading was never visible at the point the reader
+     * stops scrolling.
+     */
+    const page = source("app", "page.tsx");
+    const heights = [...page.matchAll(/min-h-\[(\d+)vh\]/g)].map((m) => Number(m[1]));
+    const closing = heights.slice(-2);
+    expect(closing).toHaveLength(2);
+    expect(closing[0]! + closing[1]!).toBeLessThanOrEqual(100);
+  });
+
+  test("neither the section nor the footer is a full screen on its own", () => {
+    const page = source("app", "page.tsx");
+    const contact = page.slice(page.indexOf('id="contact"'), page.indexOf("</footer>"));
+    expect(contact).not.toMatch(/min-h-screen/);
   });
 });

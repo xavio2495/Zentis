@@ -1,5 +1,5 @@
-import { CopyLink } from "@/components/CopyLink";
 import { Cursor } from "@/components/Cursor";
+import { DockRoom } from "@/components/DockRoom";
 import { HeroLines } from "@/components/HeroLines";
 import { HeroWordmark } from "@/components/HeroWordmark";
 import { InstallDock } from "@/components/InstallDock";
@@ -8,7 +8,7 @@ import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
 import { Smoother } from "@/components/Smoother";
-import { COPY, INSTALL_COMMAND, INTEGRATIONS, REPO_LABEL, REPO_URL, ROUTES } from "@/lib/copy";
+import { COPY, INSTALL_COMMAND, INTEGRATIONS, ROUTES } from "@/lib/copy";
 
 /** The four corner brackets that stand in for a card border. */
 function Brackets() {
@@ -92,38 +92,38 @@ export default function Home() {
         {/* The outro: the field scatters as the page ends. */}
         <div aria-hidden="true" style={{ height: "60vh" }} />
 
+        {/*
+          The close: one invitation, the command, and the two places it runs.
+
+          It used to carry a serif line, the repo link, a label and two blurbs stacked above the
+          install command — six things competing for the last screen the reader sees. The command is
+          what this section is for; everything else here either points at it or points past it.
+        */}
         <section
           id="contact"
-          className="flex min-h-[80vh] flex-col items-center justify-center gap-8 px-8 text-center"
+          className="flex min-h-[62vh] flex-col items-center justify-center px-8 text-center"
         >
           <Reveal>
-            <p className="serif text-fs-2 text-ink-soft md:text-fs-4">{COPY.contactLine}</p>
-            <div className="mt-8">
-              <CopyLink
-                href={REPO_URL}
-                label={REPO_LABEL}
-                hint={COPY.contactHint}
-                copied={COPY.contactCopied}
-              />
-            </div>
-            <p className="mt-10 label-sm text-ink-faint">{COPY.routesLine}</p>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <h2 className="serif text-fs-3 text-ink md:text-fs-5">{COPY.tryItOut}</h2>
+
+            {/*
+              The install line is the dock, which is fixed and eases to the middle of the viewport
+              as the page closes. This holds that room open: anything placed here would sit
+              underneath it.
+            */}
+            <DockRoom />
+
+            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               {ROUTES.map((route) => (
-                <a
-                  key={route.href}
-                  href={route.href}
-                  data-magnetic
-                  className="nav-link text-fs-1 text-ink no-underline hover:text-ink"
-                >
+                <a key={route.href} href={route.href} data-magnetic className="cta">
                   {route.label}
-                  <span className="ml-2 text-fs-0 text-ink-faint">{route.blurb}</span>
                 </a>
               ))}
             </div>
           </Reveal>
         </section>
 
-        <footer className="flex min-h-[40vh] flex-col items-center justify-center gap-6 px-8 text-center">
+        <footer className="flex min-h-[38vh] flex-col items-center justify-center gap-6 px-8 text-center">
           <Reveal>
             <p className="serif text-fs-2 text-ink-soft md:text-fs-3">{COPY.outro}</p>
           </Reveal>
