@@ -90,3 +90,35 @@ export function dockPlacement({
   const travelled = (viewportHeight + ARRIVAL_LEAD - top) / ARRIVAL_LEAD;
   return { y: footY, opacity: Math.max(0, Math.min(1, 1 - travelled)) };
 }
+
+/** A vertical band in viewport pixels. */
+export interface Band {
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** How far content stays clear of the line before the line starts dimming. */
+const CLEARANCE = 120;
+
+/**
+ * Whether the install line may be drawn where it is, given what the page is showing there.
+ *
+ * The same rule the mark already follows, applied to the one other thing that floats over the page.
+ * Keeping the line off the closing section's heading fixed a single collision by naming a single
+ * element; it did nothing for the diagrams, and the line was drawn across the spread figure's rows
+ * and the no-bridge figure's labels on the way down. Content declares the room it needs and the
+ * line defers to all of it — so a figure added later is covered without editing this.
+ *
+ * The worst case wins rather than the average: one figure being clear is not permission to draw
+ * over another.
+ */
+export function dockClearance(line: Band, content: readonly Band[]): number {
+  let worst = 1;
+  for (const box of content) {
+    if (box.top < line.bottom && box.bottom > line.top) return 0;
+    // The nearest edge, whichever side it is on, ramped over the clearance distance.
+    const gap = box.top >= line.bottom ? box.top - line.bottom : line.top - box.bottom;
+    if (gap < CLEARANCE) worst = Math.min(worst, Math.max(0, gap / CLEARANCE));
+  }
+  return worst;
+}

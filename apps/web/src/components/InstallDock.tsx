@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { COPY, INSTALL_COMMAND } from "@/lib/copy";
-import { dockNow, dockRect } from "@/lib/dock";
+import { dockClearance, dockNow, dockRect } from "@/lib/dock";
 import { fieldState } from "@/lib/field-state";
 import { scrollNow } from "@/lib/scroll";
 
@@ -40,8 +40,18 @@ export function InstallDock() {
       const atFoot = innerHeight - 40 - height / 2;
       // One place at a time: the foot, or the section's gap, and nothing drawn in between. dock.ts.
       const { y, opacity } = dockNow(atFoot, innerHeight);
-      node.style.opacity = opacity.toFixed(3);
-      node.style.pointerEvents = opacity < 0.5 ? "none" : "auto";
+
+      // And whether anything the page is showing wants that room. Content marks itself rather than
+      // being listed here, so a figure added later is covered without touching this file.
+      const line = { top: y - height / 2, bottom: y + height / 2 };
+      const content = [...document.querySelectorAll("[data-dock-clear]")].map((el) => {
+        const box = el.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      });
+      const shown = Math.min(opacity, dockClearance(line, content));
+
+      node.style.opacity = shown.toFixed(3);
+      node.style.pointerEvents = shown < 0.5 ? "none" : "auto";
       const scale = 1 + installDock * 0.14;
 
       node.style.transform = `translate(-50%, -50%) translate(0, ${y.toFixed(1)}px) scale(${scale.toFixed(3)})`;
@@ -52,7 +62,7 @@ export function InstallDock() {
       dockRect.width = box.width;
       dockRect.height = box.height;
       // The field draws the line's border out of points; a faded line has no border to draw.
-      dockRect.on = box.width > 0 && opacity > 0.5;
+      dockRect.on = box.width > 0 && shown > 0.5;
 
       raf = requestAnimationFrame(frame);
     };

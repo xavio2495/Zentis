@@ -77,11 +77,11 @@ export default function Home() {
         */}
         <section id="position" className="mx-auto w-full max-w-6xl px-8 py-[16vh]">
           <Reveal>
-            <div className="max-w-2xl">
+            <div data-dock-clear className="max-w-2xl">
               <h2 className="serif text-fs-5 leading-tight text-ink md:text-fs-6">{COPY.statement}</h2>
               <p className="mt-6 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.statementLead}</p>
             </div>
-            <div className="mt-12 max-w-2xl">
+            <div data-dock-clear className="mt-12 max-w-2xl">
               <MidAndLegs moment={moment} />
             </div>
           </Reveal>
@@ -90,7 +90,7 @@ export default function Home() {
         <section id="quote" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
           <Reveal>
             {/* The opposite side, so the field changes hands as the reader descends. */}
-            <div className="ml-auto max-w-2xl">
+            <div data-dock-clear className="ml-auto max-w-2xl">
               <p className="label text-ink-faint">{COPY.mechanismLabel}</p>
               <p className="mt-4 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.mechanismLead}</p>
               <div className="mt-10">
@@ -102,7 +102,7 @@ export default function Home() {
 
         <section id="spread" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
           <Reveal>
-            <div className="max-w-2xl">
+            <div data-dock-clear className="max-w-2xl">
               <Spread moment={moment} />
             </div>
           </Reveal>
@@ -110,7 +110,7 @@ export default function Home() {
 
         <section id="dial" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
           <Reveal>
-            <div className="ml-auto max-w-2xl">
+            <div data-dock-clear className="ml-auto max-w-2xl">
               <p className="label text-ink-faint">{COPY.dialLabel}</p>
               <p className="mt-4 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.dialLead}</p>
               <div className="mt-10">
@@ -128,6 +128,7 @@ export default function Home() {
             <ul className="mt-10 flex list-none flex-col gap-8 p-0">
               {INTEGRATIONS.map((integration, i) => (
                 <li
+                  data-dock-clear
                   key={integration.name}
                   className={`relative border border-stroke p-6 md:max-w-md ${
                     i % 2 === 1 ? "md:ml-auto md:mr-0" : "md:ml-0 md:mr-auto"
