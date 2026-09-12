@@ -170,6 +170,8 @@ export interface FieldState {
   installDock: number;
   /** 0 while the mark is still a blob, 1 once it has gathered into the logo. */
   markForm: number;
+  /** How awake the mark is: its points' full size, softness and idle drift. */
+  markLife: number;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -213,6 +215,11 @@ export function fieldState({
   // through, finishing a little before the traverse does so the shape is
   // settled rather than still moving when the reader arrives at it.
   const markForm = easeOut(clamp(scrollY / (viewportHeight * 1.25), 0, 1));
+
+  // It wakes into itself as the shape settles rather than arriving fully
+  // formed: points grow to their own sizes and pick up their drift, so a mark
+  // that has stopped moving still has something to do.
+  const markLife = 0.18 + 0.82 * easeOut(clamp((scrollY - viewportHeight * 0.75) / (viewportHeight * 0.85), 0, 1));
 
   const positionZ = -34 + 34 * eased;
   const scale = 0.32 + 0.68 * eased;
@@ -301,6 +308,7 @@ export function fieldState({
     depthRatio,
     installDock,
     markForm,
+    markLife,
     proseFrom,
     outroFrom,
   };

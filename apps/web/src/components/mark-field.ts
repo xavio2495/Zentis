@@ -35,6 +35,10 @@ const COUNT = 9000;
 const MARK_SCALE = 9;
 /** Half the width of the ball the mark arrives as, in the mark's own units. */
 const BLOB_RADIUS = 3.6;
+/** How much the cursor hollow's radius varies point to point. */
+const RIM_JITTER = 0.08;
+/** How far an awake point wanders from its place. */
+const MARK_DRIFT = 0.055;
 
 /** The gate: an equilateral triangle standing on its point, the mark inside it. */
 const GATE_EDGE = 1500;
@@ -54,8 +58,6 @@ attribute float aPhase;
 attribute float aRise;
 attribute float aStain;
 attribute vec3 aScatterDir;
-attribute vec3 aSphere;
-attribute float aFormDelay;
 uniform float uScale;
 uniform float uTime;
 uniform float uMotion;
@@ -74,8 +76,8 @@ uniform vec4 uDisperse;
 /** xy: where the light is. z: how far it carries. w: how much of the cloud is
     held back to it — 0 leaves the whole cloud lit. */
 uniform vec4 uReveal;
-/** 0 while this cloud is still a blob, 1 once it has gathered into its shape. */
-uniform float uForm;
+/** How awake this cloud is: its points' full size and softness. */
+uniform float uLife;
 uniform float uDisperseAmount;
 varying vec3 vColor;
 varying float vAlpha;
@@ -83,25 +85,9 @@ varying float vSoft;
 
 void main() {
   vColor = aColor;
-  vSoft = aSoft;
+  vSoft = aSoft * uLife;
 
-  // Every point has two homes: somewhere in the ball the mark arrives as, and
-  // its place in the shape. Each joins on its own beat, so the mark gathers
-  // rather than appearing all at once.
-  float join = smoothstep(aFormDelay * 0.45, 1.0, uForm);
-  vec3 p = mix(aSphere, position, join);
-
-  // While it is still a ball it breathes, and the breathing goes as it forms —
-  // the shape has to arrive still.
-  float loose = 1.0 - join;
-  if (loose > 0.001) {
-    float wobble = 0.36 * loose * uMotion;
-    p.x += sin(uTime * 0.9 + aPhase * 2.1) * wobble;
-    p.y += sin(uTime * 0.78 + aPhase * 3.3) * wobble;
-    p.z += sin(uTime * 0.63 + aPhase * 1.7) * wobble;
-  }
-
-  p += aScatterDir * uScatter;
+  vec3 p = position + aScatterDir * uScatter;
 
   // Points with a rise drift up the gate and wrap, fading at both ends so they
   // are never seen to appear or to stop.
@@ -126,7 +112,8 @@ void main() {
 
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float depth = max(-mv.z, 0.1);
-  gl_PointSize = max(aSize * uScale / depth, uMinPx);
+  // Awake, a point is its own size and softness; asleep it is a hard pinprick.
+  gl_PointSize = max(mix(0.115, aSize, uLife) * uScale / depth, uMinPx);
   float twinkle = 1.0 - 0.45 * uMotion * (0.5 + 0.5 * sin(uTime * (1.4 + fract(aPhase) * 1.3) + aPhase * 6.283));
   vAlpha = twinkle * fade * smoothstep(0.12, 1.1, depth) * (1.0 - uScatter * 0.55);
   gl_Position = projectionMatrix * mv;
@@ -194,6 +181,10 @@ interface Cloud {
   sphere: Float32Array;
   /** How late it joins, so the logo assembles rather than appearing. */
   formDelay: Float32Array;
+  /** Per-point variation in the cursor hollow's radius. */
+  rimJitter: Float32Array;
+  /** How far this point wanders once the mark is awake. */
+  drift: Float32Array;
 }
 
 /**
@@ -241,6 +232,8 @@ function emptyCloud(count: number): Cloud {
     scatter: new Float32Array(count * 3),
     sphere: new Float32Array(count * 3),
     formDelay: new Float32Array(count),
+    rimJitter: new Float32Array(count),
+    drift: new Float32Array(count),
   };
 }
 
@@ -281,7 +274,7 @@ function makeMaterial(reduced: boolean, door: { bottom: number; height: number }
       uAspect: { value: 1 },
       uDisperse: { value: new Vector4(0, 0, 0, 1) },
       uReveal: { value: new Vector4(0, 0, 1, 0) },
-      uForm: { value: 1 },
+      uLife: { value: 1 },
       uDisperseAmount: { value: 0 },
     },
   });
@@ -324,6 +317,10 @@ function buildMark(): Cloud {
     cloud.sphere[i * 3 + 1] = ballRadius * Math.sin(ballPhi) * Math.sin(ballTheta);
     cloud.sphere[i * 3 + 2] = ballRadius * Math.cos(ballPhi);
     cloud.formDelay[i] = Math.random();
+    // the rim of the cursor's hollow is jittered per point, so its edge is a
+    // soft shell rather than a drawn circle
+    cloud.rimJitter[i] = 1 + (Math.random() * 2 - 1) * RIM_JITTER;
+    cloud.drift[i] = MARK_DRIFT * (0.4 + Math.random() * 0.6);
 
     // outward direction for the scatter at the end of the page
     const theta = Math.random() * Math.PI * 2;
@@ -479,6 +476,12 @@ function buildStars(count: number, near: number, far: number): Cloud {
   return cloud;
 }
 
+/** The same curve the shader's smoothstep draws, for the work done here. */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0 || 1e-6)));
+  return t * t * (3 - 2 * t);
+}
+
 /** Builds the field into `host`. Returns a teardown. */
 export function mountMarkField(host: HTMLElement): () => void {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -508,7 +511,18 @@ export function mountMarkField(host: HTMLElement): () => void {
   const doorMaterial = makeMaterial(reduced, door);
   const starMaterial = makeMaterial(reduced, door);
 
-  const markGeometry = toGeometry(buildMark());
+  const markCloud = buildMark();
+  // The geometry writes into the cloud's own array every frame, so the logo's
+  // positions are copied out first. Reading a target out of the buffer you are
+  // animating means the target walks away from you.
+  const logo = new Float32Array(markCloud.positions);
+  const markGeometry = toGeometry(markCloud);
+  // The mark is moved on the processor rather than in the shader, so each point
+  // can carry its own memory: where it is drifting to, and how far the cursor
+  // has pushed it. Points then trail behind a fast cursor and flow back one by
+  // one, which a single value shared by all of them cannot do.
+  const settled = new Float32Array(logo);
+  const pushed = new Float32Array(COUNT * 3);
   const doorGeometry = toGeometry(buildGate());
   const nearGeometry = toGeometry(buildStars(STARS_NEAR, 25, 80));
   const farGeometry = toGeometry(buildStars(STARS_FAR, 30, 90));
@@ -584,7 +598,7 @@ export function mountMarkField(host: HTMLElement): () => void {
   // clears there. The hole is a fraction of the mark, not the whole of it.
   const STAIN_REACH = gate.side * 0.34;
   const MARK_LIGHT = 2.4;
-  const MARK_CLEARS = 1.15;
+  const MARK_CLEARS = 0.78;
 
   let previous = start;
   const frame = (now: number) => {
@@ -618,7 +632,77 @@ export function mountMarkField(host: HTMLElement): () => void {
     group.rotation.y = state.rotationY + (reduced ? 0 : time * 0.06);
     group.rotation.x = state.rotationX;
 
-    markMaterial.uniforms.uForm.value = state.markForm;
+    // Blend, wobble, drift, inertia and the cursor's hollow, per point.
+    {
+      const positions = markGeometry.attributes.position.array as Float32Array;
+      const inertia = settle(5);
+      const towardHollow = settle(15);
+      const backFromHollow = settle(3.4);
+      const life = state.markLife;
+      const hollow = MARK_CLEARS;
+      const cursorOn = disperse > 0.002;
+
+      for (let i = 0; i < COUNT; i++) {
+        const at = i * 3;
+        const join = smoothstep(markCloud.formDelay[i] * 0.45, 1, state.markForm);
+        const loose = 1 - join;
+        const phase = markCloud.phases[i];
+
+        // where this point wants to be, right now
+        let wantX = markCloud.sphere[at] + (logo[at] - markCloud.sphere[at]) * join;
+        let wantY = markCloud.sphere[at + 1] + (logo[at + 1] - markCloud.sphere[at + 1]) * join;
+        let wantZ = markCloud.sphere[at + 2] + (logo[at + 2] - markCloud.sphere[at + 2]) * join;
+
+        if (!reduced) {
+          // unformed, it breathes; awake, it wanders — the two never overlap
+          const breath = 0.36 * loose;
+          const wander = markCloud.drift[i] * life * join;
+          wantX += Math.sin(time * 0.9 + phase * 2.1) * breath + Math.sin(time * 0.31 + phase) * wander;
+          wantY += Math.sin(time * 0.78 + phase * 3.3) * breath + Math.sin(time * 0.27 + phase * 1.7) * wander;
+          wantZ += Math.sin(time * 0.63 + phase * 1.7) * breath + Math.sin(time * 0.23 + phase * 2.3) * wander;
+        }
+
+        // the mark carries weight: it eases toward where it wants to be
+        settled[at] += (wantX - settled[at]) * inertia;
+        settled[at + 1] += (wantY - settled[at + 1]) * inertia;
+        settled[at + 2] += (wantZ - settled[at + 2]) * inertia;
+
+        // what the cursor is asking of this point
+        let askX = 0;
+        let askY = 0;
+        let askZ = 0;
+        let inReach = false;
+        if (cursorOn) {
+          const awayX = settled[at] - cursorLocal.x;
+          const awayY = settled[at + 1] - cursorLocal.y;
+          const awayZ = settled[at + 2] - cursorLocal.z;
+          const distance = Math.sqrt(awayX * awayX + awayY * awayY + awayZ * awayZ);
+          const rim = hollow * markCloud.rimJitter[i];
+          if (distance < rim && distance > 1e-4) {
+            const push = (rim / distance - 1) * disperse;
+            askX = awayX * push;
+            askY = awayY * push;
+            askZ = awayZ * push;
+            inReach = true;
+          }
+        }
+
+        // quick to give way, slow to come back
+        const rate = inReach ? towardHollow : backFromHollow;
+        pushed[at] += (askX - pushed[at]) * rate;
+        pushed[at + 1] += (askY - pushed[at + 1]) * rate;
+        pushed[at + 2] += (askZ - pushed[at + 2]) * rate;
+
+        positions[at] = settled[at] + pushed[at];
+        positions[at + 1] = settled[at + 1] + pushed[at + 1];
+        positions[at + 2] = settled[at + 2] + pushed[at + 2];
+      }
+      markGeometry.attributes.position.needsUpdate = true;
+    }
+
+    // the blend, the breathing and the hollow are all done above
+    markMaterial.uniforms.uDisperseAmount.value = 0;
+    markMaterial.uniforms.uLife.value = state.markLife;
     markMaterial.uniforms.uOpacity.value = state.opacity;
     markMaterial.uniforms.uScatter.value = state.scatter;
     markMaterial.uniforms.uTime.value = time;
@@ -638,13 +722,7 @@ export function mountMarkField(host: HTMLElement): () => void {
 
     markMaterial.uniforms.uStain.value.set(cursorLocal.x, cursorLocal.y, MARK_LIGHT, disperse);
     // the hollow the cursor clears is a sphere about that point, not a tube
-    markMaterial.uniforms.uDisperse.value.set(
-      cursorLocal.x,
-      cursorLocal.y,
-      cursorLocal.z,
-      MARK_CLEARS,
-    );
-    markMaterial.uniforms.uDisperseAmount.value = disperse;
+
 
     // Lay the border onto wherever the install line has got to. Its points are
     // written in world units at the camera's own plane, so a pixel on screen is
