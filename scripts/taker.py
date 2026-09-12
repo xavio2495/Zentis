@@ -28,8 +28,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rebalance import ROOT, RPCS, call, next_nonce, send  # noqa: E402
 import txlog  # noqa: E402
 
-SIZE_A = 150_000                 # 0.15 USDC, raw
-SIZE_B = 60_000_000_000_000      # 0.00006 WETH, raw
+# Fill size follows the leg: one percent of what the leg holds on the input side, floored at
+# 0.15 USDC / 0.00006 WETH, so a leg scaled up with scripts/scale.py is traded in proportion and a
+# fill still moves the curve by a few bps rather than a few percent.
+SIZE_FRACTION_BPS = 100
+MIN_SIZE_A = 150_000                 # 0.15 USDC, raw
+MIN_SIZE_B = 60_000_000_000_000      # 0.00006 WETH, raw
 GAS_FLOOR_WEI = 2 * 10**15       # 0.002 ETH: below this, stop rather than strand a nonce mid-fill
 CHAIN_IDS = {"sepolia": 11155111, "arbitrum-sepolia": 421614, "base-sepolia": 84532}
 STATE = Path.home() / ".zentis" / "taker-state.json"
@@ -87,6 +91,12 @@ def plan_leg(name: str, rpc: str, taker: str, state: dict) -> dict:
     if fill["taker"].lower() != taker.lower():
         return {"name": name, "skip": f"the recorded taker bytes are for {fill['taker'][:10]}…, not this key"}
     token_a, token_b = record["tokens"]["tokenA"]["address"], record["tokens"]["tokenB"]["address"]
+    fast = json.loads((ROOT / "cre/fast/config.staging.json").read_text())
+    leg = next((l for l in fast["legs"] if l["strategyHash"].lower() == record["position"]["strategyHash"].lower()), None)
+    held = call(leg["aqua"], "safeBalances(address,address,bytes32,address,address)(uint256,uint256)",
+                fast["maker"], leg["app"], leg["strategyHash"], token_a, token_b, rpc=rpc) if leg else None
+    size_a = max(MIN_SIZE_A, held[0] * SIZE_FRACTION_BPS // 10_000) if held else MIN_SIZE_A
+    size_b = max(MIN_SIZE_B, held[1] * SIZE_FRACTION_BPS // 10_000) if held else MIN_SIZE_B
     gas = int(subprocess.run(["cast", "balance", taker, "-r", rpc], capture_output=True, text=True).stdout.split()[0])
     if gas < GAS_FLOOR_WEI:
         return {"name": name, "skip": f"gas {gas / 1e18:.4f} ETH is under the {GAS_FLOOR_WEI / 1e18} floor"}
@@ -95,7 +105,7 @@ def plan_leg(name: str, rpc: str, taker: str, state: dict) -> dict:
     last = state.get(name, {}).get("lastDirection")
     order = ["BToA", "AToB"] if last == "AToB" else ["AToB", "BToA"]
     for direction in order:
-        amount = SIZE_A if direction == "AToB" else SIZE_B
+        amount = size_a if direction == "AToB" else size_b
         have = bal_a if direction == "AToB" else bal_b
         if have >= amount:
             token_in, token_out = (token_a, token_b) if direction == "AToB" else (token_b, token_a)
