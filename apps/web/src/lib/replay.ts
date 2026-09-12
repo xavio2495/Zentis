@@ -92,6 +92,15 @@ export interface Decomposition {
   readonly clampedByMaxTilt: boolean;
   readonly balancesMatchEnclave: boolean;
   readonly referenceAgeSeconds: number | null;
+  /**
+   * True where this seq republished the previous round's tilt against a re-budgeted boundary.
+   *
+   * The slow workflow does not recompute the tilt; it carries the last fast round's. The console
+   * recomputes against the fresh boundary and lands a few basis points short in the tilt's own
+   * direction, which is a carry and not the enclave and the console disagreeing.
+   */
+  readonly carried?: boolean;
+  readonly carriedFromSeq?: number | null;
 }
 
 export interface SpreadStack {
