@@ -23,6 +23,8 @@ const leg: Leg = {
   label: "Sepolia",
   strategyHash: "0x212fec3f",
   maxTiltBps: 500,
+  balanceA: "15000000",
+  balanceB: "496902045775143",
   rounds: [round(1, -10), round(2, -120), round(3, -480), round(4, -500), round(5, -200)],
   fills: [],
   rejections: [],

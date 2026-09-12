@@ -35,6 +35,9 @@ export interface Leg {
   readonly strategyHash: string;
   /** the leg's own band edge, read off the position rather than assumed */
   readonly maxTiltBps: number;
+  /** what the position committed, as raw amounts, from the deployment record */
+  readonly balanceA: string;
+  readonly balanceB: string;
   readonly rounds: Round[];
   readonly fills: Fill[];
   readonly rejections: { atSeconds: number; transaction: string; reason: string }[];

@@ -24,26 +24,34 @@ test("zero is the middle, because the line it draws is signed", () => {
   for (const point of plot.points) expect(point.y).toBeCloseTo(25, 5);
 });
 
-test("the band edges are the extremes of the scale, so a clamp touches the frame", () => {
+test("a clamped shift sits on the cap line, which is what says it is clamped", () => {
   const plot = plotShift(rounds([-500, 0, 500]), { width: 100, height: 50, edgeBps: 500 });
-  expect(plot.edge.top).toBeCloseTo(0, 5);
-  expect(plot.edge.bottom).toBeCloseTo(50, 5);
-  expect(plot.points[0]!.y).toBeCloseTo(50, 5);
-  expect(plot.points[2]!.y).toBeCloseTo(0, 5);
+  expect(plot.edgeVisible).toBe(true);
+  expect(plot.points[0]!.y).toBeCloseTo(plot.edge.bottom, 5);
+  expect(plot.points[2]!.y).toBeCloseTo(plot.edge.top, 5);
+  // With a little air above it, so the line is not drawn along the frame itself.
+  expect(plot.edge.top).toBeGreaterThan(0);
+  expect(plot.edge.bottom).toBeLessThan(50);
 });
 
-test("a shift inside the band stays inside the frame, in proportion", () => {
-  const plot = plotShift(rounds([250]), { width: 100, height: 50, edgeBps: 500 });
-  // Half the cap, so a quarter of the height above the middle.
-  expect(plot.points[0]!.y).toBeCloseTo(12.5, 5);
+test("the scale follows the shift, not the cap, or the line it is drawing is invisible", () => {
+  // These legs are capped at ±5,000 bps and quote in the low hundreds. Scaling to the cap drew a
+  // flat line through the middle of an empty box: the chart said nothing about the one quantity it
+  // exists to show. The cap is still stated — it is off this scale, and the panel says so.
+  const plot = plotShift(rounds([-200, -250, -229]), { width: 100, height: 50, edgeBps: 5_000 });
+  expect(plot.edgeVisible).toBe(false);
+  expect(plot.domainBps).toBeLessThan(500);
+  // The deepest shift is near the floor of the frame rather than a hair off its middle.
+  expect(plot.points[1]!.y).toBeGreaterThan(40);
 });
 
 test("the scale widens past the cap rather than clipping a shift that exceeded it", () => {
-  // The cap is the band the workflow configured; a published shift can still arrive outside it, and
-  // a chart that clipped it would hide the one round worth looking at.
+  // A published shift outside the band is the one round worth looking at, so it is never clipped.
   const plot = plotShift(rounds([-1000]), { width: 100, height: 50, edgeBps: 500 });
-  expect(plot.points[0]!.y).toBeCloseTo(50, 5);
-  expect(plot.edge.bottom).toBeCloseTo(37.5, 5);
+  expect(plot.edgeVisible).toBe(true);
+  // Past the cap line, and still inside the frame.
+  expect(plot.points[0]!.y).toBeGreaterThan(plot.edge.bottom);
+  expect(plot.points[0]!.y).toBeLessThanOrEqual(50);
 });
 
 test("time runs left to right, so a fill lands where its own timestamp is", () => {
