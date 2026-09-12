@@ -38,6 +38,34 @@ test("the served copy is the built bundle, byte for byte, wherever one has been 
   expect(readFileSync(bundles.served, "utf8")).toBe(readFileSync(bundles.built, "utf8"));
 });
 
+test("a build machine with no sibling install verifies the committed copy instead of failing", async () => {
+  // On Vercel the project root is `apps/web`. The siblings are in the checkout but nobody installs
+  // them, so the publisher cannot run — and a build step that dies there takes the deploy with it
+  // for a rebuild that would produce the file already committed beside it. Checking is the honest
+  // thing to do there: the rebuild belongs where the fixtures change, which is a developer's
+  // machine, before the commit.
+  const { decide, verify } = await import("./scripts/publish-console.js");
+  expect(decide({}, false)).toBe("check");
+  expect(decide({ ZENTIS_PUBLISH_CONSOLE: "check" }, true)).toBe("check");
+  expect(decide({}, true)).toBe("build");
+});
+
+test("checking fails loudly on a copy from an older recording, naming both stamps", async () => {
+  const { verify } = await import("./scripts/publish-console.js");
+  // The current copy passes.
+  expect(() => verify(readFileSync(bundles.served, "utf8"), recordedAt.seconds)).not.toThrow();
+  // One from an earlier moment does not, and the message has to say which two moments, or whoever
+  // reads the failed deploy log has to go and find them.
+  let said = "";
+  try {
+    verify("a bundle built against 1789227919", recordedAt.seconds);
+  } catch (cause) {
+    said = String(cause instanceof Error ? cause.message : cause);
+  }
+  expect(said).toContain(String(recordedAt.seconds));
+  expect(said).toMatch(/publish-console|rebuild|bun run/i);
+});
+
 test("publishing the console is one command, so the copy cannot be forgotten", () => {
   const script = join(import.meta.dir, "scripts", "publish-console.ts");
   expect(existsSync(script)).toBe(true);
