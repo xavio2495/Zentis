@@ -233,6 +233,28 @@ export function firstClamp(leg: Leg): number | null {
   return index === -1 ? null : index;
 }
 
+/** What a key does to the playhead. Arithmetic on its own, so it can be tested without a browser. */
+export type Step = "left" | "right" | "home" | "end";
+
+/**
+ * Where a key moves the playhead.
+ *
+ * Ten for a modified arrow, because four hundred rounds is too many to walk one at a time and too
+ * few to need a page. The ends hold rather than wrap: a replay that jumps from the last round back
+ * to the first under a reader's hand takes the answer away from them at the moment they found it.
+ */
+export function step(playhead: number, key: Step, far: boolean, length: number): number {
+  if (length <= 0) return 0;
+  const last = length - 1;
+  const moved =
+    key === "home"
+      ? 0
+      : key === "end"
+        ? last
+        : playhead + (key === "right" ? 1 : -1) * (far ? 10 : 1);
+  return Math.max(0, Math.min(last, moved));
+}
+
 /**
  * Speed as a stride over the same tick.
  *

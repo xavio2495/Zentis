@@ -58,6 +58,11 @@ export function Transport() {
         )}
       </div>
 
+      {/* The keys are on the strip that answers them, at the width that has room for them: a
+          control nobody knows about is a control nobody uses. */}
+      <span className="label-sm hidden shrink-0 whitespace-nowrap text-ink-faint xl:inline">
+        space · ← → · shift ×10 · home/end
+      </span>
       <span className="tnum shrink-0 font-mono text-[11px] text-ink-faint">
         {now === null ? "—" : `${clock(now.atSeconds)} UTC · ${playhead + 1}/${length}`}
       </span>

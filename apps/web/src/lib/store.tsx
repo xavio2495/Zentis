@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { SPEEDS, TICK_MS, type Leg, type Replay, at, firstClamp, visible } from "./replay";
+import { SPEEDS, TICK_MS, type Leg, type Replay, type Step, at, firstClamp, step, visible } from "./replay";
 
 /**
  * The replay, as React sees it: one integer and a timer.
@@ -79,6 +79,46 @@ export function ReplayProvider({ children }: { children: React.ReactNode }) {
       if (timer.current !== null) clearInterval(timer.current);
     };
   }, [playing, speed, length]);
+
+  /**
+   * The keys a reader tries first.
+   *
+   * Space, the arrows, home and end — on the window rather than on the transport, because the
+   * transport is a strip at the bottom of the screen and nobody clicks into it before pressing
+   * space. A field keeps its own keys: the scrub handle is an input, and space on it would both
+   * drag the handle and toggle play.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable === true) {
+        // The one exception: space on the scrub handle should still play and pause, because the
+        // handle is where a reader's hand already is. The arrows there are the handle's own.
+        if (!(tag === "INPUT" && event.key === " ")) return;
+      }
+      const keys: Record<string, Step> = { ArrowLeft: "left", ArrowRight: "right", Home: "home", End: "end" };
+      const which = keys[event.key];
+      if (which !== undefined) {
+        event.preventDefault();
+        // Stepping is reading rather than watching, so it pauses, exactly as dragging does.
+        setPlaying(false);
+        setPlayhead((current) => step(current, which, event.shiftKey, length));
+        return;
+      }
+      if (event.key === " " || event.key === "Spacebar") {
+        // Or the page scrolls under the screen it is meant to be controlling.
+        event.preventDefault();
+        setPlaying((current) => {
+          if (!current && length > 0) setPlayhead((at) => (at >= length - 1 ? 0 : at));
+          return !current;
+        });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [length]);
 
   // At the end it stops rather than looping: a replay that restarts under a reader who is reading
   // the last frame takes the answer away from them.
