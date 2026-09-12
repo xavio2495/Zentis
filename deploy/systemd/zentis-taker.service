@@ -1,0 +1,8 @@
+[Unit]
+Description=Zentis taker: one small fill per leg, alternating direction, so the demo keeps accumulating real fills
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.foundry/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=%h/projects/Zentis
+ExecStart=/usr/bin/python3 %h/projects/Zentis/scripts/taker.py

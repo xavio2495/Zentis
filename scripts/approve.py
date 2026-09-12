@@ -24,6 +24,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rebalance import RPCS, ROOT, call, key, next_nonce, send  # noqa: E402
+import txlog  # noqa: E402
+
+CHAIN_IDS = {"sepolia": 11155111, "arbitrum-sepolia": 421614, "base-sepolia": 84532}
 
 TOKENS = (("tokenA", "USDC", 10**6), ("tokenB", "WETH", 10**18))
 
@@ -97,6 +100,9 @@ def main():
                 print(f"      approve FAILED: {error}")
                 continue
             print(f"      approved {fmt(row['committed'])}: {receipt['transactionHash']} status {receipt['status']}")
+            txlog.record(name, CHAIN_IDS[name], "approve", plan["maker"], tx=receipt["transactionHash"],
+                         status=int(receipt["status"], 16), amount_in=row["committed"], token_in=row["token"],
+                         note="maker allowance to Aqua raised to the committed balance")
 
     if short_anywhere and not sending:
         print("\nnothing sent; run with --send to approve")

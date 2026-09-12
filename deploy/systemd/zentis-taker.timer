@@ -1,0 +1,11 @@
+[Unit]
+Description=Fill each leg every twenty minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=20min
+AccuracySec=1min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

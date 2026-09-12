@@ -24,6 +24,11 @@ rather than doing half of it.
 import json, os, subprocess, sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import txlog  # noqa: E402
+
+CHAIN_IDS = {"sepolia": 11155111, "arbitrum-sepolia": 421614, "base-sepolia": 84532}
+
 ROOT = Path(__file__).resolve().parent.parent
 ONE = 10**18
 RPCS = {
@@ -162,6 +167,8 @@ def main():
                 print(f"   approve FAILED: {error}")
                 continue
             print(f"   approved: {receipt['transactionHash']}")
+            txlog.record(name, CHAIN_IDS[name], "approve", plan["maker"], tx=receipt["transactionHash"],
+                         status=int(receipt["status"], 16), amount_in=plan["approval"], token_in=leg["tokenB"])
             nonce += 1
         receipt, error = send(leg["aqua"], "push(address,address,bytes32,address,uint256)",
                               plan["maker"], leg["app"], leg["strategyHash"], leg["tokenB"], plan["topUp"],
@@ -170,6 +177,9 @@ def main():
             print(f"   push FAILED: {error}")
             continue
         print(f"   pushed: {receipt['transactionHash']} status {receipt['status']}")
+        txlog.record(name, CHAIN_IDS[name], "push", plan["maker"], tx=receipt["transactionHash"],
+                     status=int(receipt["status"], 16), amount_in=plan["topUp"], token_in=leg["tokenB"],
+                     note="Aqua push: top-up of the short side onto the mid")
 
 
 if __name__ == "__main__":
