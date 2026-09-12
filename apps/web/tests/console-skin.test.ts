@@ -78,3 +78,69 @@ describe("the grain and the one easing", () => {
     expect(css).toMatch(/\.tap\s*\{[^}]*var\(--ease-out\)/);
   });
 });
+
+describe("the scrollbars are ours", () => {
+  /**
+   * Five panels on this screen scroll, and a default scrollbar is the one surface the design system
+   * does not reach: a light-grey rounded bar on a near-black instrument, drawn by the OS in its own
+   * palette. It is also load-bearing rather than cosmetic — the scrollbars are the only clue that a
+   * panel has more evidence below the fold, so on a screen whose whole claim is "every number is
+   * here and traceable" they need to be visible and on-palette rather than invisible.
+   */
+  const rule = (selector: string): string | undefined => {
+    const at = css.indexOf(selector + " {");
+    if (at === -1) return undefined;
+    return css.slice(at, css.indexOf("}", at));
+  };
+
+  test("the scrolling surface is a class, so nothing gets them by accident", () => {
+    expect(rule(".scroll")).toBeDefined();
+  });
+
+  test("Firefox is told thin, and told in tokens", () => {
+    const block = rule(".scroll")!;
+    expect(block).toMatch(/scrollbar-width:\s*thin/);
+    expect(block).toMatch(/scrollbar-color:.*var\(--color-/);
+  });
+
+  test("the WebKit bar has a width, a track and a thumb", () => {
+    expect(rule(".scroll::-webkit-scrollbar")).toMatch(/width:/);
+    expect(rule(".scroll::-webkit-scrollbar-track")).toBeDefined();
+    expect(rule(".scroll::-webkit-scrollbar-thumb")).toBeDefined();
+  });
+
+  test("every colour in them is a token, never a literal", () => {
+    for (const selector of [
+      ".scroll",
+      ".scroll::-webkit-scrollbar",
+      ".scroll::-webkit-scrollbar-track",
+      ".scroll::-webkit-scrollbar-thumb",
+      ".scroll::-webkit-scrollbar-thumb:hover",
+    ]) {
+      const block = rule(selector);
+      if (block === undefined) continue;
+      expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+      expect(block).not.toMatch(/\brgb\(|\bhsl\(/);
+    }
+  });
+
+  test("the thumb answers the cursor on the one curve", () => {
+    expect(rule(".scroll::-webkit-scrollbar-thumb:hover")).toBeDefined();
+  });
+
+  test("every console container that scrolls wears the class", () => {
+    for (const file of ["LegCard.tsx", "FeedPanel.tsx", "PnlPanel.tsx"]) {
+      const text = source("components", "console", file);
+      for (const [, classes] of text.matchAll(/className="([^"]*overflow-[xy]?-?(?:auto|scroll)[^"]*)"/g)) {
+        expect(classes).toContain("scroll");
+      }
+    }
+  });
+
+  test("the tabular-numerals note still sits on the tabular-numerals rule", () => {
+    // A block was once inserted between a comment and the rule it explained, which leaves two rules
+    // each documented by the other's reasoning.
+    const note = css.indexOf("Tabular numerals");
+    expect(css.slice(note, css.indexOf("{", note))).toMatch(/\.tnum\s*$/);
+  });
+});
