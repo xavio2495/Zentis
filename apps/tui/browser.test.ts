@@ -85,7 +85,7 @@ test("pressing x closes the console instead of reaching for a timer no browser h
   const had = (globalThis as { setImmediate?: unknown }).setImmediate;
   delete (globalThis as { setImmediate?: unknown }).setImmediate;
   const thrown: unknown[] = [];
-  const onError = (event: PromiseRejectionEvent | ErrorEvent) => thrown.push(event);
+  const onError = (cause: unknown) => thrown.push(cause);
   process.on("uncaughtException", onError as never);
   process.on("unhandledRejection", onError as never);
 
@@ -105,4 +105,28 @@ test("pressing x closes the console instead of reaching for a timer no browser h
   // And it says what happened: a console that vanished on a keystroke reads as a page that broke.
   expect(screen).toMatch(/console closed/i);
   expect(screen).toMatch(/reload/i);
+}, 30_000);
+
+test("the shimmed process carries the listener surface Ink unmounts through", async () => {
+  // `x` stopped throwing at `setImmediate` and then threw at `process.off` instead: Ink registers a
+  // `beforeExit` handler in `waitUntilExit` and removes it in `unmount`, and the shimmed process had
+  // neither method. Bun's own process has both, which is why only the browser ever saw it — so what
+  // is asserted here is the shim's surface rather than a keystroke.
+  const { installBrowserGlobals } = await import("./src/stubs/browser-globals.js");
+  const had = { process: globalThis.process, setImmediate: (globalThis as { setImmediate?: unknown }).setImmediate };
+  delete (globalThis as { process?: unknown }).process;
+  delete (globalThis as { setImmediate?: unknown }).setImmediate;
+  installBrowserGlobals();
+  const shimmed = globalThis.process as unknown as Record<string, unknown>;
+  for (const method of ["on", "once", "off", "removeListener", "emit"]) {
+    expect(typeof shimmed[method]).toBe("function");
+  }
+  // And the timer runs its callback rather than merely existing.
+  const ran = await new Promise<boolean>((resolve) => {
+    (globalThis as { setImmediate: (fn: () => void) => void }).setImmediate(() => resolve(true));
+  });
+  expect(ran).toBe(true);
+
+  globalThis.process = had.process;
+  (globalThis as { setImmediate?: unknown }).setImmediate = had.setImmediate;
 }, 30_000);
