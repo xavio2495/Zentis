@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { COPY } from "@/lib/copy";
+import { COPY, ROUTES } from "@/lib/copy";
 import { scrollToTarget } from "@/lib/scroll";
 
 const SECTIONS = [
@@ -64,6 +64,21 @@ export function Nav() {
             }`}
           >
             {section.label}
+          </a>
+        ))}
+        {/* After the anchors, and marked off from them: the sections above are the argument, these
+            two are where it is running. A reader who wants the evidence rather than the pitch
+            should not have to guess a URL. */}
+        <span aria-hidden className="h-4 w-px self-center bg-stroke" />
+        {ROUTES.map((route) => (
+          <a
+            key={route.href}
+            href={route.href}
+            data-magnetic
+            title={route.blurb}
+            className="nav-link text-ink-soft no-underline hover:text-ink"
+          >
+            {route.label}
           </a>
         ))}
       </div>

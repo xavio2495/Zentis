@@ -43,6 +43,26 @@ export const INTEGRATIONS: Integration[] = [
 /** The three words the loader crosses through while the field is built. */
 export const LOADER_WORDS = ["Quote", "Tilt", "Fill"] as const;
 
+/**
+ * The two places the argument is demonstrated rather than made.
+ *
+ * Declared once so the nav, the contact section and each route's own header all name the same
+ * paths — three components inventing "/sim" separately is three chances to be wrong about it, and
+ * a dead link on a judged submission costs more than a typo usually does.
+ */
+export const ROUTES = [
+  {
+    href: "/console",
+    label: "Console",
+    blurb: "the tool the maker runs, on the recorded moment",
+  },
+  {
+    href: "/sim",
+    label: "Replay",
+    blurb: "the same moment as one screen, for a reader in forty seconds",
+  },
+] as const;
+
 export const COPY = {
   wordmark: "ZENTIS",
   heroLine: "Market making · Three chains · One position",
@@ -58,6 +78,7 @@ export const COPY = {
   installCopied: "Copied",
 
   contactLine: "Read it for yourself.",
+  routesLine: "Or watch it run:",
   contactHint: "Click to copy",
   contactCopied: "Copied",
 

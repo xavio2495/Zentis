@@ -14,7 +14,7 @@ export function MarkGlyph({ className = "" }: { className?: string }) {
       aria-hidden
       focusable="false"
       className={`h-4 w-4 shrink-0 ${className}`}
-      fill="currentColor"
+      fill={className.includes("fill-") ? undefined : "currentColor"}
     >
       <path d={CHAIN_B} />
       <path d={BRIDGE} />

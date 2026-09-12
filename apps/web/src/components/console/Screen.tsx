@@ -51,11 +51,22 @@ export function Screen() {
       */}
       <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-stroke px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <MarkGlyph className="text-ink" />
-          <span className="label whitespace-nowrap text-ink">Zentis</span>
+          {/* The way back. A route reached from the landing that cannot return to it is a dead end
+              costing a browser button, and the mark is where a reader looks for home. */}
+          <a href="/" className="tap flex items-center gap-3 no-underline" aria-label="Zentis — back to the landing page">
+            <MarkGlyph className="fill-em" />
+            <span className="label whitespace-nowrap text-ink">Zentis</span>
+          </a>
+          <span aria-hidden className="h-4 w-px bg-stroke" />
+          <a href="/console" className="label-sm tap whitespace-nowrap text-ink-faint no-underline hover:text-ink">
+            Console
+          </a>
+          {/* A rule on both sides of the link, or "Console" and the subtitle run together and read
+              as one phrase: "console replay · recorded testnet reads". */}
+          <span aria-hidden className="hidden h-4 w-px bg-stroke xl:block" />
           {/* Dropped rather than wrapped: three lines of subtitle push the bar out of its own
               height, and the words are the least load-bearing thing on the screen. */}
-          <span className="label-sm hidden truncate text-ink-faint lg:inline">replay · recorded testnet reads</span>
+          <span className="label-sm hidden truncate text-ink-faint xl:inline">recorded testnet reads</span>
         </div>
         <div className="flex items-center justify-center gap-2">
           {(replay?.legs ?? []).map((option, index) => (

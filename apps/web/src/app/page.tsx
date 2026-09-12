@@ -8,7 +8,7 @@ import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
 import { Smoother } from "@/components/Smoother";
-import { COPY, INTEGRATIONS, INSTALL_COMMAND, REPO_LABEL, REPO_URL } from "@/lib/copy";
+import { COPY, INSTALL_COMMAND, INTEGRATIONS, REPO_LABEL, REPO_URL, ROUTES } from "@/lib/copy";
 
 /** The four corner brackets that stand in for a card border. */
 function Brackets() {
@@ -105,6 +105,20 @@ export default function Home() {
                 hint={COPY.contactHint}
                 copied={COPY.contactCopied}
               />
+            </div>
+            <p className="mt-10 label-sm text-ink-faint">{COPY.routesLine}</p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+              {ROUTES.map((route) => (
+                <a
+                  key={route.href}
+                  href={route.href}
+                  data-magnetic
+                  className="nav-link text-fs-1 text-ink no-underline hover:text-ink"
+                >
+                  {route.label}
+                  <span className="ml-2 text-fs-0 text-ink-faint">{route.blurb}</span>
+                </a>
+              ))}
             </div>
           </Reveal>
         </section>
