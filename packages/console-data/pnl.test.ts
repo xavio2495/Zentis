@@ -124,6 +124,62 @@ test("hold says how much inventory it does not cover, rather than leaving the ga
   expect(pnl.unvaluedB).toBe(pushed);
 });
 
+test("the gap counts only the fills of this generation, since older ones moved another position", () => {
+  // A leg is re-shipped: the subgraph keeps every fill the position ever took, including the ones
+  // that moved the balance of the generation before this one. Counting those made the gap read
+  // half a milli-WETH too large on two legs — a number that looked plausible and was wrong, which
+  // is the only kind worth catching.
+  const mark = (10n ** 30n) / 2_467n;
+  const shippedB = 3_609_187_305_665_584n;
+  const pushed = 2_462_000_000_000_000n;
+  const soldNow = 57_941_952_335_277n;
+  const fill = (timestamp: bigint, amountOut: bigint) => ({
+    transaction: `0x${timestamp}`,
+    timestamp,
+    isAToB: true,
+    amountIn: 150_000n,
+    amountOut,
+    hasReference: true,
+    refMid: mark,
+    refTiltBps: 0,
+    refSeq: 1,
+    refAgeSeconds: 0n,
+    chainId: 84532,
+    kind: "fill",
+  });
+  const shipAt = 1_789_100_906;
+  const history = {
+    position: { balanceA: 15_000_000n, balanceB: shippedB + pushed - soldNow, active: true },
+    // One before the ship and one after: only the second moved this generation's balance.
+    fills: [fill(BigInt(shipAt) + 100n, soldNow), fill(BigInt(shipAt) - 100_000n, 543_830_902_874_131n)],
+    references: [],
+    rejections: [],
+  } as never;
+  const shipped = {
+    balanceA: 15_000_000n,
+    balanceB: shippedB,
+    mid: mark,
+    markAtShip: mark,
+    markAtShipAt: shipAt,
+    markAtShipSource: "x",
+    seq: 1,
+    block: 1,
+  };
+  expect(legPnl(history, shipped, mark, mark).unvaluedB).toBe(pushed);
+});
+
+test("without a ship time the gap is unknown rather than a number nobody can stand behind", () => {
+  const mark = (10n ** 30n) / 2_467n;
+  const history = {
+    position: { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, active: true },
+    fills: [],
+    references: [],
+    rejections: [],
+  } as never;
+  const shipped = { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, mid: mark, markAtShip: mark, markAtShipAt: null, markAtShipSource: null, seq: 1, block: 1 };
+  expect(legPnl(history, shipped, mark, mark).unvaluedB).toBeNull();
+});
+
 test("a leg holding exactly what it was shipped with, less its fills, has no gap to report", () => {
   const mark = (10n ** 30n) / 2_467n;
   const shippedB = 496_902_045_775_143n;
