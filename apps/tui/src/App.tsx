@@ -774,11 +774,11 @@ export function App({
   // shorter ones. Taking the label from a leg's automatic window put "1h window" over six days.
   const marketWindow = WINDOWS[windowChoice ?? WINDOWS.length - 1] ?? WINDOWS[WINDOWS.length - 1]!;
   const marketWindowLabel = `${marketWindow.label} window${windowChoice === null ? " · auto" : ""} · t`;
-  // The command row is a row of the screen, taken from the region below the charts rather than added
-  // to the frame: a frame that grew by a row when the colon was pressed would reach `stdout.rows`
-  // and make Ink clear the terminal on every repaint.
-  const commandRows = typing === null ? 0 : 1;
-  const feedRows = Math.max(0, regions.feedRows - commandRows);
+  // The command row costs the screen nothing: it is the keys' own row, saying something else. It
+  // used to be an extra row below them, paid for by taking one off the feed — and when the row moved
+  // into the keys' panel the subtraction stayed behind, leaving the right-hand column a row short of
+  // the frame and a strip of empty terminal under the command box that nothing accounted for.
+  const feedRows = regions.feedRows;
   const pageRows = regions.graphRows + feedRows;
 
   return (
