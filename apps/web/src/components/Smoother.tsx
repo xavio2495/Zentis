@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { clearScrollSource, setScrollSource } from "@/lib/scroll";
+import { clearScrollSource, clearScrollTo, setScrollSource, setScrollTo } from "@/lib/scroll";
 
 /**
  * Smoothed scrolling, the way the reference does it: the content is moved by a
@@ -41,6 +41,15 @@ export function Smoother() {
       // the eased position, which is what the reader is actually looking at
       setScrollSource(() => -(gsap.getProperty("#smooth-content", "y") as number));
 
+      // and how to reach a place on it. The browser cannot: the wrapper it would try to scroll is
+      // fixed and overflow-hidden, so a native anchor jump moves nothing.
+      setScrollTo((target) => {
+        const node = document.querySelector(target);
+        if (!node) return false;
+        smoother.scrollTo(node, true);
+        return true;
+      });
+
       // the loader holds the page still while it runs, so the measurements it
       // would take before that are the wrong ones
       const refresh = () => ScrollTrigger.refresh();
@@ -48,6 +57,7 @@ export function Smoother() {
 
       destroy = () => {
         removeEventListener("zentis:ready", refresh);
+        clearScrollTo();
         clearScrollSource();
         smoother.kill();
       };

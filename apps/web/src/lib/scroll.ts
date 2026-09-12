@@ -27,3 +27,43 @@ export function scrollNow(): number {
   }
   return typeof scrollY === "number" ? scrollY : 0;
 }
+
+/**
+ * How to reach a place on the page, when the page is not what scrolls.
+ *
+ * ScrollSmoother makes `#smooth-wrapper` the visual viewport — fixed, overflow hidden — and moves
+ * the content by transform. A browser asked to jump to `#position` looks for the nearest scrollable
+ * ancestor, finds one that cannot scroll, and does nothing; the hash changes and the reader stays
+ * exactly where they were. So the smoother has to be asked directly, and the only place that knows
+ * it exists is the component that made it. It registers here, the same way the read side does.
+ */
+type ScrollTo = (target: string) => boolean;
+
+let scrollTo: ScrollTo | null = null;
+
+export function setScrollTo(next: ScrollTo): void {
+  scrollTo = next;
+}
+
+export function clearScrollTo(): void {
+  scrollTo = null;
+}
+
+/**
+ * Ask whatever is driving the page to go to `target`.
+ *
+ * Returns whether it actually scrolled, so the caller can fall back. It is deliberately the
+ * caller's fallback and not this module's: when no smoother is running the page scrolls natively
+ * and the browser's own anchor handling is already correct, which is a decision about an event,
+ * not about scrolling.
+ */
+export function scrollToTarget(target: string): boolean {
+  if (!scrollTo) return false;
+  try {
+    return scrollTo(target) === true;
+  } catch {
+    // A navigation is not worth an exception. If the smoother is mid-teardown the reader gets the
+    // browser's behaviour, which is the thing that works when there is no smoother at all.
+    return false;
+  }
+}

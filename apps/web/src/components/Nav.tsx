@@ -2,12 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { COPY } from "@/lib/copy";
+import { scrollToTarget } from "@/lib/scroll";
 
 const SECTIONS = [
   { id: "position", label: "Position" },
   { id: "built-on", label: "Built on" },
   { id: "contact", label: "Source" },
 ];
+
+/**
+ * Take a click to the place it names.
+ *
+ * The hash is still set, so the address bar and the back button behave and a link can be shared.
+ * What changes is that something actually scrolls: the smoother is asked first, and where there is
+ * no smoother — reduced motion, or a touch device — the default is left alone, because native
+ * anchor scrolling is already right in exactly those cases.
+ */
+function goTo(event: React.MouseEvent<HTMLAnchorElement>, id: string) {
+  // A modified click is the reader asking for a new tab or a download; it is not ours to take.
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (!scrollToTarget(`#${id}`)) return;
+  event.preventDefault();
+  history.pushState(null, "", `#${id}`);
+}
 
 /** The nav, with the section the reader is in marked. */
 export function Nav() {
@@ -32,7 +49,7 @@ export function Nav() {
 
   return (
     <nav className="nav-diff fixed inset-x-0 top-0 z-60 flex items-center justify-between px-8 py-6 md:px-12">
-      <a href="#hero" className="label text-ink no-underline" data-magnetic>
+      <a href="#hero" onClick={(event) => goTo(event, "hero")} className="label text-ink no-underline" data-magnetic>
         {COPY.wordmark}
       </a>
       <div className="hidden gap-8 text-fs-0 md:flex">
@@ -40,6 +57,7 @@ export function Nav() {
           <a
             key={section.id}
             href={`#${section.id}`}
+            onClick={(event) => goTo(event, section.id)}
             data-magnetic
             className={`nav-link text-ink-soft no-underline transition-colors hover:text-ink ${
               active === section.id ? "on" : ""
