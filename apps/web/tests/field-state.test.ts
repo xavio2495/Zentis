@@ -3,6 +3,7 @@ import {
   MARK_HALF_EXTENT,
   fieldState,
   gateShape,
+  insideGate,
   pixelsPerWorldUnit,
   textColumnHalfWidth,
 } from "../src/lib/field-state";
@@ -151,18 +152,33 @@ describe("the gate, and the mark held inside it", () => {
   });
 
   test("but never outside the gate, however far the cursor goes", () => {
-    const gate = gateShape();
     for (const x of [-1, -0.5, 0, 0.5, 1]) {
       for (const y of [-1, -0.5, 0, 0.5, 1]) {
         const state = at(0, { x, y });
-        const markRadius = MARK_HALF_EXTENT * state.scale;
-        const fromCentre = Math.hypot(
-          state.markOffsetX,
-          state.markOffsetY - gate.incircleCenterY,
-        );
-        expect(fromCentre).toBeLessThanOrEqual(gate.incircleRadius - markRadius * 0.9 + 1e-9);
+        expect(insideGate(state.markOffsetX, state.markOffsetY)).toBe(true);
       }
     }
+  });
+
+  test("the mark has the run of the gate, not just its middle", () => {
+    const gate = gateShape();
+    // it reaches out along the wide top edge
+    const right = at(0, { x: 1, y: 0.55 });
+    const left = at(0, { x: -1, y: 0.55 });
+    expect(right.markOffsetX).toBeGreaterThan(gate.side * 0.2);
+    expect(left.markOffsetX).toBeLessThan(-gate.side * 0.2);
+    // and down toward the point it stands on
+    const low = at(0, { x: 0, y: -1 });
+    expect(low.markOffsetY).toBeLessThan(gate.apexY * 0.45);
+    // and up to the top edge
+    const high = at(0, { x: 0, y: 1 });
+    expect(high.markOffsetY).toBeGreaterThan(gate.topY * 0.45);
+  });
+
+  test("the cursor's own position is reported for the light it casts", () => {
+    const state = at(0, { x: 1, y: 1 });
+    // unclamped, so effects can key off where the cursor really is
+    expect(state.pointerWorldX).toBeGreaterThan(state.markOffsetX);
   });
 
   test("the cursor lets go once the reader is through the gate", () => {
