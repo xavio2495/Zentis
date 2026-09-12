@@ -7,6 +7,7 @@ import { useLegAt, useReplay } from "@/lib/store";
 import { FillsPanel } from "./FillsPanel";
 import { ShiftPanel } from "./ShiftPanel";
 import { SimPanel, type SimSeed } from "./SimPanel";
+import { LegCard } from "./LegCard";
 import { MarketPanel } from "./MarketPanel";
 import { MarkGlyph } from "./MarkGlyph";
 import { Transport } from "./Transport";
@@ -104,6 +105,13 @@ export function Screen() {
           <SimPanel sim={sim} />
         </div>
       </main>
+
+      {/* The three legs across, below the charts: one position, said three times. */}
+      <section className="grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 lg:grid-cols-3">
+        {(replay?.legs ?? []).map((each) => (
+          <LegCard key={each.chainId} leg={each} />
+        ))}
+      </section>
 
       <Transport />
     </div>

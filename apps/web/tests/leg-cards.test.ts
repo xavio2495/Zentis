@@ -102,12 +102,13 @@ describe("the spread stack", () => {
 
 describe("the inventory split", () => {
   test("the even split is the mark the bar is read against", () => {
-    expect(inventorySplit("500000000000000000").shareA).toBeCloseTo(0.5, 6);
-    expect(inventorySplit("500000000000000000").evenAt).toBe(0.5);
+    const even = inventorySplit("500000000000000000")!;
+    expect(even.shareA).toBeCloseTo(0.5, 6);
+    expect(even.evenAt).toBe(0.5);
   });
 
   test("a leg leaning to tokenA reads above the even mark", () => {
-    const split = inventorySplit(legs[0]!.decomposition.weightA);
+    const split = inventorySplit(legs[0]!.decomposition.weightA)!;
     expect(split.shareA).toBeGreaterThan(0);
     expect(split.shareA).toBeLessThan(1);
     expect(split.leansTo).toBe(split.shareA > 0.5 ? "A" : "B");
