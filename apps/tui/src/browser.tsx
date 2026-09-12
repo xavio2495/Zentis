@@ -68,9 +68,15 @@ export function streams(terminal: TerminalHandle) {
     // xterm that assumption breaks and successive frames tear into each other. Since Ink emits the
     // *whole* frame every time anyway, the fix is to stop trusting the relative erase: each frame
     // is preceded by a home-and-clear, so every render starts from a known position.
-    write: (data: string) => {
+    // The callback is not decoration: Ink resolves its exit promise from this write when the stream
+    // looks writable, so a shim that ignored it left `x` unmounting the console and nothing saying
+    // so. Node's signature puts the callback second or third depending on whether an encoding was
+    // given, and both forms are answered here rather than the one that happened to be seen.
+    write: (data: string, encodingOrDone?: unknown, maybeDone?: unknown) => {
       if (data.includes(SYNC_START)) terminal.write(HOME_AND_CLEAR);
       terminal.write(data);
+      const done = typeof encodingOrDone === "function" ? encodingOrDone : maybeDone;
+      if (typeof done === "function") (done as () => void)();
       return true;
     },
     isTTY: true,
@@ -120,14 +126,12 @@ export function mount(terminal: TerminalHandle) {
     ...fakeSnapshot("fresh"),
     caveats: ["recorded testnet reads, not live: this public console asks no endpoint anything"],
   });
-  // A console closed on the page is not a process that ended: there is nothing to exit, and a
-  // terminal that simply goes still reads as a page that broke. So the last thing written is a line
-  // saying what happened and how to get it back.
-  const closed = () => terminal.write("\r\n  console closed · reload to reopen\r\n");
   // The log page gets the recording too: there is no machine behind this console to have a file on,
   // and a visitor pressing `l` on an empty table learns nothing about what the page is for.
-  const app = render(
+  return render(
     <App
+      // There is no process behind this console, so `x` says so rather than ending one.
+      quitHint="this console lives in the page · reload to reopen it, or close the tab"
       actions={watchActions}
       runAction={null}
       makeStore={store}
@@ -143,6 +147,4 @@ export function mount(terminal: TerminalHandle) {
       exitOnCtrlC: false,
     },
   );
-  void app.waitUntilExit().then(closed, closed);
-  return app;
 }

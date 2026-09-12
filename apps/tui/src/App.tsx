@@ -105,6 +105,7 @@ export function App({
   onboarding = false,
   onChoose,
   onArm,
+  quitHint = null,
   readTxLog: readTxLogGiven = null,
   txlogPath: txlogPathGiven = "~/.zentis/txlog.jsonl",
 }: {
@@ -157,6 +158,15 @@ export function App({
   readTxLog?: (() => TxLogLine[]) | null;
   /** where that file is, said on screen so an empty page can be explained rather than doubted */
   txlogPath?: string;
+  /**
+   * What to say instead of quitting, where there is nothing to quit.
+   *
+   * In a terminal `x` means exit and Ink's own `exit` is right. On a web page there is no process
+   * to end: Ink's exit path walks out through Node's timers and process listeners, and its parting
+   * frame clears the screen — so a console that "closed" left a blank rectangle in a page that was
+   * still perfectly alive. The honest answer there is to say so and stay up, which is what this is.
+   */
+  quitHint?: string | null;
 }) {
   const { exit } = useApp();
   const size = useSize();
@@ -589,6 +599,11 @@ export function App({
     if (binding === null) return;
     switch (binding.id) {
       case "quit":
+        // Nothing to exit in a page: say why, and stay. In a terminal this is Ink's own exit.
+        if (quitHint !== null) {
+          say(quitHint);
+          return;
+        }
         exit();
         return;
       case "help":

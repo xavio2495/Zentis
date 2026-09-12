@@ -77,7 +77,7 @@ test("a visitor's keystrokes reach the console, because a console nobody can pre
   expect(screen).toMatch(/strategy/);
 }, 30_000);
 
-test("pressing x closes the console instead of reaching for a timer no browser has", async () => {
+test("pressing x says why there is nothing to quit, rather than reaching for a timer no browser has", async () => {
   // Ink resolves its exit promise through `setImmediate`, which is Node's and not the platform's.
   // In the browser that threw "ReferenceError: setImmediate is not defined" out of the unmount path
   // and left the page with a console that could not be closed. Bun has the function, so the browser
@@ -102,8 +102,9 @@ test("pressing x closes the console instead of reaching for a timer no browser h
   app.unmount();
 
   expect(thrown).toEqual([]);
-  // And it says what happened: a console that vanished on a keystroke reads as a page that broke.
-  expect(screen).toMatch(/console closed/i);
+  // And it says why: unmounting left a blank rectangle in a page that was still alive, which reads
+  // as something broken. The console stays up and the status bar answers the keystroke.
+  expect(screen).toMatch(/lives in the page/i);
   expect(screen).toMatch(/reload/i);
 }, 30_000);
 

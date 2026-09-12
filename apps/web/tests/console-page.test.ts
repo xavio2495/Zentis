@@ -32,5 +32,7 @@ test("the mark comes from the geometry the landing draws, not from three pasted 
 });
 
 test("the mark is drawn in the accent, which is what makes it the Zentis mark and not a glyph", () => {
-  expect(page).toMatch(/accent/);
+  // `--color-em` is the accent in this sheet, so `fill-em` is the utility for it. A mark in the ink
+  // ladder is a glyph; the accent is what says the thing under it is Zentis.
+  expect(page).toMatch(/fill-em\b/);
 });
