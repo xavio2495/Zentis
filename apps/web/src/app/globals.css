@@ -439,3 +439,95 @@ body.ready .rise-4 {
 .hero-name-glow span {
   opacity: 0;
 }
+
+/* ── The page's own cursor ──────────────────────────────────────────
+   Difference blend, so it reads over the black field and over the
+   wordmark alike without either having to know about it. */
+body.has-cursor,
+body.has-cursor a,
+body.has-cursor button {
+  cursor: none;
+}
+
+body.has-cursor input,
+body.has-cursor textarea,
+body.has-cursor select,
+body.has-cursor [contenteditable] {
+  cursor: auto;
+}
+
+.cur-dot,
+.cur-ring,
+.cur-trail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  will-change: transform;
+}
+
+.cur-dot {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: #fff;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.cur-ring {
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  transition:
+    width 0.25s var(--ease-out),
+    height 0.25s var(--ease-out),
+    margin 0.25s var(--ease-out),
+    border-color 0.25s var(--ease-out),
+    opacity 0.3s var(--ease-out);
+}
+
+.cur-ring.over {
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-color: var(--color-em);
+}
+
+.cur-trail {
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  background: var(--color-em);
+  opacity: 0;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .cur-dot,
+  .cur-ring,
+  .cur-trail {
+    display: none;
+  }
+}
+
+/* The section the reader is in, marked in the nav. */
+.nav-link.on {
+  color: var(--color-em);
+}
+
+/* The two lines under the wordmark carry the same lit copy as the wordmark,
+   masked to wherever the mark has got to. */
+.hero-line-glow {
+  color: transparent;
+  pointer-events: none;
+  mix-blend-mode: normal;
+  opacity: 0;
+  text-shadow:
+    0 0 9px rgba(0, 237, 100, 0.5),
+    0 0 24px rgba(0, 237, 100, 0.2);
+}

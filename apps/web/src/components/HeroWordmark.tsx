@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { COPY } from "@/lib/copy";
 import { letterGlow } from "@/lib/hero-glow";
+import { markPosition } from "@/lib/mark-position";
 
 const LETTERS = COPY.wordmark.split("");
 
@@ -46,12 +47,19 @@ export function HeroWordmark() {
         const node = realLetters[i] as HTMLElement | undefined;
         if (!node) continue;
         const rect = node.getBoundingClientRect();
-        const target = letterGlow(
-          pointerX,
-          pointerY,
-          { centerX: rect.left + rect.width / 2, width: rect.width },
-          band,
-        );
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const fromCursor = letterGlow(pointerX, pointerY, { centerX, width: rect.width }, band);
+
+        // The mark lights what it passes behind, as well as the cursor.
+        let fromMark = 0;
+        if (markPosition.visible && markPosition.radius > 0) {
+          const reach = markPosition.radius * 1.5 + box.height * 0.3;
+          const away = Math.hypot(markPosition.x - centerX, markPosition.y - centerY);
+          fromMark = Math.max(0, 1 - away / reach) * 0.85;
+        }
+
+        const target = Math.min(1, Math.max(fromCursor, fromMark));
 
         // quick to light, slower to let go
         eased[i] += (target - eased[i]) * (target > eased[i] ? 0.22 : 0.07);

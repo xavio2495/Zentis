@@ -1,5 +1,8 @@
 import { CopyCommand } from "@/components/CopyCommand";
+import { Cursor } from "@/components/Cursor";
+import { HeroLines } from "@/components/HeroLines";
 import { HeroWordmark } from "@/components/HeroWordmark";
+import { Nav } from "@/components/Nav";
 import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
@@ -23,23 +26,9 @@ export default function Home() {
       <Loader />
       <Field />
       <div className="grain" />
+      <Cursor />
 
-      <nav className="nav-diff fixed inset-x-0 top-0 z-60 flex items-center justify-between px-8 py-6 md:px-12">
-        <a href="#hero" className="label text-ink no-underline">
-          {COPY.wordmark}
-        </a>
-        <div className="hidden gap-8 text-fs-0 md:flex">
-          <a href="#position" className="text-ink-soft no-underline transition-colors hover:text-ink">
-            Position
-          </a>
-          <a href="#built-on" className="text-ink-soft no-underline transition-colors hover:text-ink">
-            Built on
-          </a>
-          <a href="#install" className="text-ink-soft no-underline transition-colors hover:text-ink">
-            Install
-          </a>
-        </div>
-      </nav>
+      <Nav />
 
       <main className="relative z-3">
         {/* The first screen is server-rendered at its final metrics, so the
@@ -50,8 +39,7 @@ export default function Home() {
           style={{ height: "100svh" }}
         >
           <HeroWordmark />
-          <p className="hero-line rise-2">{COPY.heroLine}</p>
-          <p className="hero-tagline serif rise-3">{COPY.tagline}</p>
+          <HeroLines line={COPY.heroLine} tagline={COPY.tagline} />
           <div className="rise-4 absolute bottom-8 opacity-0">
             <svg
               className="pulse-soft h-6 w-6 stroke-ink-faint"

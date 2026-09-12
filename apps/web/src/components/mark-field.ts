@@ -14,6 +14,7 @@ import {
 } from "three";
 import { BAR, sampleMark } from "@/lib/mark-geometry";
 import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state";
+import { markPosition } from "@/lib/mark-position";
 
 /**
  * The field: a doorway, the mark, and the light behind both.
@@ -31,8 +32,8 @@ const COUNT = 6000;
 const MARK_SCALE = 9;
 
 /** The gate: an equilateral triangle standing on its point, the mark inside it. */
-const GATE_EDGE = 900;
-const GATE_RISING = 260;
+const GATE_EDGE = 1500;
+const GATE_RISING = 320;
 /** How readily the gate takes the cursor's green. */
 const GATE_STAIN = 0.85;
 
@@ -139,14 +140,34 @@ interface Cloud {
 }
 
 /**
- * How big a point is and how far out of focus. Most are small and sharp; a few
- * are large and soft, and those are what give the field its depth.
+ * Three populations, each with its own focus.
+ *
+ * The mark is drawn in fine, mostly sharp points, because it has a shape to
+ * hold. The gate is a column of large, out-of-focus light — it is the nearest
+ * thing to the reader and reads as being past the plane the mark sits on. The
+ * far field is small and faint with a scatter of soft blobs for depth. Three
+ * profiles rather than one is what stops the whole field reading as a single
+ * spray of confetti.
  */
-function focus(): { size: number; soft: number } {
+function fineFocus(): { size: number; soft: number } {
   const roll = Math.random();
-  if (roll < 0.68) return { size: 0.05 + Math.random() * 0.05, soft: 0.1 };
-  if (roll < 0.92) return { size: 0.11 + Math.random() * 0.09, soft: 0.45 };
-  return { size: 0.22 + Math.random() * 0.26, soft: 1 };
+  if (roll < 0.72) return { size: 0.045 + Math.random() * 0.045, soft: 0.08 };
+  if (roll < 0.93) return { size: 0.1 + Math.random() * 0.08, soft: 0.4 };
+  return { size: 0.2 + Math.random() * 0.2, soft: 1 };
+}
+
+function bokehFocus(): { size: number; soft: number } {
+  const roll = Math.random();
+  if (roll < 0.3) return { size: 0.08 + Math.random() * 0.07, soft: 0.25 };
+  if (roll < 0.62) return { size: 0.22 + Math.random() * 0.16, soft: 0.75 };
+  return { size: 0.42 + Math.random() * 0.5, soft: 1 };
+}
+
+function distantFocus(): { size: number; soft: number } {
+  const roll = Math.random();
+  if (roll < 0.74) return { size: 0.05 + Math.random() * 0.06, soft: 0.12 };
+  if (roll < 0.93) return { size: 0.14 + Math.random() * 0.12, soft: 0.6 };
+  return { size: 0.34 + Math.random() * 0.4, soft: 1 };
 }
 
 function emptyCloud(count: number): Cloud {
@@ -221,7 +242,7 @@ function buildMark(): Cloud {
     cloud.colors[i * 3 + 2] = shade;
     cloud.stain[i] = roles[i] === BAR ? 0.7 : 1;
 
-    const spot = focus();
+    const spot = fineFocus();
     cloud.sizes[i] = spot.size;
     cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
@@ -261,7 +282,7 @@ function buildGate(): Cloud {
     cloud.colors[i * 3 + 1] = shade;
     cloud.colors[i * 3 + 2] = shade * 0.99;
     cloud.stain[i] = GATE_STAIN;
-    const spot = focus();
+    const spot = fineFocus();
     cloud.sizes[i] = spot.size;
     cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
@@ -299,7 +320,7 @@ function buildGate(): Cloud {
     // a soft spray either side of the line, so the frame is drawn rather than ruled
     const nx = -(edge.b.y - edge.a.y) / edge.length;
     const ny = (edge.b.x - edge.a.x) / edge.length;
-    const spread = (Math.random() * 2 - 1) * Math.abs(Math.random()) * gate.side * 0.014;
+    const spread = (Math.random() * 2 - 1) * Math.abs(Math.random()) * gate.side * 0.035;
 
     cloud.positions[n * 3] = edge.a.x + (edge.b.x - edge.a.x) * t + nx * spread;
     cloud.positions[n * 3 + 1] = edge.a.y + (edge.b.y - edge.a.y) * t + ny * spread;
@@ -341,11 +362,9 @@ function buildStars(count: number, near: number, far: number): Cloud {
     cloud.colors[i * 3 + 1] = shade;
     cloud.colors[i * 3 + 2] = shade;
 
-    // further out, more of them are out of focus — that is what reads as depth
-    const spot = focus();
-    const blurred = Math.random() < 0.4;
-    cloud.sizes[i] = spot.size * (blurred ? 1.7 : 0.9);
-    cloud.softness[i] = blurred ? 1 : spot.soft;
+    const spot = distantFocus();
+    cloud.sizes[i] = spot.size;
+    cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
   }
   return cloud;
@@ -525,12 +544,21 @@ export function mountMarkField(host: HTMLElement): () => void {
     near.rotation.y = reduced ? 0 : time * 0.006;
     far.rotation.y = reduced ? 0 : -time * 0.004;
 
+    // Report where the mark has got to, so the hero can light the words it
+    // passes behind.
+    const perUnit = innerHeight / (2 * Math.tan((25 * Math.PI) / 180) * (16 - group.position.z));
+    markPosition.x = innerWidth / 2 + group.position.x * perUnit;
+    markPosition.y = innerHeight / 2 - group.position.y * perUnit;
+    markPosition.radius = 4.5 * state.scale * perUnit;
+    markPosition.visible = state.opacity > 0.05;
+
     renderer.render(scene, camera);
     raf = requestAnimationFrame(frame);
   };
   raf = requestAnimationFrame(frame);
 
   return () => {
+    markPosition.visible = false;
     cancelAnimationFrame(raf);
     removeEventListener("resize", resize);
     removeEventListener("pointermove", onPointerMove);
