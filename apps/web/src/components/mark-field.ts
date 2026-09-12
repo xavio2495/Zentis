@@ -521,6 +521,7 @@ export function mountMarkField(host: HTMLElement): () => void {
   let followX = 0;
   let followY = 0;
   let disperse = 0;
+  let borderGlow = 0;
   const cursorLocal = new Vector3();
   const inverseRotation = new Matrix4();
   const start = performance.now();
@@ -637,7 +638,11 @@ export function mountMarkField(host: HTMLElement): () => void {
       }
       borderGeometry.attributes.position.needsUpdate = true;
 
-      borderMaterial.uniforms.uOpacity.value = 0.9;
+      // The border is not a frame the line wears; it is what the line does when
+      // the cursor comes to it, and it goes again when the cursor leaves.
+      const wanted = dockRect.hovered ? 1 : 0;
+      borderGlow += (wanted - borderGlow) * settle(dockRect.hovered ? 7 : 4);
+      borderMaterial.uniforms.uOpacity.value = 0.52 * borderGlow;
       borderMaterial.uniforms.uTime.value = time;
       // the cursor's light and the space it clears, in the same world units
       borderMaterial.uniforms.uStain.value.set(
@@ -654,7 +659,7 @@ export function mountMarkField(host: HTMLElement): () => void {
       );
       borderMaterial.uniforms.uDisperseAmount.value = disperse * 0.55;
     }
-    borderPoints.visible = dockRect.on;
+    borderPoints.visible = dockRect.on && borderGlow > 0.004;
 
     // The type's quiet applies to everything drawn behind it.
     const aspect = innerWidth / innerHeight;

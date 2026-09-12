@@ -55,9 +55,21 @@ export function InstallDock() {
     };
 
     raf = requestAnimationFrame(frame);
+    const onEnter = () => {
+      dockRect.hovered = true;
+    };
+    const onLeave = () => {
+      dockRect.hovered = false;
+    };
+    node.addEventListener("pointerenter", onEnter);
+    node.addEventListener("pointerleave", onLeave);
+
     return () => {
       cancelAnimationFrame(raf);
+      node.removeEventListener("pointerenter", onEnter);
+      node.removeEventListener("pointerleave", onLeave);
       dockRect.on = false;
+      dockRect.hovered = false;
     };
   }, []);
 

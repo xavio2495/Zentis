@@ -11,4 +11,6 @@ export const dockRect = {
   width: 0,
   height: 0,
   on: false,
+  /** The border is the line's answer to being approached; otherwise it is not there. */
+  hovered: false,
 };
