@@ -7,6 +7,7 @@ import {
   Points,
   Scene,
   ShaderMaterial,
+  Vector4,
   WebGLRenderer,
 } from "three";
 import { BAR, sampleMark } from "@/lib/mark-geometry";
@@ -26,14 +27,12 @@ import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state"
 
 const COUNT = 6000;
 const MARK_SCALE = 9;
-const ACCENT = [0x00 / 255, 0xed / 255, 0x64 / 255] as const;
 
 /** The gate: an equilateral triangle standing on its point, the mark inside it. */
 const GATE_EDGE = 900;
 const GATE_RISING = 260;
-const GATE_FOOT = 80;
-/** One point in five is accented; the rest are light. */
-const GATE_ACCENT_SHARE = 0.2;
+/** How readily the gate takes the cursor's green. */
+const GATE_STAIN = 0.85;
 
 const STARS_NEAR = 700;
 const STARS_FAR = 900;
@@ -41,30 +40,49 @@ const STARS_FAR = 900;
 const vertexShader = `
 attribute vec3 aColor;
 attribute float aSize;
+attribute float aSoft;
 attribute float aPhase;
 attribute float aRise;
+attribute float aStain;
 attribute vec3 aScatterDir;
 uniform float uScale;
 uniform float uTime;
 uniform float uMotion;
 uniform float uScatter;
 uniform float uMinPx;
-uniform float uDoorBottom;
-uniform float uDoorHeight;
+uniform float uGateBottom;
+uniform float uGateHeight;
+/** xy: where the cursor is, in this object's own space. z: reach. w: strength. */
+uniform vec4 uStain;
+/** xy: cursor again, z: radius it clears, w: strength. */
+uniform vec4 uDisperse;
 varying vec3 vColor;
 varying float vAlpha;
+varying float vSoft;
 
 void main() {
   vColor = aColor;
+  vSoft = aSoft;
   vec3 p = position + aScatterDir * uScatter;
 
-  // Points with a rise drift up the doorway and wrap, fading at both ends so
-  // they are never seen to appear or to stop.
+  // Points with a rise drift up the gate and wrap, fading at both ends so they
+  // are never seen to appear or to stop.
   float fade = 1.0;
   if (aRise > 0.0) {
-    float y = mod(p.y - uDoorBottom + uTime * aRise * uMotion, uDoorHeight);
-    fade = smoothstep(0.0, 0.08, y / uDoorHeight) * (1.0 - smoothstep(0.86, 1.0, y / uDoorHeight));
-    p.y = uDoorBottom + y;
+    float y = mod(p.y - uGateBottom + uTime * aRise * uMotion, uGateHeight);
+    fade = smoothstep(0.0, 0.08, y / uGateHeight) * (1.0 - smoothstep(0.86, 1.0, y / uGateHeight));
+    p.y = uGateBottom + y;
+  }
+
+  // The cursor clears a space around itself: anything within its reach is
+  // pushed out to the edge of that space, leaving a hole where it rests.
+  if (uDisperse.w > 0.0) {
+    vec2 away = p.xy - uDisperse.xy;
+    float distance = length(away);
+    if (distance < uDisperse.z && distance > 0.0001) {
+      float push = (uDisperse.z / distance - 1.0) * uDisperse.w;
+      p.xy += away * push;
+    }
   }
 
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
@@ -73,6 +91,13 @@ void main() {
   float twinkle = 1.0 - 0.45 * uMotion * (0.5 + 0.5 * sin(uTime * (1.4 + fract(aPhase) * 1.3) + aPhase * 6.283));
   vAlpha = twinkle * fade * smoothstep(0.12, 1.1, depth) * (1.0 - uScatter * 0.55);
   gl_Position = projectionMatrix * mv;
+
+  // The green is the cursor's own light: it falls on what is near it and
+  // nothing else.
+  if (uStain.w > 0.0) {
+    float near = 1.0 - smoothstep(0.0, uStain.z, length(p.xy - uStain.xy));
+    vColor = mix(vColor, vec3(0.0, 0.929, 0.392), aStain * uStain.w * near);
+  }
 }
 `;
 
@@ -80,13 +105,19 @@ const fragmentShader = `
 uniform float uOpacity;
 varying vec3 vColor;
 varying float vAlpha;
+varying float vSoft;
 
 void main() {
   vec2 q = gl_PointCoord - vec2(0.5);
   float d2 = dot(q, q) * 4.0;
   if (d2 >= 1.0) discard;
-  float falloff = 1.0 - d2;
-  float a = min(1.0, falloff * 1.9) * vAlpha * uOpacity;
+  float inv = 1.0 - d2;
+
+  // A tight point and a soft one, mixed per particle: most are pinpricks, a few
+  // are out of focus, which is what stops the field reading as confetti.
+  float tight = min(1.0, inv * 1.9);
+  float soft = inv * inv;
+  float a = mix(tight, soft * 0.55, vSoft) * vAlpha * uOpacity;
   if (a < 0.004) discard;
   gl_FragColor = vec4(vColor, a);
 }
@@ -96,9 +127,22 @@ interface Cloud {
   positions: Float32Array;
   colors: Float32Array;
   sizes: Float32Array;
+  softness: Float32Array;
   phases: Float32Array;
   rise: Float32Array;
+  stain: Float32Array;
   scatter: Float32Array;
+}
+
+/**
+ * How big a point is and how far out of focus. Most are small and sharp; a few
+ * are large and soft, and those are what give the field its depth.
+ */
+function focus(): { size: number; soft: number } {
+  const roll = Math.random();
+  if (roll < 0.68) return { size: 0.05 + Math.random() * 0.05, soft: 0.1 };
+  if (roll < 0.92) return { size: 0.11 + Math.random() * 0.09, soft: 0.45 };
+  return { size: 0.22 + Math.random() * 0.26, soft: 1 };
 }
 
 function emptyCloud(count: number): Cloud {
@@ -106,8 +150,10 @@ function emptyCloud(count: number): Cloud {
     positions: new Float32Array(count * 3),
     colors: new Float32Array(count * 3),
     sizes: new Float32Array(count),
+    softness: new Float32Array(count),
     phases: new Float32Array(count),
     rise: new Float32Array(count),
+    stain: new Float32Array(count),
     scatter: new Float32Array(count * 3),
   };
 }
@@ -117,8 +163,10 @@ function toGeometry(cloud: Cloud): BufferGeometry {
   geometry.setAttribute("position", new BufferAttribute(cloud.positions, 3));
   geometry.setAttribute("aColor", new BufferAttribute(cloud.colors, 3));
   geometry.setAttribute("aSize", new BufferAttribute(cloud.sizes, 1));
+  geometry.setAttribute("aSoft", new BufferAttribute(cloud.softness, 1));
   geometry.setAttribute("aPhase", new BufferAttribute(cloud.phases, 1));
   geometry.setAttribute("aRise", new BufferAttribute(cloud.rise, 1));
+  geometry.setAttribute("aStain", new BufferAttribute(cloud.stain, 1));
   geometry.setAttribute("aScatterDir", new BufferAttribute(cloud.scatter, 3));
   return geometry;
 }
@@ -137,8 +185,10 @@ function makeMaterial(reduced: boolean, door: { bottom: number; height: number }
       uMotion: { value: reduced ? 0 : 1 },
       uScatter: { value: 0 },
       uMinPx: { value: 1.2 },
-      uDoorBottom: { value: door.bottom },
-      uDoorHeight: { value: door.height },
+      uGateBottom: { value: door.bottom },
+      uGateHeight: { value: door.height },
+      uStain: { value: new Vector4(0, 0, 1, 0) },
+      uDisperse: { value: new Vector4(0, 0, 1, 0) },
     },
   });
 }
@@ -158,19 +208,17 @@ function buildMark(): Cloud {
     cloud.positions[i * 3 + 1] = positions[i * 3 + 1] * MARK_SCALE;
     cloud.positions[i * 3 + 2] = positions[i * 3 + 2] * MARK_SCALE;
 
-    if (roles[i] === BAR) {
-      // the chains: light, with a little variance so the field has grain
-      const shade = 0.78 + Math.random() * 0.22;
-      cloud.colors[i * 3] = shade;
-      cloud.colors[i * 3 + 1] = shade;
-      cloud.colors[i * 3 + 2] = shade;
-    } else {
-      cloud.colors[i * 3] = ACCENT[0];
-      cloud.colors[i * 3 + 1] = ACCENT[1];
-      cloud.colors[i * 3 + 2] = ACCENT[2];
-    }
+    // All of it is light. The green is the cursor's, and falls only where the
+    // cursor is — the connector simply takes it more readily than the chains.
+    const shade = 0.78 + Math.random() * 0.22;
+    cloud.colors[i * 3] = shade;
+    cloud.colors[i * 3 + 1] = shade;
+    cloud.colors[i * 3 + 2] = shade;
+    cloud.stain[i] = roles[i] === BAR ? 0.7 : 1;
 
-    cloud.sizes[i] = 0.055 + Math.random() * 0.075;
+    const spot = focus();
+    cloud.sizes[i] = spot.size;
+    cloud.softness[i] = spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
 
     // outward direction for the scatter at the end of the page
@@ -191,7 +239,7 @@ function buildMark(): Cloud {
  */
 function buildGate(): Cloud {
   const gate = gateShape();
-  const total = GATE_EDGE + GATE_RISING + GATE_FOOT;
+  const total = GATE_EDGE + GATE_RISING;
   const cloud = emptyCloud(total);
 
   const half = gate.side / 2;
@@ -202,19 +250,16 @@ function buildGate(): Cloud {
   ];
   const depth = gate.side * 0.05;
 
-  // Four points in five are light; the fifth is the accent, scattered through
-  // the frame rather than gathered anywhere.
   const light = (i: number) => {
-    if (Math.random() < GATE_ACCENT_SHARE) {
-      cloud.colors[i * 3] = ACCENT[0];
-      cloud.colors[i * 3 + 1] = ACCENT[1];
-      cloud.colors[i * 3 + 2] = ACCENT[2];
-      return;
-    }
-    const shade = 0.78 + Math.random() * 0.22;
+    const shade = 0.72 + Math.random() * 0.28;
     cloud.colors[i * 3] = shade;
     cloud.colors[i * 3 + 1] = shade;
     cloud.colors[i * 3 + 2] = shade * 0.99;
+    cloud.stain[i] = GATE_STAIN;
+    const spot = focus();
+    cloud.sizes[i] = spot.size;
+    cloud.softness[i] = spot.soft;
+    cloud.phases[i] = Math.random() * 6.283;
   };
 
   /** Is a point inside the triangle? Same crossing test the mark uses. */
@@ -255,8 +300,6 @@ function buildGate(): Cloud {
     cloud.positions[n * 3 + 1] = edge.a.y + (edge.b.y - edge.a.y) * t + ny * spread;
     cloud.positions[n * 3 + 2] = (Math.random() * 2 - 1) * depth;
     light(n);
-    cloud.sizes[n] = 0.05 + Math.random() * 0.08;
-    cloud.phases[n] = Math.random() * 6.283;
   }
 
   for (let i = 0; i < GATE_RISING; i++, n++) {
@@ -271,19 +314,7 @@ function buildGate(): Cloud {
     cloud.positions[n * 3 + 1] = y;
     cloud.positions[n * 3 + 2] = (Math.random() * 2 - 1) * depth * 1.6;
     light(n);
-    cloud.sizes[n] = 0.045 + Math.random() * 0.06;
-    cloud.phases[n] = Math.random() * 6.283;
     cloud.rise[n] = 0.1 + Math.random() * 0.2;
-  }
-
-  // gathered at the point it stands on
-  for (let i = 0; i < GATE_FOOT; i++, n++) {
-    cloud.positions[n * 3] = (Math.random() * 2 - 1) * gate.side * 0.08;
-    cloud.positions[n * 3 + 1] = gate.apexY - 0.06 - Math.random() * 0.5;
-    cloud.positions[n * 3 + 2] = (Math.random() * 2 - 1) * 1.2;
-    light(n);
-    cloud.sizes[n] = 0.05 + Math.random() * 0.07;
-    cloud.phases[n] = Math.random() * 6.283;
   }
 
   return cloud;
@@ -300,14 +331,16 @@ function buildStars(count: number, near: number, far: number): Cloud {
     cloud.positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta) * 0.7;
     cloud.positions[i * 3 + 2] = -Math.abs(radius * Math.cos(phi)) * 0.6 - 4;
 
-    // mostly cold light, with the occasional accented one
-    const accented = Math.random() < 0.035;
     const shade = 0.45 + Math.random() * 0.35;
-    cloud.colors[i * 3] = accented ? ACCENT[0] : shade;
-    cloud.colors[i * 3 + 1] = accented ? ACCENT[1] : shade;
-    cloud.colors[i * 3 + 2] = accented ? ACCENT[2] : shade;
+    cloud.colors[i * 3] = shade;
+    cloud.colors[i * 3 + 1] = shade;
+    cloud.colors[i * 3 + 2] = shade;
 
-    cloud.sizes[i] = 0.09 + Math.random() * 0.2;
+    // further out, more of them are out of focus — that is what reads as depth
+    const spot = focus();
+    const blurred = Math.random() < 0.4;
+    cloud.sizes[i] = spot.size * (blurred ? 1.7 : 0.9);
+    cloud.softness[i] = blurred ? 1 : spot.soft;
     cloud.phases[i] = Math.random() * 6.283;
   }
   return cloud;
@@ -400,7 +433,15 @@ export function mountMarkField(host: HTMLElement): () => void {
   let raf = 0;
   let followX = 0;
   let followY = 0;
+  let disperse = 0;
   const start = performance.now();
+
+  // How far the cursor's light reaches across the gate, and — in the mark's own
+  // units — how far its light reaches into the mark and how big a space it
+  // clears there. The hole is a fraction of the mark, not the whole of it.
+  const STAIN_REACH = gate.side * 0.34;
+  const MARK_LIGHT = 2.4;
+  const MARK_CLEARS = 0.85;
 
   const frame = (now: number) => {
     const time = (now - start) / 1000;
@@ -417,8 +458,8 @@ export function mountMarkField(host: HTMLElement): () => void {
 
     // eased toward the cursor rather than pinned to it, so the mark is led
     // rather than dragged
-    followX += (state.markOffsetX - followX) * 0.05;
-    followY += (state.markOffsetY - followY) * 0.05;
+    followX += (state.markOffsetX - followX) * 0.09;
+    followY += (state.markOffsetY - followY) * 0.09;
 
     group.position.x = state.positionX + followX;
     group.position.y = followY;
@@ -431,9 +472,24 @@ export function mountMarkField(host: HTMLElement): () => void {
     markMaterial.uniforms.uScatter.value = state.scatter;
     markMaterial.uniforms.uTime.value = time;
 
+    // The cursor's light, and the space it clears, both in the mark's own
+    // space — so they travel with it rather than being painted on the screen.
+    const wants = state.pointerPresent && state.doorOpacity > 0.002 ? 1 : 0;
+    disperse += (wants - disperse) * (wants > disperse ? 0.12 : 0.06);
+    const localX = (state.pointerWorldX - group.position.x) / Math.max(state.scale, 1e-4);
+    const localY = (state.pointerWorldY - group.position.y) / Math.max(state.scale, 1e-4);
+    markMaterial.uniforms.uStain.value.set(localX, localY, MARK_LIGHT, disperse);
+    markMaterial.uniforms.uDisperse.value.set(localX, localY, MARK_CLEARS, disperse);
+
     doorGroup.scale.setScalar(state.doorScale);
     doorMaterial.uniforms.uOpacity.value = state.doorOpacity;
     doorMaterial.uniforms.uTime.value = time;
+    doorMaterial.uniforms.uStain.value.set(
+      state.pointerWorldX / state.doorScale,
+      state.pointerWorldY / state.doorScale,
+      STAIN_REACH / state.doorScale,
+      disperse,
+    );
     doorPoints.visible = state.doorOpacity > 0.002;
 
     starMaterial.uniforms.uOpacity.value = state.starfieldOpacity;

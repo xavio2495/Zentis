@@ -14,6 +14,8 @@ export const MARK_HALF_EXTENT = 4.5;
 
 /** How much of the visible height the gate stands across. */
 const GATE_SHARE = 0.62;
+/** How far in from the gate's edges the mark is kept, as a share of the shape. */
+const GATE_INSET = 0.26;
 
 export interface Gate {
   /** Side length and height of the triangle, in world units. */
@@ -31,6 +33,75 @@ export interface Gate {
  * The gate: an equilateral triangle standing on its point, sized against what
  * the camera can see so it frames the wordmark at any viewport.
  */
+/** The triangle's three corners, in world units. */
+export function gateCorners(inset = 0): { x: number; y: number }[] {
+  const gate = gateShape();
+  const centroidY = gate.incircleCenterY;
+  const raw = [
+    { x: -gate.side / 2, y: gate.topY },
+    { x: gate.side / 2, y: gate.topY },
+    { x: 0, y: gate.apexY },
+  ];
+  if (inset === 0) return raw;
+  // shrink about the centroid, which for a triangle keeps it similar and
+  // centred — the mark's own body is what the inset makes room for
+  const keep = 1 - inset;
+  return raw.map((c) => ({ x: c.x * keep, y: centroidY + (c.y - centroidY) * keep }));
+}
+
+/** Is this point inside the triangle the mark is allowed to roam? */
+export function insideGate(x: number, y: number, inset = GATE_INSET): boolean {
+  const corners = gateCorners(inset);
+  let hit = false;
+  for (let i = 0, j = corners.length - 1; i < corners.length; j = i++) {
+    const a = corners[i];
+    const b = corners[j];
+    if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) hit = !hit;
+  }
+  return hit;
+}
+
+/** The nearest point on a segment. */
+function closestOnSegment(
+  x: number,
+  y: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / lengthSq));
+  return { x: a.x + t * dx, y: a.y + t * dy };
+}
+
+/**
+ * Holds a point inside the gate. Inside, it is left where it is; outside, it is
+ * put down on the nearest edge — so the mark tracks the cursor right out to the
+ * corners instead of being penned into a circle in the middle.
+ */
+export function clampIntoGate(x: number, y: number, inset = GATE_INSET) {
+  if (insideGate(x, y, inset)) return { x, y };
+  const corners = gateCorners(inset);
+  let best = { x, y };
+  let bestDistance = Infinity;
+  for (let i = 0; i < corners.length; i++) {
+    const point = closestOnSegment(x, y, corners[i], corners[(i + 1) % corners.length]);
+    const distance = Math.hypot(point.x - x, point.y - y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = point;
+    }
+  }
+  // a hair inside the edge rather than exactly on it, so the mark is never
+  // ambiguously half in and half out
+  const centroidY = gateShape().incircleCenterY;
+  return {
+    x: best.x * 0.999,
+    y: centroidY + (best.y - centroidY) * 0.999,
+  };
+}
+
 export function gateShape(): Gate {
   const visibleHeight = 2 * Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z;
   const height = visibleHeight * GATE_SHARE;
@@ -84,6 +155,11 @@ export interface FieldState {
   /** Where the cursor has drawn the mark, held inside the gate. */
   markOffsetX: number;
   markOffsetY: number;
+  /** Where the cursor itself is, in world units, unclamped. */
+  pointerWorldX: number;
+  pointerWorldY: number;
+  /** Whether there is a cursor to cast light and push points at all. */
+  pointerPresent: boolean;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -159,26 +235,20 @@ export function fieldState({
   // never leaves: it is the room the rest of the page happens in.
   const starfieldOpacity = 0.12 + 0.43 * eased;
 
-  // While the gate stands, the mark answers the cursor — but it is held inside
-  // the gate, so it can be led around without ever escaping the frame. The hold
+  // While the gate stands, the mark answers the cursor — held inside the gate,
+  // so it can be led anywhere within the frame without escaping it. The hold
   // lets go as the reader comes through.
-  const gate = gateShape();
   const held = 1 - through;
+  const reach = Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z;
+  const pointerWorldX = pointer ? pointer.x * reach * (viewportWidth / viewportHeight) : 0;
+  const pointerWorldY = pointer ? pointer.y * reach : 0;
+
   let markOffsetX = 0;
   let markOffsetY = 0;
   if (pointer && held > 0) {
-    const reachY = Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z;
-    const wantX = pointer.x * reachY * (viewportWidth / viewportHeight);
-    const wantY = pointer.y * reachY;
-
-    const room = Math.max(0, gate.incircleRadius - MARK_HALF_EXTENT * scale * 0.9);
-    const dx = wantX;
-    const dy = wantY - gate.incircleCenterY;
-    const distance = Math.hypot(dx, dy);
-    const scaled = distance > room && distance > 0 ? room / distance : 1;
-
-    markOffsetX = dx * scaled * held;
-    markOffsetY = (gate.incircleCenterY + dy * scaled) * held;
+    const held_ = clampIntoGate(pointerWorldX, pointerWorldY);
+    markOffsetX = held_.x * held;
+    markOffsetY = held_.y * held;
   }
 
   return {
@@ -194,6 +264,9 @@ export function fieldState({
     starfieldOpacity,
     markOffsetX,
     markOffsetY,
+    pointerWorldX,
+    pointerWorldY,
+    pointerPresent: !!pointer,
     proseFrom,
     outroFrom,
   };
