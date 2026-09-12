@@ -223,3 +223,41 @@ describe("the gate, and the mark held inside it", () => {
     expect(at(0).markOffsetY).toBe(0);
   });
 });
+
+describe("the ending", () => {
+  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const height = docHeight(viewport.viewportHeight);
+  const at = (scrollY: number) => fieldState({ scrollY, ...viewport, docHeight: height });
+
+  test("the mark comes back to the middle to come apart", () => {
+    // it spends the prose off to one side; an explosion from the edge of the
+    // screen reads as something falling out of frame, not as an ending
+    const midProse = at(at(0).proseFrom + viewport.viewportHeight);
+    expect(Math.abs(midProse.positionX)).toBeGreaterThan(1);
+    expect(Math.abs(at(height).positionX)).toBeLessThan(0.01);
+  });
+
+  test("it is back in the middle before it has scattered far", () => {
+    const quarter = at(at(0).outroFrom + viewport.viewportHeight * 0.35);
+    expect(quarter.scatter).toBeGreaterThan(0);
+    expect(Math.abs(quarter.positionX)).toBeLessThan(Math.abs(at(at(0).outroFrom).positionX));
+  });
+
+  test("the install line rides at the foot of the page until the end", () => {
+    expect(at(0).installDock).toBe(0);
+    expect(at(at(0).proseFrom).installDock).toBe(0);
+    expect(at(at(0).outroFrom).installDock).toBeLessThan(0.2);
+  });
+
+  test("and comes to the middle as the page closes", () => {
+    expect(at(height).installDock).toBe(1);
+  });
+
+  test("it never overshoots either resting place", () => {
+    for (let y = 0; y <= height; y += viewport.viewportHeight / 6) {
+      const dock = at(y).installDock;
+      expect(dock).toBeGreaterThanOrEqual(0);
+      expect(dock).toBeLessThanOrEqual(1);
+    }
+  });
+});
