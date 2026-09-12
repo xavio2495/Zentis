@@ -14,8 +14,12 @@ export const MARK_HALF_EXTENT = 4.5;
 
 /** How much of the visible height the gate stands across. */
 const GATE_SHARE = 0.62;
-/** How far in from the gate's edges the mark is kept, as a share of the shape. */
-const GATE_INSET = 0.26;
+/**
+ * How far in from the gate's edges the mark is kept. Barely at all: the gate is
+ * a frame the mark moves within, not a box it is packed into, so it is allowed
+ * right out into the corners and to overhang the edge on the way.
+ */
+const GATE_INSET = 0.04;
 
 export interface Gate {
   /** Side length and height of the triangle, in world units. */
@@ -160,6 +164,8 @@ export interface FieldState {
   pointerWorldY: number;
   /** Whether there is a cursor to cast light and push points at all. */
   pointerPresent: boolean;
+  /** How much further from the camera the mark is than the gate. */
+  depthRatio: number;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -243,12 +249,18 @@ export function fieldState({
   const pointerWorldX = pointer ? pointer.x * reach * (viewportWidth / viewportHeight) : 0;
   const pointerWorldY = pointer ? pointer.y * reach : 0;
 
+  // The mark sits further from the camera than the gate does, so a world
+  // distance covers less of the screen there. Its allowance is the gate's shape
+  // as the reader sees it, grown by that ratio — otherwise the mark rattles
+  // around in the middle of a frame it can never reach the corners of.
+  const depthRatio = (CAMERA_Z - positionZ) / CAMERA_Z;
+
   let markOffsetX = 0;
   let markOffsetY = 0;
   if (pointer && held > 0) {
-    const held_ = clampIntoGate(pointerWorldX, pointerWorldY);
-    markOffsetX = held_.x * held;
-    markOffsetY = held_.y * held;
+    const inGate = clampIntoGate(pointerWorldX, pointerWorldY);
+    markOffsetX = inGate.x * depthRatio * held;
+    markOffsetY = inGate.y * depthRatio * held;
   }
 
   return {
@@ -267,6 +279,7 @@ export function fieldState({
     pointerWorldX,
     pointerWorldY,
     pointerPresent: !!pointer,
+    depthRatio,
     proseFrom,
     outroFrom,
   };

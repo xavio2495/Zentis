@@ -6,7 +6,9 @@ import {
   PerspectiveCamera,
   Points,
   Scene,
+  Matrix4,
   ShaderMaterial,
+  Vector3,
   Vector4,
   WebGLRenderer,
 } from "three";
@@ -54,8 +56,9 @@ uniform float uGateBottom;
 uniform float uGateHeight;
 /** xy: where the cursor is, in this object's own space. z: reach. w: strength. */
 uniform vec4 uStain;
-/** xy: cursor again, z: radius it clears, w: strength. */
+/** xyz: the cursor in this object's own space. w: the radius it clears. */
 uniform vec4 uDisperse;
+uniform float uDisperseAmount;
 varying vec3 vColor;
 varying float vAlpha;
 varying float vSoft;
@@ -75,13 +78,14 @@ void main() {
   }
 
   // The cursor clears a space around itself: anything within its reach is
-  // pushed out to the edge of that space, leaving a hole where it rests.
-  if (uDisperse.w > 0.0) {
-    vec2 away = p.xy - uDisperse.xy;
+  // pushed out along the line from its centre, leaving a hollow sphere where it
+  // rests. Depth counts toward the distance, or the hollow would be a tube
+  // bored through the mark and would read wrong the moment the mark turns.
+  if (uDisperseAmount > 0.0) {
+    vec3 away = p - uDisperse.xyz;
     float distance = length(away);
-    if (distance < uDisperse.z && distance > 0.0001) {
-      float push = (uDisperse.z / distance - 1.0) * uDisperse.w;
-      p.xy += away * push;
+    if (distance < uDisperse.w && distance > 0.0001) {
+      p += away * ((uDisperse.w / distance - 1.0) * uDisperseAmount);
     }
   }
 
@@ -188,7 +192,8 @@ function makeMaterial(reduced: boolean, door: { bottom: number; height: number }
       uGateBottom: { value: door.bottom },
       uGateHeight: { value: door.height },
       uStain: { value: new Vector4(0, 0, 1, 0) },
-      uDisperse: { value: new Vector4(0, 0, 1, 0) },
+      uDisperse: { value: new Vector4(0, 0, 0, 1) },
+      uDisperseAmount: { value: 0 },
     },
   });
 }
@@ -434,6 +439,8 @@ export function mountMarkField(host: HTMLElement): () => void {
   let followX = 0;
   let followY = 0;
   let disperse = 0;
+  const cursorLocal = new Vector3();
+  const inverseRotation = new Matrix4();
   const start = performance.now();
 
   // How far the cursor's light reaches across the gate, and — in the mark's own
@@ -441,10 +448,16 @@ export function mountMarkField(host: HTMLElement): () => void {
   // clears there. The hole is a fraction of the mark, not the whole of it.
   const STAIN_REACH = gate.side * 0.34;
   const MARK_LIGHT = 2.4;
-  const MARK_CLEARS = 0.85;
+  const MARK_CLEARS = 1.15;
 
+  let previous = start;
   const frame = (now: number) => {
     const time = (now - start) / 1000;
+    // Time-based rather than per-frame, so easing takes the same wall-clock
+    // time whatever rate the display or the tab is running at.
+    const delta = Math.min(0.1, (now - previous) / 1000);
+    previous = now;
+    const settle = (rate: number) => 1 - Math.exp(-rate * delta);
 
     // Where everything stands, and how brightly, is computed apart from here so
     // the rule that the mark never sits on the text can be held to by test.
@@ -458,8 +471,9 @@ export function mountMarkField(host: HTMLElement): () => void {
 
     // eased toward the cursor rather than pinned to it, so the mark is led
     // rather than dragged
-    followX += (state.markOffsetX - followX) * 0.09;
-    followY += (state.markOffsetY - followY) * 0.09;
+    const lead = settle(6);
+    followX += (state.markOffsetX - followX) * lead;
+    followY += (state.markOffsetY - followY) * lead;
 
     group.position.x = state.positionX + followX;
     group.position.y = followY;
@@ -472,14 +486,28 @@ export function mountMarkField(host: HTMLElement): () => void {
     markMaterial.uniforms.uScatter.value = state.scatter;
     markMaterial.uniforms.uTime.value = time;
 
-    // The cursor's light, and the space it clears, both in the mark's own
-    // space — so they travel with it rather than being painted on the screen.
-    const wants = state.pointerPresent && state.doorOpacity > 0.002 ? 1 : 0;
-    disperse += (wants - disperse) * (wants > disperse ? 0.12 : 0.06);
-    const localX = (state.pointerWorldX - group.position.x) / Math.max(state.scale, 1e-4);
-    const localY = (state.pointerWorldY - group.position.y) / Math.max(state.scale, 1e-4);
-    markMaterial.uniforms.uStain.value.set(localX, localY, MARK_LIGHT, disperse);
-    markMaterial.uniforms.uDisperse.value.set(localX, localY, MARK_CLEARS, disperse);
+    // The cursor's light, and the space it clears, both carried into the mark's
+    // own space — through its position, its scale and its rotation — so they
+    // stay with it wherever it has turned to.
+    const wants = state.pointerPresent && state.opacity > 0.02 ? 1 : 0;
+    disperse += (wants - disperse) * settle(wants > disperse ? 9 : 4);
+
+    inverseRotation.makeRotationFromEuler(group.rotation).invert();
+    cursorLocal
+      .set(state.pointerWorldX, state.pointerWorldY, group.position.z)
+      .sub(group.position)
+      .divideScalar(Math.max(state.scale, 1e-4))
+      .applyMatrix4(inverseRotation);
+
+    markMaterial.uniforms.uStain.value.set(cursorLocal.x, cursorLocal.y, MARK_LIGHT, disperse);
+    // the hollow the cursor clears is a sphere about that point, not a tube
+    markMaterial.uniforms.uDisperse.value.set(
+      cursorLocal.x,
+      cursorLocal.y,
+      cursorLocal.z,
+      MARK_CLEARS,
+    );
+    markMaterial.uniforms.uDisperseAmount.value = disperse;
 
     doorGroup.scale.setScalar(state.doorScale);
     doorMaterial.uniforms.uOpacity.value = state.doorOpacity;

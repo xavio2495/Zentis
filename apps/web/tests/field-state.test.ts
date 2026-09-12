@@ -205,8 +205,9 @@ describe("the gate, and the mark held inside it", () => {
 
   test("the cursor's own position is reported for the light it casts", () => {
     const state = at(0, { x: 1, y: 1 });
-    // unclamped, so effects can key off where the cursor really is
-    expect(state.pointerWorldX).toBeGreaterThan(state.markOffsetX);
+    // unclamped, so effects can key off where the cursor really is rather than
+    // where the mark was allowed to follow it to
+    expect(state.pointerWorldX).toBeGreaterThan(state.markOffsetX / state.depthRatio);
   });
 
   test("the cursor lets go once the reader is through the gate", () => {
