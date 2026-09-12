@@ -10,7 +10,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { BAR, sampleMark } from "@/lib/mark-geometry";
-import { CAMERA_Z, FOV_DEGREES, fieldState } from "@/lib/field-state";
+import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state";
 
 /**
  * The field: a doorway, the mark, and the light behind both.
@@ -28,11 +28,12 @@ const COUNT = 6000;
 const MARK_SCALE = 9;
 const ACCENT = [0x00 / 255, 0xed / 255, 0x64 / 255] as const;
 
-/** The doorway, in world units: tall and narrow, the mark suspended inside it. */
-const DOOR_FRAME = 900;
-const DOOR_RISING = 260;
-const DOOR_FOOT = 80;
-const DOOR_ASPECT = 2.6;
+/** The gate: an equilateral triangle standing on its point, the mark inside it. */
+const GATE_EDGE = 900;
+const GATE_RISING = 260;
+const GATE_FOOT = 80;
+/** One point in five is accented; the rest are light. */
+const GATE_ACCENT_SHARE = 0.2;
 
 const STARS_NEAR = 700;
 const STARS_FAR = 900;
@@ -184,68 +185,103 @@ function buildMark(): Cloud {
 }
 
 /**
- * The doorway: a rectangle drawn in points, walked by perimeter so the frame is
- * evenly lit, with a scatter of rising points inside it and a few at its foot.
+ * The gate: an equilateral triangle standing on its point, drawn in points.
+ * The edges are walked by length so the frame is evenly lit, with a scatter of
+ * rising points inside it and a few gathered at the point it stands on.
  */
-function buildDoor(height: number): Cloud {
-  const total = DOOR_FRAME + DOOR_RISING + DOOR_FOOT;
+function buildGate(): Cloud {
+  const gate = gateShape();
+  const total = GATE_EDGE + GATE_RISING + GATE_FOOT;
   const cloud = emptyCloud(total);
-  const halfHeight = height / 2;
-  const halfWidth = height / DOOR_ASPECT / 2;
-  const perimeter = 4 * halfWidth + 4 * halfHeight;
-  const depth = halfWidth * 0.5;
 
-  const light = (i: number, warm: number) => {
-    cloud.colors[i * 3] = warm;
-    cloud.colors[i * 3 + 1] = warm;
-    cloud.colors[i * 3 + 2] = warm * 0.98;
+  const half = gate.side / 2;
+  const corners = [
+    { x: -half, y: gate.topY },
+    { x: half, y: gate.topY },
+    { x: 0, y: gate.apexY },
+  ];
+  const depth = gate.side * 0.05;
+
+  // Four points in five are light; the fifth is the accent, scattered through
+  // the frame rather than gathered anywhere.
+  const light = (i: number) => {
+    if (Math.random() < GATE_ACCENT_SHARE) {
+      cloud.colors[i * 3] = ACCENT[0];
+      cloud.colors[i * 3 + 1] = ACCENT[1];
+      cloud.colors[i * 3 + 2] = ACCENT[2];
+      return;
+    }
+    const shade = 0.78 + Math.random() * 0.22;
+    cloud.colors[i * 3] = shade;
+    cloud.colors[i * 3 + 1] = shade;
+    cloud.colors[i * 3 + 2] = shade * 0.99;
   };
 
-  let n = 0;
-  for (let i = 0; i < DOOR_FRAME; i++, n++) {
-    // walk the rectangle by arc length: right edge, top, left edge, bottom
-    let along = ((i + Math.random() * 0.8) / DOOR_FRAME) * perimeter;
-    let x: number;
-    let y: number;
-    if (along < 2 * halfHeight) {
-      x = halfWidth;
-      y = -halfHeight + along;
-    } else if ((along -= 2 * halfHeight) < 2 * halfWidth) {
-      x = halfWidth - along;
-      y = halfHeight;
-    } else if ((along -= 2 * halfWidth) < 2 * halfHeight) {
-      x = -halfWidth;
-      y = halfHeight - along;
-    } else {
-      x = -halfWidth + (along - 2 * halfHeight);
-      y = -halfHeight;
+  /** Is a point inside the triangle? Same crossing test the mark uses. */
+  const inside = (x: number, y: number) => {
+    let hit = false;
+    for (let i = 0, j = corners.length - 1; i < corners.length; j = i++) {
+      const a = corners[i];
+      const b = corners[j];
+      if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) hit = !hit;
     }
+    return hit;
+  };
 
+  const edges = corners.map((a, i) => {
+    const b = corners[(i + 1) % corners.length];
+    return { a, b, length: Math.hypot(b.x - a.x, b.y - a.y) };
+  });
+  const perimeter = edges.reduce((sum, e) => sum + e.length, 0);
+
+  let n = 0;
+  for (let i = 0; i < GATE_EDGE; i++, n++) {
+    let along = ((i + Math.random() * 0.8) / GATE_EDGE) * perimeter;
+    let edge = edges[edges.length - 1];
+    for (const candidate of edges) {
+      if (along <= candidate.length) {
+        edge = candidate;
+        break;
+      }
+      along -= candidate.length;
+    }
+    const t = along / edge.length;
     // a soft spray either side of the line, so the frame is drawn rather than ruled
-    const spread = (Math.random() * 2 - 1) * Math.abs(Math.random()) * halfWidth * 0.1;
-    cloud.positions[n * 3] = x + (Math.abs(x) === halfWidth ? spread : 0) + (Math.random() - 0.5) * 0.02;
-    cloud.positions[n * 3 + 1] = y + (Math.abs(y) === halfHeight ? spread : 0);
+    const nx = -(edge.b.y - edge.a.y) / edge.length;
+    const ny = (edge.b.x - edge.a.x) / edge.length;
+    const spread = (Math.random() * 2 - 1) * Math.abs(Math.random()) * gate.side * 0.014;
+
+    cloud.positions[n * 3] = edge.a.x + (edge.b.x - edge.a.x) * t + nx * spread;
+    cloud.positions[n * 3 + 1] = edge.a.y + (edge.b.y - edge.a.y) * t + ny * spread;
     cloud.positions[n * 3 + 2] = (Math.random() * 2 - 1) * depth;
-    light(n, 0.82 + Math.random() * 0.18);
+    light(n);
     cloud.sizes[n] = 0.05 + Math.random() * 0.08;
     cloud.phases[n] = Math.random() * 6.283;
   }
 
-  for (let i = 0; i < DOOR_RISING; i++, n++) {
-    cloud.positions[n * 3] = (Math.random() * 2 - 1) * (halfWidth - 0.08);
-    cloud.positions[n * 3 + 1] = -halfHeight + Math.random() * height;
+  for (let i = 0; i < GATE_RISING; i++, n++) {
+    let x = 0;
+    let y = 0;
+    for (let attempt = 0; attempt < 48; attempt++) {
+      x = (Math.random() * 2 - 1) * half;
+      y = gate.apexY + Math.random() * gate.height;
+      if (inside(x, y)) break;
+    }
+    cloud.positions[n * 3] = x;
+    cloud.positions[n * 3 + 1] = y;
     cloud.positions[n * 3 + 2] = (Math.random() * 2 - 1) * depth * 1.6;
-    light(n, 0.6 + Math.random() * 0.25);
+    light(n);
     cloud.sizes[n] = 0.045 + Math.random() * 0.06;
     cloud.phases[n] = Math.random() * 6.283;
     cloud.rise[n] = 0.1 + Math.random() * 0.2;
   }
 
-  for (let i = 0; i < DOOR_FOOT; i++, n++) {
-    cloud.positions[n * 3] = (Math.random() * 2 - 1) * halfWidth * (0.6 + Math.random() * 1.2);
-    cloud.positions[n * 3 + 1] = -halfHeight - 0.06 - Math.random() * 0.55;
+  // gathered at the point it stands on
+  for (let i = 0; i < GATE_FOOT; i++, n++) {
+    cloud.positions[n * 3] = (Math.random() * 2 - 1) * gate.side * 0.08;
+    cloud.positions[n * 3 + 1] = gate.apexY - 0.06 - Math.random() * 0.5;
     cloud.positions[n * 3 + 2] = (Math.random() * 2 - 1) * 1.2;
-    light(n, 0.45 + Math.random() * 0.3);
+    light(n);
     cloud.sizes[n] = 0.05 + Math.random() * 0.07;
     cloud.phases[n] = Math.random() * 6.283;
   }
@@ -297,18 +333,17 @@ export function mountMarkField(host: HTMLElement): () => void {
   const camera = new PerspectiveCamera(FOV_DEGREES, innerWidth / innerHeight, 0.1, 300);
   camera.position.z = CAMERA_Z;
 
-  // The doorway is sized against what the camera can see, so it frames the
+  // The gate is sized against what the camera can see, so it frames the
   // wordmark at any viewport rather than at one.
-  const visibleHeight = 2 * Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z;
-  const doorHeight = visibleHeight * 0.62;
-  const door = { bottom: -doorHeight / 2, height: doorHeight };
+  const gate = gateShape();
+  const door = { bottom: gate.apexY, height: gate.height };
 
   const markMaterial = makeMaterial(reduced, door);
   const doorMaterial = makeMaterial(reduced, door);
   const starMaterial = makeMaterial(reduced, door);
 
   const markGeometry = toGeometry(buildMark());
-  const doorGeometry = toGeometry(buildDoor(doorHeight));
+  const doorGeometry = toGeometry(buildGate());
   const nearGeometry = toGeometry(buildStars(STARS_NEAR, 25, 80));
   const farGeometry = toGeometry(buildStars(STARS_FAR, 30, 90));
 
@@ -345,7 +380,26 @@ export function mountMarkField(host: HTMLElement): () => void {
   setScale();
   addEventListener("resize", resize);
 
+  // The cursor leads the mark around inside the gate. Held in NDC; the clamp
+  // that keeps it inside the triangle lives in field-state.
+  let pointer: { x: number; y: number } | undefined;
+  const onPointerMove = (event: PointerEvent) => {
+    pointer = {
+      x: (event.clientX / innerWidth) * 2 - 1,
+      y: -(event.clientY / innerHeight) * 2 + 1,
+    };
+  };
+  const onPointerLeave = () => {
+    pointer = undefined;
+  };
+  if (!reduced && matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    addEventListener("pointermove", onPointerMove, { passive: true });
+    addEventListener("pointerleave", onPointerLeave);
+  }
+
   let raf = 0;
+  let followX = 0;
+  let followY = 0;
   const start = performance.now();
 
   const frame = (now: number) => {
@@ -358,9 +412,16 @@ export function mountMarkField(host: HTMLElement): () => void {
       viewportWidth: innerWidth,
       viewportHeight: innerHeight,
       docHeight: document.documentElement.scrollHeight,
+      pointer,
     });
 
-    group.position.x = state.positionX;
+    // eased toward the cursor rather than pinned to it, so the mark is led
+    // rather than dragged
+    followX += (state.markOffsetX - followX) * 0.05;
+    followY += (state.markOffsetY - followY) * 0.05;
+
+    group.position.x = state.positionX + followX;
+    group.position.y = followY;
     group.position.z = state.positionZ;
     group.scale.setScalar(state.scale);
     group.rotation.y = state.rotationY + (reduced ? 0 : time * 0.06);
@@ -388,6 +449,8 @@ export function mountMarkField(host: HTMLElement): () => void {
   return () => {
     cancelAnimationFrame(raf);
     removeEventListener("resize", resize);
+    removeEventListener("pointermove", onPointerMove);
+    removeEventListener("pointerleave", onPointerLeave);
     host.removeChild(renderer.domElement);
     for (const geometry of [markGeometry, doorGeometry, nearGeometry, farGeometry]) {
       geometry.dispose();

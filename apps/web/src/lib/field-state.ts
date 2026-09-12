@@ -12,6 +12,41 @@ export const FOV_DEGREES = 50;
 /** Half the mark's width in world units, at scale 1. */
 export const MARK_HALF_EXTENT = 4.5;
 
+/** How much of the visible height the gate stands across. */
+const GATE_SHARE = 0.62;
+
+export interface Gate {
+  /** Side length and height of the triangle, in world units. */
+  side: number;
+  height: number;
+  /** y of the flat top edge, and of the point it stands on. */
+  topY: number;
+  apexY: number;
+  /** The largest circle that fits inside it — where the mark is allowed to go. */
+  incircleRadius: number;
+  incircleCenterY: number;
+}
+
+/**
+ * The gate: an equilateral triangle standing on its point, sized against what
+ * the camera can see so it frames the wordmark at any viewport.
+ */
+export function gateShape(): Gate {
+  const visibleHeight = 2 * Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z;
+  const height = visibleHeight * GATE_SHARE;
+  const side = (2 * height) / Math.sqrt(3);
+  return {
+    side,
+    height,
+    topY: height / 2,
+    apexY: -height / 2,
+    // for an equilateral triangle the inradius is a third of the height, and it
+    // sits on the centroid
+    incircleRadius: height / 3,
+    incircleCenterY: height / 6,
+  };
+}
+
 /** The prose column the page lays out: max-w-3xl, with the page's own padding. */
 export function textColumnHalfWidth(viewportWidth: number): number {
   return Math.min(768, viewportWidth - 64) / 2;
@@ -29,6 +64,8 @@ export interface FieldInput {
   viewportWidth: number;
   viewportHeight: number;
   docHeight: number;
+  /** Cursor in normalised device coordinates, if there is one. */
+  pointer?: { x: number; y: number };
 }
 
 export interface FieldState {
@@ -44,6 +81,9 @@ export interface FieldState {
   doorScale: number;
   /** The field of light the whole page happens in. */
   starfieldOpacity: number;
+  /** Where the cursor has drawn the mark, held inside the gate. */
+  markOffsetX: number;
+  markOffsetY: number;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -72,6 +112,7 @@ export function fieldState({
   viewportWidth,
   viewportHeight,
   docHeight,
+  pointer,
 }: FieldInput): FieldState {
   const proseFrom = viewportHeight * 2.2;
   const outroFrom = docHeight - viewportHeight * 2.1;
@@ -83,7 +124,7 @@ export function fieldState({
   const eased = easeOut(traverse);
 
   const positionZ = -34 + 34 * eased;
-  const scale = 0.22 + 0.78 * eased;
+  const scale = 0.32 + 0.68 * eased;
   const handoffFrom = viewportHeight * 1.65;
   const handoff = easeOut(clamp((scrollY - handoffFrom) / (proseFrom - handoffFrom), 0, 1));
 
@@ -114,9 +155,31 @@ export function fieldState({
   const doorOpacity = 1 - through;
   const doorScale = 1 + through * 1.4;
 
-  // The far field is faint behind the closed door and opens up as it goes. It
+  // The far field is faint behind the closed gate and opens up as it goes. It
   // never leaves: it is the room the rest of the page happens in.
   const starfieldOpacity = 0.12 + 0.43 * eased;
+
+  // While the gate stands, the mark answers the cursor — but it is held inside
+  // the gate, so it can be led around without ever escaping the frame. The hold
+  // lets go as the reader comes through.
+  const gate = gateShape();
+  const held = 1 - through;
+  let markOffsetX = 0;
+  let markOffsetY = 0;
+  if (pointer && held > 0) {
+    const reachY = Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z;
+    const wantX = pointer.x * reachY * (viewportWidth / viewportHeight);
+    const wantY = pointer.y * reachY;
+
+    const room = Math.max(0, gate.incircleRadius - MARK_HALF_EXTENT * scale * 0.9);
+    const dx = wantX;
+    const dy = wantY - gate.incircleCenterY;
+    const distance = Math.hypot(dx, dy);
+    const scaled = distance > room && distance > 0 ? room / distance : 1;
+
+    markOffsetX = dx * scaled * held;
+    markOffsetY = (gate.incircleCenterY + dy * scaled) * held;
+  }
 
   return {
     positionX,
@@ -129,6 +192,8 @@ export function fieldState({
     doorOpacity,
     doorScale,
     starfieldOpacity,
+    markOffsetX,
+    markOffsetY,
     proseFrom,
     outroFrom,
   };

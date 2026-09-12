@@ -1,4 +1,5 @@
 import { CopyCommand } from "@/components/CopyCommand";
+import { HeroWordmark } from "@/components/HeroWordmark";
 import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
@@ -48,7 +49,7 @@ export default function Home() {
           className="relative flex h-screen flex-col items-center justify-center"
           style={{ height: "100svh" }}
         >
-          <h1 className="hero-name rise-1">{COPY.wordmark}</h1>
+          <HeroWordmark />
           <p className="hero-line rise-2">{COPY.heroLine}</p>
           <p className="hero-tagline serif rise-3">{COPY.tagline}</p>
           <div className="rise-4 absolute bottom-8 opacity-0">

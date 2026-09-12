@@ -416,3 +416,26 @@ body.ready .rise-4 {
   border-radius: 0;
   background: var(--color-ink);
 }
+
+/* The wordmark is two stacked copies: the real one, and a transparent one whose
+   letters are lit from behind as the cursor passes along the word. */
+.hero-stack {
+  position: relative;
+  display: grid;
+}
+
+.hero-stack > * {
+  grid-area: 1 / 1;
+}
+
+.hero-name-glow {
+  color: transparent;
+  pointer-events: none;
+  text-shadow:
+    0 0 12px rgba(0, 237, 100, 0.42),
+    0 0 34px rgba(0, 237, 100, 0.18);
+}
+
+.hero-name-glow span {
+  opacity: 0;
+}
