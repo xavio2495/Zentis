@@ -45,7 +45,11 @@ test("without scripts the replay states its argument rather than drawing nothing
 });
 
 test("the sponsor chips are on the page at every width, because they are part of the claim", () => {
-  const header = screen();
-  const chips = header.slice(header.indexOf("1inch · Aqua") - 400, header.indexOf("1inch · Aqua"));
-  expect(chips).not.toMatch(/hidden[^"]*md:flex/);
+  // Comments stripped first: the sentence explaining why they are no longer hidden contains the
+  // word, and a test that reads its own explanation as the code is a test of nothing.
+  const header = screen().replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  const at = header.indexOf("1inch · Aqua");
+  expect(at).toBeGreaterThan(-1);
+  const container = header.slice(Math.max(0, at - 200), at);
+  expect(container).not.toMatch(/hidden/);
 });

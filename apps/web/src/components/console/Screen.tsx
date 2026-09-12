@@ -75,7 +75,9 @@ export function Screen() {
             </Chip>
           ))}
         </div>
-        <div className="hidden items-center justify-end gap-2 md:flex">
+        {/* At every width, wrapping rather than disappearing: these three are what the project is
+            judged on, and `hidden md:flex` took them off the page entirely on a phone. */}
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           {["1inch · Aqua", "The Graph · subgraphs", "Chainlink · CRE"].map((chip) => (
             <span key={chip} className="label-sm whitespace-nowrap border border-stroke px-2 py-1 text-ink-faint">
               {chip}
