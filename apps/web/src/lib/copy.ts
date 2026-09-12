@@ -106,7 +106,6 @@ export const COPY = {
   contactHint: "Click to copy",
   contactCopied: "Copied",
 
-  outro: "Three legs. One book. Nothing in transit.",
   footer: "Zentis · Aqua · SwapVM",
 
   metaTitle: "Zentis — one position, three chains, no bridge",

@@ -135,7 +135,9 @@ describe("the page describes the mechanism the project actually has", () => {
   test("every surface takes its words from this module", () => {
     // Hero, statement, cards, the close, the outro, metadata and noscript: one module, so a
     // retired claim cannot survive in a component nobody thought to grep.
-    for (const key of ["heroLine", "tagline", "statement", "statementBody", "mechanismBody", "tryItOut", "outro", "noscript", "metaDescription"]) {
+    // `outro` is gone: the closing sentence was replaced by the sponsor row, and a key kept in the
+    // module after nothing renders it is how a retired line finds its way back onto a page.
+    for (const key of ["heroLine", "tagline", "statement", "statementBody", "mechanismBody", "tryItOut", "noscript", "metaDescription"]) {
       expect(COPY[key as keyof typeof COPY]).toBeTruthy();
     }
   });

@@ -12,6 +12,7 @@ import { Nav } from "@/components/Nav";
 import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
+import { SponsorRow } from "@/components/SponsorRow";
 import { Smoother } from "@/components/Smoother";
 import { COPY, INSTALL_COMMAND, INTEGRATIONS, ROUTES } from "@/lib/copy";
 
@@ -186,7 +187,7 @@ export default function Home() {
 
         <footer className="flex min-h-[38vh] flex-col items-center justify-center gap-6 px-8 text-center">
           <Reveal>
-            <p className="serif text-fs-2 text-ink-soft md:text-fs-3">{COPY.outro}</p>
+            <SponsorRow />
           </Reveal>
           <p className="label-sm text-ink-faint">{COPY.footer}</p>
         </footer>
