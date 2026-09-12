@@ -71,6 +71,20 @@ export default function Home() {
           </Reveal>
         </section>
 
+        <section id="quote" className="mx-auto max-w-3xl px-8 py-[14vh]">
+          <Reveal>
+            <p className="label text-ink-faint">{COPY.mechanismLabel}</p>
+            <p className="mt-6 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.mechanismBody}</p>
+          </Reveal>
+        </section>
+
+        <section id="dial" className="mx-auto max-w-3xl px-8 py-[14vh]">
+          <Reveal>
+            <p className="label text-ink-faint">{COPY.dialLabel}</p>
+            <p className="mt-6 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.dialBody}</p>
+          </Reveal>
+        </section>
+
         <section id="built-on" className="mx-auto max-w-5xl px-8 py-[12vh]">
           <Reveal>
             <p className="label">{COPY.integrationsLabel}</p>

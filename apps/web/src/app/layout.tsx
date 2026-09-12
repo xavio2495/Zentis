@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { COPY } from "@/lib/copy";
 import { Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
 
@@ -21,9 +22,10 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const SITE = "https://zentis-eth.vercel.app";
-const TITLE = "Zentis — one position, three chains, no bridge";
-const DESCRIPTION =
-  "Zentis is a market maker that runs a single Aqua position across several chains and rebalances by pricing rather than by bridging.";
+// From the copy module like everything else: a description that lives here is a claim nothing
+// checks, and it is where the retired one survived longest.
+const TITLE = COPY.metaTitle;
+const DESCRIPTION = COPY.metaDescription;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),

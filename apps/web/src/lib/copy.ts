@@ -65,12 +65,20 @@ export const ROUTES = [
 
 export const COPY = {
   wordmark: "ZENTIS",
-  heroLine: "Market making · Three chains · One position",
-  tagline: "Price the imbalance. Don't bridge it.",
+  heroLine: "Market making · Three chains · One book",
+  tagline: "One mid everywhere. No bridge anywhere.",
 
-  statement: "One mid. Three chains. No bridge.",
+  statement: "One position. Three legs. One book.",
   statementBody:
-    "A market maker holds one position and quotes it in several places at once. When the legs drift apart, the usual answer is to move inventory across a bridge and pay for the privilege in time, in fees and in risk. Zentis answers with price instead: every leg quotes the same mid, the quote tilts toward the leg that is short, and the imbalance becomes worth something to close. Nothing crosses.",
+    "A market maker holding one position in several places has to decide what to do when the legs drift apart. The usual answer is to move inventory across a bridge, which costs time, fees and the risk of being mid-transfer when the market turns. Zentis does not move it. Every leg quotes the same mid — one mainnet reference, published from one confidential policy, and the inventory is carried as a single book — so the legs are allowed to differ, and nothing has to move for the position to stay whole.",
+
+  mechanismLabel: "The quote",
+  mechanismBody:
+    "Each leg's quote is tilted off the mid by two kinds of number. First a correction, which puts the leg's own curve back on the mid it drifted from. Then a concession, which is the leg paying to shed what it is long of — its own, and a smaller one for the book as a whole. The concession is bounded by a budget priced off a real bridge quote, so the most a leg will ever give away is what moving the inventory would have cost. Around that sits a spread: a base, a term for volatility, and a markout term for how the reference moved after the last fills were taken.",
+
+  dialLabel: "What the cross-chain term buys",
+  dialBody:
+    "The book-wide concession is a dial on risk, not a source of profit. The edge a maker earns is earned leg by leg; what the shared reference adds is the mid every leg anchors to, and a way to lean the whole book the same direction when it is lopsided. How often that reference is published matters more to the outcome than any other choice in the system.",
 
   integrationsLabel: "Built on",
   installLabel: "Install the console",
@@ -85,8 +93,12 @@ export const COPY = {
   outro: "Three legs. One book. Nothing in transit.",
   footer: "Zentis · Aqua · SwapVM",
 
+  metaTitle: "Zentis — one position, three chains, no bridge",
+  metaDescription:
+    "One market-making position quoting the same mainnet mid on three chains from one confidential policy, carrying its inventory as a single book without bridging.",
+
   noscript:
-    "Zentis is a market maker that runs a single Aqua position across several chains and rebalances by pricing rather than by bridging. When the legs drift apart, the quote tilts toward the leg that is short instead of moving inventory across a bridge. This page is an animated introduction; enable JavaScript for it, or install the console with the command below.",
+    "Zentis runs one market-making position across three chains. Every leg quotes the same mainnet mid, published from a confidential workflow, and the inventory is carried as one book rather than moved between chains. Each leg's quote is a correction back onto the mid plus a bounded concession for the inventory it holds. This page is an animated introduction; enable JavaScript for it, or install the console with the command below.",
 } as const;
 
 /**

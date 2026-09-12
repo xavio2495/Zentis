@@ -22,9 +22,13 @@ describe("the page makes no claim it cannot source", () => {
     }
   });
 
-  test("the position is one, and the chains are three", () => {
-    expect(COPY.statement.toLowerCase()).toContain("three chains");
-    expect(COPY.statement.toLowerCase()).toContain("no bridge");
+  test("the position is one, the legs are three, and nothing bridges", () => {
+    // Across the copy that carries the claim rather than inside one string: the wording of the
+    // statement is allowed to change, the claim is not.
+    const headline = [COPY.heroLine, COPY.tagline, COPY.statement, COPY.statementBody].join(" ").toLowerCase();
+    expect(headline).toMatch(/three (chains|legs)/);
+    expect(headline).toMatch(/no bridge|without bridging|does not move it/);
+    expect(headline).toMatch(/one position|one book/);
   });
 });
 
@@ -96,7 +100,7 @@ describe("the page describes the mechanism the project actually has", () => {
   }
 
   test("the claim is one position, three legs, one mid, one book", () => {
-    const body = `${COPY.statement} ${COPY.statementBody}`.toLowerCase();
+    const body = `${COPY.tagline} ${COPY.statement} ${COPY.statementBody}`.toLowerCase();
     expect(body).toMatch(/one (market-making )?position|one position/);
     expect(body).toMatch(/same mid|one mid/);
     expect(body).toMatch(/one book|a single book/);
