@@ -11,7 +11,7 @@ import { FeedPanel } from "./FeedPanel";
 import { LegCard } from "./LegCard";
 import { PnlPanel } from "./PnlPanel";
 import { MarketPanel } from "./MarketPanel";
-import { MarkGlyph } from "./MarkGlyph";
+import { BrandMark } from "@/components/BrandMark";
 import { Transport } from "./Transport";
 import { Chip, Stat, VRule } from "./ui";
 
@@ -53,8 +53,8 @@ export function Screen() {
         <div className="flex min-w-0 items-center gap-3">
           {/* The way back. A route reached from the landing that cannot return to it is a dead end
               costing a browser button, and the mark is where a reader looks for home. */}
-          <a href="/" className="tap flex items-center gap-3 no-underline" aria-label="Zentis — back to the landing page">
-            <MarkGlyph className="fill-em" />
+          <a href="/" className="tap flex items-center gap-2 no-underline" aria-label="Zentis — back to the landing page">
+            <BrandMark className="h-4 w-4" />
             <span className="label whitespace-nowrap text-ink">Zentis</span>
           </a>
           <span aria-hidden className="h-4 w-px bg-stroke" />

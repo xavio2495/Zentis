@@ -1,12 +1,10 @@
 <svg width="1000" height="1000" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
 <!-- Negative layer -->
 <rect width="1000" height="1000" fill="#00ED64"/>
-<!-- Connector bridge -->
-<path d="M594 257L663.282 297L405.282 743.869L336 703.869L594 257Z" fill="black"/>
-<!-- Negative layer -->
-<rect width="1000" height="1000" fill="#00ED64"/>
 <!-- Chain A -->
 <path fill-rule="evenodd" clip-rule="evenodd" d="M999.999 636.737H727.272L272.727 818.555V727.646L727.272 545.828H999.999V636.737Z" fill="black"/>
+<!-- Connector bridge -->
+<path d="M594 257L663.282 297L405.282 743.869L336 703.869L594 257Z" fill="black"/>
 <!-- Chain B -->
 <path fill-rule="evenodd" clip-rule="evenodd" d="M0 364.009L272.727 363.938L727.225 182L727.249 272.909L272.751 454.847L0.0239091 454.918L0 364.009Z" fill="black"/>
 </svg>

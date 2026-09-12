@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BrandMark } from "@/components/BrandMark";
 import { COPY, REPO_URL, ROUTES } from "@/lib/copy";
 import { scrollToTarget } from "@/lib/scroll";
 
@@ -49,8 +50,16 @@ export function Nav() {
 
   return (
     <nav className="nav-diff fixed inset-x-0 top-0 z-60 flex items-center justify-between px-8 py-6 md:px-12">
-      <a href="#hero" onClick={(event) => goTo(event, "hero")} className="label text-ink no-underline" data-magnetic>
-        {COPY.wordmark}
+      {/* The mark rather than the word: it is the same three shapes the field spends the whole
+          page assembling, so the nav and the hero are saying one thing. */}
+      <a
+        href="#hero"
+        onClick={(event) => goTo(event, "hero")}
+        aria-label="Zentis"
+        className="no-underline"
+        data-magnetic
+      >
+        <BrandMark className="h-5 w-5" />
       </a>
       <div className="hidden gap-8 text-fs-0 md:flex">
         {SECTIONS.map((section) => (

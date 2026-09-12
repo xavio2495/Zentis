@@ -42,7 +42,8 @@ const TSX_ALLOWED: Record<string, { uses: number; why: string }> = {
   "components/CopyCommand.tsx": { uses: 1, why: "the copy toast" },
   "components/CopyLink.tsx": { uses: 2, why: "the copy toast, and the repo link's hover" },
   "components/console/MarkGlyph.tsx": { uses: 0, why: "takes its fill from the caller" },
-  "components/console/Screen.tsx": { uses: 1, why: "the mark in the bar, as on /console" },
+  "components/console/Screen.tsx": { uses: 0, why: "the bar wears BrandMark, which carries its own field" },
+  "components/BrandMark.tsx": { uses: 1, why: "the accent as the mark's own field, with the shapes knocked out of it" },
   "app/console/page.tsx": { uses: 1, why: "the mark in the bar" },
   // The console's own rule, from console-tokens.test.ts: the accent means "this is what Zentis
   // computed". Numbers the model produced may wear it; states, health and row types may not.
@@ -59,6 +60,8 @@ const TSX_ALLOWED: Record<string, { uses: number; why: string }> = {
   // The mark itself, which the reference spends the accent on as the star particles.
   "components/Field.tsx": { uses: 3, why: "the mark drawn flat when there is no WebGL for the field" },
   "app/opengraph-image.tsx": { uses: 1, why: "the connector in the share card's mark" },
+  // The touch icon is the mark on its own field, generated rather than committed as a binary.
+  "app/apple-icon.tsx": { uses: 1, why: "the accent as the icon's field" },
 };
 
 const PATTERNS = [/#00ED64/gi, /var\(--color-em[^)]*\)/g, /\b(?:text|bg|border|fill|stroke)-em\b/g];

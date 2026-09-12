@@ -57,7 +57,9 @@ describe("the mark in the header is the landing's mark", () => {
   });
 
   test("the screen wears it", () => {
-    expect(source("components", "console", "Screen.tsx")).toMatch(/<MarkGlyph/);
+    // Either primitive, so long as it is the shared geometry: MarkGlyph inherits currentColor,
+    // BrandMark draws the accent field with the shapes knocked out of it.
+    expect(source("components", "console", "Screen.tsx")).toMatch(/<(MarkGlyph|BrandMark)/);
   });
 });
 
