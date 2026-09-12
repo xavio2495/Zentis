@@ -261,3 +261,38 @@ describe("the ending", () => {
     }
   });
 });
+
+describe("the mark gathers itself", () => {
+  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const height = docHeight(viewport.viewportHeight);
+  const at = (scrollY: number) => fieldState({ scrollY, ...viewport, docHeight: height });
+
+  test("it is a blob on the first screen, not the logo", () => {
+    expect(at(0).markForm).toBe(0);
+  });
+
+  test("it is the logo by the time the traverse is over", () => {
+    expect(at(at(0).proseFrom).markForm).toBe(1);
+  });
+
+  test("it gathers rather than snapping", () => {
+    const quarter = at(viewport.viewportHeight * 0.4).markForm;
+    const half = at(viewport.viewportHeight * 0.8).markForm;
+    expect(quarter).toBeGreaterThan(0);
+    expect(half).toBeGreaterThan(quarter);
+    expect(half).toBeLessThan(1);
+  });
+
+  test("it holds its shape for the rest of the page", () => {
+    for (const y of [at(0).proseFrom, at(0).outroFrom, height]) {
+      expect(at(y).markForm).toBe(1);
+    }
+  });
+
+  test("it never runs past either end", () => {
+    for (let y = 0; y <= height; y += viewport.viewportHeight / 8) {
+      expect(at(y).markForm).toBeGreaterThanOrEqual(0);
+      expect(at(y).markForm).toBeLessThanOrEqual(1);
+    }
+  });
+});
