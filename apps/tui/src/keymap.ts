@@ -32,7 +32,7 @@ export const BINDINGS: Binding[] = [
   { scope: "main", keys: ["w"], label: "the maker's wallet on each chain", id: "wallet" },
   { scope: "main", keys: ["m"], label: "the committed simulation run", id: "sim" },
   { scope: "main", keys: ["d"], label: "status: every source, what it last answered and when", id: "status" },
-  { scope: "main", keys: ["l"], label: "log: what this console did, and what it broadcast", id: "log" },
+  { scope: "main", keys: ["l"], label: "log: every transaction this machine sent, console and scripts alike", id: "log" },
   { scope: "overlay", keys: ["up", "down"], label: "scroll the help page", id: "scroll" },
   { scope: "overlay", keys: ["esc"], label: "back to the charts", id: "back" },
   // `esc` leaves a page for the live view, in `main` rather than `overlay`: a page is where the

@@ -4,6 +4,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { LEGS, type LegConfig } from "@zentis/console-data";
 import { createWallet } from "./wallet-file.js";
 import { type Request, approveRequest, pushRequest, quoteRequest, swapRequest, tokenIn, wrapRequest } from "./intents.js";
+import { type TxLogLine, appendTxLog, txlogPath } from "./txlog.js";
 
 /**
  * The one process in this console that holds a key.
@@ -124,6 +125,14 @@ export async function runIntent(
    * other 32-byte value. Owned by the caller because the redactor is the caller's.
    */
   sent?: Set<string>,
+  /**
+   * Where each transaction is written down for anything that reads the machine's log afterwards.
+   *
+   * This process is the only one that knows a hash the moment it exists, so this process writes the
+   * line — the same line the taker and rebalance scripts write into the same file. Passed in rather
+   * than opened here so a test journals into an array and never into the operator's own log.
+   */
+  journal?: (line: TxLogLine) => void,
 ): Promise<void> {
   if (intent.kind === "wallet-new") {
     newWallet(log);
@@ -149,7 +158,14 @@ export async function runIntent(
   // for the same number the moment two are in flight, which is the ordinary way a sequence like this
   // fails on a busy chain.
   let nonce: number | null = null;
-  const send = async (what: string, request: Request): Promise<void> => {
+  /** What the shared log calls each of the four things this child sends. */
+  const LOGGED_AS: Record<string, string> = { approved: "approve", filled: "fill", wrapped: "wrap", pushed: "push" };
+  const send = async (
+    what: string,
+    request: Request,
+    /** what moved, for the log line; absent where the kind has no amount of its own */
+    moved: { amountIn?: string; tokenIn?: string; amountOut?: string; tokenOut?: string } = {},
+  ): Promise<void> => {
     nonce ??= await reader.getTransactionCount({ address: account.address, blockTag: "pending" });
     const hash = await wallet.sendTransaction({ ...request, chain: null, account, nonce });
     // Written down before the line carrying it is printed, so the funnel knows this one is a hash.
@@ -157,11 +173,30 @@ export async function runIntent(
     nonce += 1;
     const receipt = await reader.waitForTransactionReceipt({ hash });
     log(`${what} ${hash} ${receipt.status}`);
+    // A reverted transaction is written down too, and before the throw: it cost gas, it is on chain,
+    // and a log holding only the ones that worked is the log you cannot debug a bad evening with.
+    journal?.({
+      at: new Date().toISOString(),
+      chain: leg.name,
+      chainId: leg.chainId,
+      kind: LOGGED_AS[what] ?? what,
+      actor: account.address,
+      tx: hash,
+      status: receipt.status === "success" ? 1 : 0,
+      amountIn: moved.amountIn ?? null,
+      amountOut: moved.amountOut ?? null,
+      tokenIn: moved.tokenIn ?? null,
+      tokenOut: moved.tokenOut ?? null,
+      note: null,
+    });
     if (receipt.status !== "success") throw new Error(`${what} reverted`);
   };
 
   if (intent.kind === "approve") {
-    await send("approved", approveRequest(intent.token, intent.spender, BigInt(intent.amount)));
+    await send("approved", approveRequest(intent.token, intent.spender, BigInt(intent.amount)), {
+      amountIn: intent.amount,
+      tokenIn: intent.token,
+    });
     return;
   }
 
@@ -181,10 +216,21 @@ export async function runIntent(
       args: [account.address, leg.fill!.router as Address],
     });
     if (allowance < amountRaw) {
-      await send("approved", approveRequest(input.address, leg.fill!.router as Address, amountRaw));
+      await send("approved", approveRequest(input.address, leg.fill!.router as Address, amountRaw), {
+        amountIn: amountRaw.toString(),
+        tokenIn: input.address,
+      });
     }
 
-    await send("filled", swapRequest(leg, params));
+    // The side that went in is known here; what came back is not, without decoding the receipt's
+    // logs. The fills subgraph has both and the log page shows what it has, so the line carries the
+    // input and the token it came out in rather than a number this child guessed at.
+    const output = tokenIn(leg, !intent.isAToB);
+    await send("filled", swapRequest(leg, params), {
+      amountIn: amountRaw.toString(),
+      tokenIn: input.address,
+      tokenOut: output.address,
+    });
     // Quoted again, so a swap that did not match what was quoted is visible rather than assumed.
     const after = await reader.call(quoteRequest(leg, params));
     log(`quoted after ${after.data ?? "0x"}`);
@@ -196,9 +242,18 @@ export async function runIntent(
     // well as the push itself. An approval sized to the top-up alone is consumed by it and leaves
     // the leg unable to settle its next fill, which is what happened on 2026-09-11.
     const wrap = BigInt(intent.wrap);
-    if (wrap > 0n) await send("wrapped", wrapRequest(leg.tokenB.address, wrap));
+    if (wrap > 0n) {
+      await send("wrapped", wrapRequest(leg.tokenB.address, wrap), {
+        amountIn: wrap.toString(),
+        tokenOut: leg.tokenB.address,
+        amountOut: wrap.toString(),
+      });
+    }
     if (intent.needsApproval) {
-      await send("approved", approveRequest(leg.tokenB.address, leg.aqua, BigInt(intent.approval)));
+      await send("approved", approveRequest(leg.tokenB.address, leg.aqua, BigInt(intent.approval)), {
+        amountIn: intent.approval,
+        tokenIn: leg.tokenB.address,
+      });
     }
     await send(
       "pushed",
@@ -209,6 +264,7 @@ export async function runIntent(
         token: leg.tokenB.address,
         amount: BigInt(intent.amount),
       }),
+      { amountIn: intent.amount, tokenIn: leg.tokenB.address },
     );
     return;
   }
@@ -227,7 +283,17 @@ export async function signMain(stdin: string, envPath: string | null): Promise<n
       throw new Error("no env file: set ZENTIS_ENV or run the console's onboarding");
     }
     // The hashes this run sent, gathered as it sends them: the only 32-byte values allowed out.
-    await runIntent(intent, envPath ?? "", (line) => process.stdout.write(`${redact(line, key, sent)}\n`), undefined, sent);
+    // The shared file, opened here and nowhere else in the child: `runIntent` is handed a function
+    // so the tests that drive it write into an array instead of the operator's own log.
+    const path = txlogPath();
+    await runIntent(
+      intent,
+      envPath ?? "",
+      (line) => process.stdout.write(`${redact(line, key, sent)}\n`),
+      undefined,
+      sent,
+      (entry) => appendTxLog(path, entry),
+    );
     return 0;
   } catch (cause) {
     process.stderr.write(`${redact(String(cause instanceof Error ? cause.message : cause), key, sent)}\n`);

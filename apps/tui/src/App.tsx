@@ -19,6 +19,7 @@ import { roleOf } from "./role.js";
 import { Feed } from "./components/Feed.js";
 import { Log } from "./components/Log.js";
 import { type LogEntry, record, settle } from "./journal.js";
+import { type LogRow, type TxLogLine, mergeRows, rowsOf } from "./txlog.js";
 import { Graphs, marketPrice } from "./components/Graphs.js";
 import { Help } from "./components/Help.js";
 import { LegCard } from "./components/LegCard.js";
@@ -104,6 +105,8 @@ export function App({
   onboarding = false,
   onChoose,
   onArm,
+  readTxLog: readTxLogGiven = null,
+  txlogPath: txlogPathGiven = "~/.zentis/txlog.jsonl",
 }: {
   actions: Action[];
   /**
@@ -144,6 +147,16 @@ export function App({
    * shipped path identical rather than giving the sandbox a different app to test.
    */
   makeStore?: () => Store;
+  /**
+   * The machine's transaction log, read rather than remembered.
+   *
+   * This console is not the only thing that sends: the headless taker and the rebalance scripts
+   * append to the same file in the same shape. So the log page reads a file, and it is handed in as
+   * a function — the sandbox gives a recorded one, and no test ever reads the operator's own.
+   */
+  readTxLog?: (() => TxLogLine[]) | null;
+  /** where that file is, said on screen so an empty page can be explained rather than doubted */
+  txlogPath?: string;
 }) {
   const { exit } = useApp();
   const size = useSize();
@@ -181,6 +194,19 @@ export function App({
   // from opposite ends, so they share a region rather than competing for one.
   const [log, setLog] = useState<LogEntry[]>([]);
   const [showingLog, setShowingLog] = useState(false);
+  // The file's lines, re-read while the page is up. Only while: a console on the live view has no
+  // reason to stat a file every few seconds, and the page is the only thing that shows them.
+  const [txLines, setTxLines] = useState<TxLogLine[]>([]);
+  useEffect(() => {
+    if (!showingLog || readTxLogGiven === null) return;
+    const read = () => setTxLines(readTxLogGiven());
+    read();
+    // Another process appends while this one draws, so the page follows the file rather than
+    // showing whatever was in it at the keystroke that opened the page.
+    const timer = setInterval(read, 3_000);
+    return () => clearInterval(timer);
+  }, [showingLog, readTxLogGiven]);
+  const logRows: LogRow[] = useMemo(() => mergeRows(rowsOf(txLines), log), [txLines, log]);
   const nextEntry = useRef(0);
   /** An action, written down as it is asked for; the id is how its answer finds it again. */
   const noteAction = (action: string, source: "key" | "command" | "mcp"): number => {
@@ -880,7 +906,8 @@ export function App({
           >
             {showingLog ? (
               <Log
-                log={log}
+                entries={logRows}
+                path={txlogPathGiven}
                 nowSeconds={now}
                 width={panelInner(regions.rightWidth, feedRows).width}
                 rows={panelInner(regions.rightWidth, feedRows).height}

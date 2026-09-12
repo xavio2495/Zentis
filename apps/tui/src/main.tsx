@@ -8,6 +8,8 @@ import { fixedStore } from "../sandbox/state.js";
 import { fakeSnapshot } from "../sandbox/world.js";
 import { run, summarise } from "./runner.js";
 import type { Action } from "./action-types.js";
+import { appendTxLog, parseTxLog, readTxLog, txlogPath } from "./txlog.js";
+import { RECORDED_TXLOG } from "./txlog-fixture.js";
 
 /**
  * The operator console.
@@ -102,8 +104,60 @@ if (!process.stdin.isTTY) {
 // variable by hand after onboarding.
 const envFile = watchOnly ? null : resolveEnvPath();
 
-const runAction = async (action: Action): Promise<string> =>
-  summarise(action, await run(action.command!));
+/**
+ * `ZENTIS_FIXTURES=1` runs the console against the recorded moment instead of the network.
+ *
+ * It is what a test drives — a console started by a test must not be able to spend the maker's
+ * indexer allowance — and it is what the demo falls back on if an endpoint is down at the wrong
+ * minute. The screen is the real one; only the world behind it is the recording, and the status bar
+ * says so rather than letting a recorded moment pass for a live one.
+ */
+const fixtures = (process.env.ZENTIS_FIXTURES ?? "") !== "";
+
+/**
+ * The machine's transaction log: a file this console reads and never writes.
+ *
+ * What writes it is the signing child, and the taker and rebalance scripts beside it. Under
+ * fixtures the recording stands in for it, so the demo's log page shows the transactions that were
+ * really sent rather than an empty table.
+ */
+const txlog = txlogPath();
+const readLog = fixtures ? () => parseTxLog(RECORDED_TXLOG) : () => readTxLog(txlog);
+const txlogLabel = fixtures ? "recorded transaction log" : txlog.replace(homedir(), "~");
+
+/**
+ * A republish, written down where transactions are.
+ *
+ * It is the one action that does not go through the signing child: the cloud job holds its own key
+ * and writes the registry minutes later, so there is no hash here to write down and the line says
+ * what was asked and which sequence it answered. `tx` absent is the shape the scripts use for an
+ * event rather than a transaction, and this is one.
+ */
+const noteRepublish = (action: Action, tail: string) => {
+  if (fixtures) return;
+  const line = tail.split("\n").find((said) => said.includes("seq")) ?? tail.split("\n").pop() ?? "";
+  appendTxLog(txlog, {
+    at: new Date().toISOString(),
+    // Not a chain: the fast workflow writes every leg's registry from one run.
+    chain: null,
+    chainId: null,
+    kind: "republish",
+    actor: null,
+    tx: null,
+    status: null,
+    amountIn: null,
+    amountOut: null,
+    tokenIn: null,
+    tokenOut: null,
+    note: `${action.label} · ${line.trim()}`.slice(0, 200),
+  });
+};
+
+const runAction = async (action: Action): Promise<string> => {
+  const result = await run(action.command!);
+  if (action.label.startsWith("republish") && result.exitCode === 0) noteRepublish(action, result.tail);
+  return summarise(action, result);
+};
 
 /**
  * The address this console holds a key for, read without reading the key.
@@ -157,18 +211,10 @@ const choose = async (choice: "generate" | "existing" | "watch", path?: string):
   return result.tail;
 };
 
-/**
- * `ZENTIS_FIXTURES=1` runs the console against the recorded moment instead of the network.
- *
- * It is what a test drives — a console started by a test must not be able to spend the maker's
- * indexer allowance — and it is what the demo falls back on if an endpoint is down at the wrong
- * minute. The screen is the real one; only the world behind it is the recording, and the status bar
- * says so rather than letting a recorded moment pass for a live one.
- */
-const fixtures = (process.env.ZENTIS_FIXTURES ?? "") !== "";
 const makeStore = fixtures
   ? fixedStore({ ...fakeSnapshot("fresh"), caveats: ["recorded fixtures, not live: no source was read"] })
   : undefined;
+
 
 /**
  * What the console becomes once a wallet exists that did not when it started.
@@ -200,6 +246,10 @@ const app = render(
     onChoose={choose}
     onArm={arm}
     makeStore={makeStore}
+    // The file every process on this machine appends to, read here and never written: the console
+    // draws this log, the signing child and the scripts beside it are what write to it.
+    readTxLog={readLog}
+    txlogPath={txlogLabel}
   />,
 );
 void app.waitUntilExit().then(() => {

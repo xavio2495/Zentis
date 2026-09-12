@@ -4,6 +4,7 @@ import { App } from "../src/App.js";
 import { buildActions, commandActions, findRepoRoot, publisherMode } from "../src/actions.js";
 import type { Action } from "../src/action-types.js";
 import { type Scenario, fakeSnapshot } from "./world.js";
+import type { TxLogLine } from "../src/txlog.js";
 
 /**
  * Headless frame capture.
@@ -62,6 +63,12 @@ export async function drive(
     publisher?: "cloud" | "local" | "none";
     /** a stranger's first run: no wallet, no env file, nothing chosen yet */
     onboarding?: boolean;
+    /**
+     * The machine's transaction log, recorded. Handed in rather than read: a test that read the
+     * real file would draw whatever this machine happens to have sent today, and one that wrote it
+     * would put fixtures into the operator's own record of what went on chain.
+     */
+    txlog?: TxLogLine[];
   } = {},
 ): Promise<Frame> {
   const stdin = Object.assign(new PassThrough(), {
@@ -101,6 +108,7 @@ export async function drive(
       }
       // The fake world has no file to arm on, so continuing leaves the console as it started.
       onArm={() => null}
+      readTxLog={() => options.txlog ?? []}
     />,
     {
     stdout: stdout as never,

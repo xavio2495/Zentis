@@ -119,7 +119,11 @@ test("what this console asked for is on the same list, until the file has the an
   const running = mergeRows(rowsOf([]), asked);
   expect(running).toHaveLength(1);
   expect(running[0]!.status).toBe("running");
-  expect(running[0]!.flow).toContain("fill sepolia");
+  expect(running[0]!.kind).toBe("fill");
+  // The chain column is filled from the words it was asked in, so the row is not a nameless one
+  // beside rows that all say where they happened.
+  expect(running[0]!.chain).toBe("sepolia");
+  expect(running[0]!.flow).toContain("0.15 USDC");
 
   // Once it has settled with a hash, the file is the record and the console does not say it twice.
   const done = settle(asked, 1, `filled ${hash} success`, false);

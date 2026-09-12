@@ -1,6 +1,8 @@
 import "./stubs/browser-globals.js";
 import { render } from "ink";
 import { App } from "./App.js";
+import { parseTxLog } from "./txlog.js";
+import { RECORDED_TXLOG } from "./txlog-fixture.js";
 import { fixedStore } from "../sandbox/state.js";
 import { fakeSnapshot } from "../sandbox/world.js";
 import { emitter } from "./stubs/node-stream.js";
@@ -115,12 +117,23 @@ export function mount(terminal: TerminalHandle) {
     ...fakeSnapshot("fresh"),
     caveats: ["recorded testnet reads, not live: this public console asks no endpoint anything"],
   });
-  return render(<App actions={watchActions} runAction={null} makeStore={store} />, {
-    stdout: stdout as never,
-    stdin: stdin as never,
-    // Ink's console patch reaches for Node's console internals, and there is no terminal here to
-    // protect from stray logging anyway.
-    patchConsole: false,
-    exitOnCtrlC: false,
-  });
+  // The log page gets the recording too: there is no machine behind this console to have a file on,
+  // and a visitor pressing `l` on an empty table learns nothing about what the page is for.
+  return render(
+    <App
+      actions={watchActions}
+      runAction={null}
+      makeStore={store}
+      readTxLog={() => parseTxLog(RECORDED_TXLOG)}
+      txlogPath="recorded transaction log"
+    />,
+    {
+      stdout: stdout as never,
+      stdin: stdin as never,
+      // Ink's console patch reaches for Node's console internals, and there is no terminal here to
+      // protect from stray logging anyway.
+      patchConsole: false,
+      exitOnCtrlC: false,
+    },
+  );
 }
