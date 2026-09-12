@@ -141,6 +141,34 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
     );
   }
 
+  // The inventory hold is silent about, named in the leg's own units. Pushing tokenB into a leg
+  // after it shipped is an ordinary thing to do — it is how a leg is rebalanced without bridging —
+  // and hold values only what the leg was shipped with, so the book's hold understates by whatever
+  // that inventory has done since. The page cannot value it, and says so rather than letting the
+  // total read as complete.
+  const pushed = legs
+    .map((leg) => ({ leg, amount: leg.pnl?.unvaluedB ?? 0n }))
+    .filter((entry) => entry.amount !== 0n);
+  if (pushed.length > 0) {
+    const tokenB = pushed[0]!.leg.config.tokenB;
+    const total = pushed.reduce((sum, entry) => sum + entry.amount, 0n);
+    const named = pushed
+      .map((entry) => `${entry.leg.config.label.split(" ")[0]} ${tokenAmount(entry.amount, tokenB.decimals)}`)
+      .join(", ");
+    for (const [i, line] of wrapLines(
+      `! hold covers what each leg was shipped with; ${tokenAmount(total, tokenB.decimals)} ${tokenB.symbol} ` +
+        `pushed after that is not in it (${named})`,
+      width,
+      2,
+    ).entries()) {
+      rows.push(
+        <Text key={`pushed${i}`} color={UI.caveat}>
+          {line}
+        </Text>,
+      );
+    }
+  }
+
   // What the totals are made of, in whatever room is left. A page whose lower half is blank has
   // spent it on nothing; the fills are the only thing on this screen that actually moved value, and
   // each one is scored twice — against the reference it was quoted from, and against the next one

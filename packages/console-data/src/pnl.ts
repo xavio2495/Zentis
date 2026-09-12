@@ -51,6 +51,17 @@ export interface LegPnl {
   readonly tradingA: bigint | null;
   readonly holdA: bigint | null;
   readonly totalA: bigint | null;
+  /**
+   * TokenB the leg holds that `holdA` does not value, signed, in tokenB's own raw units.
+   *
+   * Hold is the price move on what the leg was *shipped* with. Anything pushed in afterwards is
+   * inventory it holds and hold is silent about, and the silence is the problem: the book's hold
+   * understates by whatever that inventory has done since. The amount is derivable from what is
+   * already read — what the position holds now, less what it was shipped with, less what the fills
+   * moved — so the screen can at least name it. Valuing it needs a mark from the moment of each
+   * push, which no record carries yet.
+   */
+  readonly unvaluedB: bigint | null;
   /** why trading/hold are null, when they are */
   readonly caveat: string | null;
   readonly perFill: FillEconomics[];
@@ -113,9 +124,26 @@ export function legPnl(
   if (mark === null) caveat = "no mark, so inventory cannot be valued";
   else if (shipped.balanceB === null) caveat = "this generation's shipped B side was not recorded, so there is no opening value";
   if (caveat !== null || mark === null) {
-    return { fills, volumeA, edgeA, markoutA, tradingA: null, holdA: null, totalA: null, caveat, perFill };
+    return { fills, volumeA, edgeA, markoutA, tradingA: null, holdA: null, totalA: null, unvaluedB: null, caveat, perFill };
   }
   const shippedB = shipped.balanceB as bigint;
+  // What the leg holds that hold does not speak for. Zero on a leg nobody has pushed to.
+  //
+  // Only this generation's fills count. The subgraph keeps every fill the position ever took, and a
+  // re-shipped leg's older ones moved the balance of the generation before this one — counting them
+  // put half a milli-WETH of imaginary inventory on two legs. Without the ship's own timestamp
+  // there is no way to tell the two apart, so the answer is null rather than a number that looks
+  // plausible.
+  const shipAt = shipped.markAtShipAt;
+  const heldB = history.position?.balanceB ?? null;
+  const unvaluedB =
+    heldB === null || shipAt === null
+      ? null
+      : heldB -
+        shippedB -
+        history.fills
+          .filter((fill) => Number(fill.timestamp) >= shipAt)
+          .reduce((sum, fill) => sum + fillDelta(fill).deltaB, 0n);
   // Summed over the fills, not taken from the balance: see the note at the top of this file.
   const tradingA = history.fills.reduce((sum, fill) => {
     const { deltaA, deltaB } = fillDelta(fill);
@@ -130,10 +158,11 @@ export function legPnl(
       tradingA,
       holdA: null,
       totalA: null,
+      unvaluedB,
       caveat: "no mark was recorded from this source when the leg was shipped, so the hold effect cannot be separated from the trading",
       perFill,
     };
   }
   const holdA = bInA(shippedB, mark) - bInA(shippedB, openingMark);
-  return { fills, volumeA, edgeA, markoutA, tradingA, holdA, totalA: tradingA + holdA, caveat: null, perFill };
+  return { fills, volumeA, edgeA, markoutA, tradingA, holdA, totalA: tradingA + holdA, unvaluedB, caveat: null, perFill };
 }
