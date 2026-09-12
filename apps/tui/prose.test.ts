@@ -92,3 +92,12 @@ test("the pnl page names the inventory hold does not cover, in the leg's own uni
   expect(pnl).toMatch(/WETH/);
 }, 60_000);
 
+test("the page says which span its totals cover, and reports the position's whole life apart", async () => {
+  // Every figure in the table is this generation's, because hold is: a total that added a
+  // lifetime's trading to one generation's hold answered two questions at once. What the position
+  // did before its last ship is still shown, on its own line, labelled as the other span.
+  const pnl = await pageText("n");
+  expect(pnl).toMatch(/since first ship/i);
+  expect(pnl).toMatch(/generation/i);
+}, 60_000);
+
