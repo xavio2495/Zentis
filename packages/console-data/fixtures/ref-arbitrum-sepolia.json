@@ -1,12 +1,12 @@
 {
-  "mid": "393075768740229048480023621",
-  "spreadBps": 11,
-  "tiltBps": 240,
-  "updatedAt": "1789218342",
-  "seq": 1789218343,
+  "mid": "392412218630695997888507774",
+  "spreadBps": 12,
+  "tiltBps": 257,
+  "updatedAt": "1789227918",
+  "seq": 1789227919,
   "refBalanceA": "15000000",
-  "dTiltPerA": "-492122587498300",
+  "dTiltPerA": "-493288390486024",
   "maxExtrapBps": 100,
   "markoutBps": 200,
-  "bandEdgeBps": 297
+  "bandEdgeBps": 312
 }

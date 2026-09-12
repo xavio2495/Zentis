@@ -1,0 +1,31 @@
+{
+  "marks": [
+    {
+      "chainId": 84532,
+      "chain": "base-sepolia",
+      "mainnetChainId": 8453,
+      "mid": "394281692504096968667536230",
+      "source": "1inch spot",
+      "readAtSeconds": 1789229178,
+      "error": null
+    },
+    {
+      "chainId": 421614,
+      "chain": "arbitrum-sepolia",
+      "mainnetChainId": 42161,
+      "mid": "394606850537456014010968529",
+      "source": "1inch spot",
+      "readAtSeconds": 1789229178,
+      "error": null
+    },
+    {
+      "chainId": 11155111,
+      "chain": "sepolia",
+      "mainnetChainId": 1,
+      "mid": "392624043542853990650534201",
+      "source": "1inch spot",
+      "readAtSeconds": 1789229178,
+      "error": null
+    }
+  ]
+}

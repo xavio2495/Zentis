@@ -1,6 +1,6 @@
 {
   "provenance": {
-    "recordedAtSeconds": 1789220035,
+    "recordedAtSeconds": 1789229181,
     "sources": [
       "packages/console-data/fixtures/history-sepolia.json",
       "packages/console-data/fixtures/history-base-sepolia.json",
@@ -20,244 +20,6 @@
       "balanceB": "5899422880110771",
       "shippedAtSeconds": 1789100856,
       "rounds": [
-        {
-          "seq": 1789102658,
-          "atSeconds": 1789103904,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789102659,
-          "atSeconds": 1789104144,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103269,
-          "atSeconds": 1789104228,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103534,
-          "atSeconds": 1789104564,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103535,
-          "atSeconds": 1789104888,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789104296,
-          "atSeconds": 1789105548,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789104576,
-          "atSeconds": 1789105872,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105162,
-          "atSeconds": 1789106208,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105440,
-          "atSeconds": 1789106544,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105836,
-          "atSeconds": 1789106868,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105837,
-          "atSeconds": 1789107192,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789106140,
-          "atSeconds": 1789107528,
-          "tiltBps": 0,
-          "mid": "33126803051676234437519155",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789106498,
-          "atSeconds": 1789107852,
-          "tiltBps": -5000,
-          "mid": "404625046912720009931962230",
-          "referenceChanged": true
-        },
-        {
-          "seq": 1789108526,
-          "atSeconds": 1789109544,
-          "tiltBps": -4001,
-          "mid": "404784606639443958798733096",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789108968,
-          "atSeconds": 1789110192,
-          "tiltBps": -4001,
-          "mid": "404740652539244047225978789",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789109254,
-          "atSeconds": 1789110540,
-          "tiltBps": -4001,
-          "mid": "404588390835919016719309547",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789109634,
-          "atSeconds": 1789110864,
-          "tiltBps": 233,
-          "mid": "404558961002331962317092233",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110209,
-          "atSeconds": 1789111200,
-          "tiltBps": 217,
-          "mid": "404464591484604016556666912",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110510,
-          "atSeconds": 1789111524,
-          "tiltBps": 6,
-          "mid": "404457177211510016872668472",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110876,
-          "atSeconds": 1789111860,
-          "tiltBps": 5,
-          "mid": "404505282878917946134567605",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110877,
-          "atSeconds": 1789112196,
-          "tiltBps": 7,
-          "mid": "404373680155609019637224943",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789111152,
-          "atSeconds": 1789112520,
-          "tiltBps": 7,
-          "mid": "404375895688137977915778105",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789111724,
-          "atSeconds": 1789112844,
-          "tiltBps": 8,
-          "mid": "404310046701268027647251687",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112084,
-          "atSeconds": 1789113180,
-          "tiltBps": 9,
-          "mid": "404235427561554985666428101",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112406,
-          "atSeconds": 1789113480,
-          "tiltBps": 7,
-          "mid": "404369784554792057801148851",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112848,
-          "atSeconds": 1789113804,
-          "tiltBps": 19,
-          "mid": "403593385028514028515939510",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112862,
-          "atSeconds": 1789114128,
-          "tiltBps": 15,
-          "mid": "403893173712831018803447296",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113642,
-          "atSeconds": 1789114764,
-          "tiltBps": 5,
-          "mid": "404535646733363020286018597",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113643,
-          "atSeconds": 1789114824,
-          "tiltBps": 7,
-          "mid": "404370656976949005923844366",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113870,
-          "atSeconds": 1789115088,
-          "tiltBps": 11,
-          "mid": "404147377718865022558189300",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114308,
-          "atSeconds": 1789115580,
-          "tiltBps": 34,
-          "mid": "402615030950833991615818989",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114602,
-          "atSeconds": 1789115916,
-          "tiltBps": 35,
-          "mid": "402582071468444047875777931",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114966,
-          "atSeconds": 1789116144,
-          "tiltBps": 35,
-          "mid": "402591668185703963457148487",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789115428,
-          "atSeconds": 1789116540,
-          "tiltBps": 36,
-          "mid": "402555208301163019326626281",
-          "referenceChanged": false
-        },
         {
           "seq": 1789115429,
           "atSeconds": 1789116792,
@@ -2819,6 +2581,244 @@
           "tiltBps": -237,
           "mid": "393075768740229048480023621",
           "referenceChanged": false
+        },
+        {
+          "seq": 1789218829,
+          "atSeconds": 1789220052,
+          "tiltBps": -238,
+          "mid": "393102586783533022835284607",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219150,
+          "atSeconds": 1789220268,
+          "tiltBps": -237,
+          "mid": "393070442658574003798208794",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219440,
+          "atSeconds": 1789220604,
+          "tiltBps": -238,
+          "mid": "393103813519759015720954176",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219441,
+          "atSeconds": 1789220856,
+          "tiltBps": -239,
+          "mid": "393122620657359005632550999",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219980,
+          "atSeconds": 1789221204,
+          "tiltBps": -237,
+          "mid": "393042076329039998223304347",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220268,
+          "atSeconds": 1789221480,
+          "tiltBps": -236,
+          "mid": "393031501082871047997341658",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220564,
+          "atSeconds": 1789221804,
+          "tiltBps": -233,
+          "mid": "392879725370215008465447334",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220565,
+          "atSeconds": 1789221876,
+          "tiltBps": -233,
+          "mid": "392879725370215008465447334",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221110,
+          "atSeconds": 1789222080,
+          "tiltBps": -232,
+          "mid": "392853397334365997901266957",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221111,
+          "atSeconds": 1789222428,
+          "tiltBps": -232,
+          "mid": "392841818500050004813881465",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221368,
+          "atSeconds": 1789222656,
+          "tiltBps": -231,
+          "mid": "392838845076280959414297915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221930,
+          "atSeconds": 1789223004,
+          "tiltBps": -231,
+          "mid": "392809426171946983544745558",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222212,
+          "atSeconds": 1789223292,
+          "tiltBps": -226,
+          "mid": "392633949579463965948146765",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222518,
+          "atSeconds": 1789223604,
+          "tiltBps": -223,
+          "mid": "392507929921938026393253285",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222519,
+          "atSeconds": 1789223892,
+          "tiltBps": -230,
+          "mid": "392796788483343970378000712",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223074,
+          "atSeconds": 1789224216,
+          "tiltBps": -232,
+          "mid": "392840329168625011823638012",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223360,
+          "atSeconds": 1789224468,
+          "tiltBps": -230,
+          "mid": "392791319003764961794791883",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223670,
+          "atSeconds": 1789224828,
+          "tiltBps": -228,
+          "mid": "392703700545475005116938697",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223671,
+          "atSeconds": 1789225068,
+          "tiltBps": -230,
+          "mid": "392764688962920001664995956",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224199,
+          "atSeconds": 1789225380,
+          "tiltBps": -225,
+          "mid": "392573197340907055562581915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224200,
+          "atSeconds": 1789225428,
+          "tiltBps": -225,
+          "mid": "392573197340907055562581915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224522,
+          "atSeconds": 1789225764,
+          "tiltBps": -224,
+          "mid": "392576543143435975105307868",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224820,
+          "atSeconds": 1789225980,
+          "tiltBps": -230,
+          "mid": "392818423500803023117767432",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225384,
+          "atSeconds": 1789226352,
+          "tiltBps": -213,
+          "mid": "392133316817725960853656395",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225385,
+          "atSeconds": 1789226556,
+          "tiltBps": -230,
+          "mid": "392833039759103026500995535",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225686,
+          "atSeconds": 1789226808,
+          "tiltBps": -230,
+          "mid": "392835995798206016213254589",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225946,
+          "atSeconds": 1789227180,
+          "tiltBps": -226,
+          "mid": "392639756908266053193489783",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226486,
+          "atSeconds": 1789227444,
+          "tiltBps": -229,
+          "mid": "392797560152445056655042346",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226487,
+          "atSeconds": 1789227816,
+          "tiltBps": -235,
+          "mid": "393027924809169007989069532",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226776,
+          "atSeconds": 1789228104,
+          "tiltBps": -235,
+          "mid": "393014953992091985754044289",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227058,
+          "atSeconds": 1789228392,
+          "tiltBps": -219,
+          "mid": "392383223734159031657330257",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227628,
+          "atSeconds": 1789228644,
+          "tiltBps": -219,
+          "mid": "392368102811899014899548752",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227918,
+          "atSeconds": 1789228992,
+          "tiltBps": -220,
+          "mid": "392412218630695997888507774",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227919,
+          "atSeconds": 1789229028,
+          "tiltBps": -220,
+          "mid": "392412218630695997888507774",
+          "referenceChanged": false
         }
       ],
       "fills": [
@@ -2891,244 +2891,6 @@
       "balanceB": "6071109788088660",
       "shippedAtSeconds": 1789100906,
       "rounds": [
-        {
-          "seq": 1789102658,
-          "atSeconds": 1789103888,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789102659,
-          "atSeconds": 1789104132,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103269,
-          "atSeconds": 1789104218,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103534,
-          "atSeconds": 1789104548,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103535,
-          "atSeconds": 1789104878,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789104296,
-          "atSeconds": 1789105536,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789104576,
-          "atSeconds": 1789105866,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105162,
-          "atSeconds": 1789106196,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105440,
-          "atSeconds": 1789106526,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105836,
-          "atSeconds": 1789106858,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105837,
-          "atSeconds": 1789107186,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789106140,
-          "atSeconds": 1789107516,
-          "tiltBps": 0,
-          "mid": "240612487044372315119727001",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789106498,
-          "atSeconds": 1789107846,
-          "tiltBps": -3990,
-          "mid": "404625046912720009931962230",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789108526,
-          "atSeconds": 1789109536,
-          "tiltBps": -3992,
-          "mid": "404784606639443958798733096",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789108968,
-          "atSeconds": 1789110186,
-          "tiltBps": -3992,
-          "mid": "404740652539244047225978789",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789109254,
-          "atSeconds": 1789110526,
-          "tiltBps": -3989,
-          "mid": "404588390835919016719309547",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789109634,
-          "atSeconds": 1789110858,
-          "tiltBps": -3989,
-          "mid": "404558961002331962317092233",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110209,
-          "atSeconds": 1789111186,
-          "tiltBps": -3988,
-          "mid": "404464591484604016556666912",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110510,
-          "atSeconds": 1789111516,
-          "tiltBps": 6,
-          "mid": "404457177211510016872668472",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110876,
-          "atSeconds": 1789111846,
-          "tiltBps": 4,
-          "mid": "404505282878917946134567605",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110877,
-          "atSeconds": 1789112176,
-          "tiltBps": 6,
-          "mid": "404373680155609019637224943",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789111152,
-          "atSeconds": 1789112506,
-          "tiltBps": 6,
-          "mid": "404375895688137977915778105",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789111724,
-          "atSeconds": 1789112836,
-          "tiltBps": 7,
-          "mid": "404310046701268027647251687",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112084,
-          "atSeconds": 1789113166,
-          "tiltBps": 8,
-          "mid": "404235427561554985666428101",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112406,
-          "atSeconds": 1789113466,
-          "tiltBps": 6,
-          "mid": "404369784554792057801148851",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112848,
-          "atSeconds": 1789113796,
-          "tiltBps": 18,
-          "mid": "403593385028514028515939510",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112862,
-          "atSeconds": 1789114118,
-          "tiltBps": 13,
-          "mid": "403893173712831018803447296",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113642,
-          "atSeconds": 1789114756,
-          "tiltBps": 4,
-          "mid": "404535646733363020286018597",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113643,
-          "atSeconds": 1789114812,
-          "tiltBps": 6,
-          "mid": "404370656976949005923844366",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113870,
-          "atSeconds": 1789115086,
-          "tiltBps": 10,
-          "mid": "404147377718865022558189300",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114308,
-          "atSeconds": 1789115574,
-          "tiltBps": 33,
-          "mid": "402615030950833991615818989",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114602,
-          "atSeconds": 1789115914,
-          "tiltBps": 34,
-          "mid": "402582071468444047875777931",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114966,
-          "atSeconds": 1789116124,
-          "tiltBps": 34,
-          "mid": "402591668185703963457148487",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789115428,
-          "atSeconds": 1789116534,
-          "tiltBps": 35,
-          "mid": "402555208301163019326626281",
-          "referenceChanged": false
-        },
         {
           "seq": 1789115429,
           "atSeconds": 1789116784,
@@ -5690,6 +5452,244 @@
           "tiltBps": 239,
           "mid": "393075768740229048480023621",
           "referenceChanged": false
+        },
+        {
+          "seq": 1789218829,
+          "atSeconds": 1789220042,
+          "tiltBps": 239,
+          "mid": "393102586783533022835284607",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219150,
+          "atSeconds": 1789220262,
+          "tiltBps": 239,
+          "mid": "393070442658574003798208794",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219440,
+          "atSeconds": 1789220594,
+          "tiltBps": 239,
+          "mid": "393103813519759015720954176",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219441,
+          "atSeconds": 1789220844,
+          "tiltBps": 238,
+          "mid": "393122620657359005632550999",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219980,
+          "atSeconds": 1789221194,
+          "tiltBps": 240,
+          "mid": "393042076329039998223304347",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220268,
+          "atSeconds": 1789221464,
+          "tiltBps": 240,
+          "mid": "393031501082871047997341658",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220564,
+          "atSeconds": 1789221794,
+          "tiltBps": 244,
+          "mid": "392879725370215008465447334",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220565,
+          "atSeconds": 1789221844,
+          "tiltBps": 244,
+          "mid": "392879725370215008465447334",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221110,
+          "atSeconds": 1789222074,
+          "tiltBps": 245,
+          "mid": "392853397334365997901266957",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221111,
+          "atSeconds": 1789222422,
+          "tiltBps": 245,
+          "mid": "392841818500050004813881465",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221368,
+          "atSeconds": 1789222654,
+          "tiltBps": 245,
+          "mid": "392838845076280959414297915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221930,
+          "atSeconds": 1789222994,
+          "tiltBps": 246,
+          "mid": "392809426171946983544745558",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222212,
+          "atSeconds": 1789223274,
+          "tiltBps": 251,
+          "mid": "392633949579463965948146765",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222518,
+          "atSeconds": 1789223594,
+          "tiltBps": 254,
+          "mid": "392507929921938026393253285",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222519,
+          "atSeconds": 1789223872,
+          "tiltBps": 247,
+          "mid": "392796788483343970378000712",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223074,
+          "atSeconds": 1789224204,
+          "tiltBps": 245,
+          "mid": "392840329168625011823638012",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223360,
+          "atSeconds": 1789224452,
+          "tiltBps": 247,
+          "mid": "392791319003764961794791883",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223670,
+          "atSeconds": 1789224824,
+          "tiltBps": 249,
+          "mid": "392703700545475005116938697",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223671,
+          "atSeconds": 1789225054,
+          "tiltBps": 247,
+          "mid": "392764688962920001664995956",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224199,
+          "atSeconds": 1789225374,
+          "tiltBps": 252,
+          "mid": "392573197340907055562581915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224200,
+          "atSeconds": 1789225424,
+          "tiltBps": 252,
+          "mid": "392573197340907055562581915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224522,
+          "atSeconds": 1789225754,
+          "tiltBps": 251,
+          "mid": "392576543143435975105307868",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224820,
+          "atSeconds": 1789225962,
+          "tiltBps": 245,
+          "mid": "392818423500803023117767432",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225384,
+          "atSeconds": 1789226344,
+          "tiltBps": 263,
+          "mid": "392133316817725960853656395",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225385,
+          "atSeconds": 1789226554,
+          "tiltBps": 245,
+          "mid": "392833039759103026500995535",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225686,
+          "atSeconds": 1789226804,
+          "tiltBps": 245,
+          "mid": "392835995798206016213254589",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225946,
+          "atSeconds": 1789227174,
+          "tiltBps": 250,
+          "mid": "392639756908266053193489783",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226486,
+          "atSeconds": 1789227434,
+          "tiltBps": 246,
+          "mid": "392797560152445056655042346",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226487,
+          "atSeconds": 1789227794,
+          "tiltBps": 240,
+          "mid": "393027924809169007989069532",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226776,
+          "atSeconds": 1789228084,
+          "tiltBps": 240,
+          "mid": "393014953992091985754044289",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227058,
+          "atSeconds": 1789228374,
+          "tiltBps": 256,
+          "mid": "392383223734159031657330257",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227628,
+          "atSeconds": 1789228634,
+          "tiltBps": 257,
+          "mid": "392368102811899014899548752",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227918,
+          "atSeconds": 1789228974,
+          "tiltBps": 256,
+          "mid": "392412218630695997888507774",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227919,
+          "atSeconds": 1789229024,
+          "tiltBps": 256,
+          "mid": "392412218630695997888507774",
+          "referenceChanged": false
         }
       ],
       "fills": [
@@ -5787,244 +5787,6 @@
       "balanceB": "6071769099591659",
       "shippedAtSeconds": 1789100886,
       "rounds": [
-        {
-          "seq": 1789102040,
-          "atSeconds": 1789103229,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789102658,
-          "atSeconds": 1789103889,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789102659,
-          "atSeconds": 1789104132,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103269,
-          "atSeconds": 1789104219,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103534,
-          "atSeconds": 1789104549,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789103535,
-          "atSeconds": 1789104878,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789104296,
-          "atSeconds": 1789105537,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789104576,
-          "atSeconds": 1789105866,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105162,
-          "atSeconds": 1789106197,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105440,
-          "atSeconds": 1789106527,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105836,
-          "atSeconds": 1789106858,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789105837,
-          "atSeconds": 1789107187,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789106140,
-          "atSeconds": 1789107516,
-          "tiltBps": 0,
-          "mid": "387143877965886497353059054",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789106498,
-          "atSeconds": 1789107846,
-          "tiltBps": -369,
-          "mid": "404625046912720009931962230",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789108526,
-          "atSeconds": 1789109539,
-          "tiltBps": -372,
-          "mid": "404784606639443958798733096",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789108968,
-          "atSeconds": 1789110186,
-          "tiltBps": -371,
-          "mid": "404740652539244047225978789",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789109254,
-          "atSeconds": 1789110526,
-          "tiltBps": -368,
-          "mid": "404588390835919016719309547",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789109634,
-          "atSeconds": 1789110859,
-          "tiltBps": -367,
-          "mid": "404558961002331962317092233",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110209,
-          "atSeconds": 1789111187,
-          "tiltBps": 70,
-          "mid": "404464591484604016556666912",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110510,
-          "atSeconds": 1789111518,
-          "tiltBps": 6,
-          "mid": "404457177211510016872668472",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110876,
-          "atSeconds": 1789111846,
-          "tiltBps": 5,
-          "mid": "404505282878917946134567605",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789110877,
-          "atSeconds": 1789112176,
-          "tiltBps": 7,
-          "mid": "404373680155609019637224943",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789111152,
-          "atSeconds": 1789112507,
-          "tiltBps": 7,
-          "mid": "404375895688137977915778105",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789111724,
-          "atSeconds": 1789112836,
-          "tiltBps": 8,
-          "mid": "404310046701268027647251687",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112084,
-          "atSeconds": 1789113166,
-          "tiltBps": 9,
-          "mid": "404235427561554985666428101",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112406,
-          "atSeconds": 1789113467,
-          "tiltBps": 7,
-          "mid": "404369784554792057801148851",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112848,
-          "atSeconds": 1789113796,
-          "tiltBps": 19,
-          "mid": "403593385028514028515939510",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789112862,
-          "atSeconds": 1789114118,
-          "tiltBps": 15,
-          "mid": "403893173712831018803447296",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113642,
-          "atSeconds": 1789114756,
-          "tiltBps": 5,
-          "mid": "404535646733363020286018597",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113643,
-          "atSeconds": 1789114813,
-          "tiltBps": 7,
-          "mid": "404370656976949005923844366",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789113870,
-          "atSeconds": 1789115086,
-          "tiltBps": 11,
-          "mid": "404147377718865022558189300",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114308,
-          "atSeconds": 1789115573,
-          "tiltBps": 34,
-          "mid": "402615030950833991615818989",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114602,
-          "atSeconds": 1789115913,
-          "tiltBps": 35,
-          "mid": "402582071468444047875777931",
-          "referenceChanged": false
-        },
-        {
-          "seq": 1789114966,
-          "atSeconds": 1789116123,
-          "tiltBps": 35,
-          "mid": "402591668185703963457148487",
-          "referenceChanged": false
-        },
         {
           "seq": 1789115428,
           "atSeconds": 1789116533,
@@ -8585,6 +8347,244 @@
           "atSeconds": 1789219703,
           "tiltBps": 240,
           "mid": "393075768740229048480023621",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789218829,
+          "atSeconds": 1789220043,
+          "tiltBps": 240,
+          "mid": "393102586783533022835284607",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219150,
+          "atSeconds": 1789220263,
+          "tiltBps": 241,
+          "mid": "393070442658574003798208794",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219440,
+          "atSeconds": 1789220593,
+          "tiltBps": 240,
+          "mid": "393103813519759015720954176",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219441,
+          "atSeconds": 1789220843,
+          "tiltBps": 239,
+          "mid": "393122620657359005632550999",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789219980,
+          "atSeconds": 1789221193,
+          "tiltBps": 241,
+          "mid": "393042076329039998223304347",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220268,
+          "atSeconds": 1789221463,
+          "tiltBps": 242,
+          "mid": "393031501082871047997341658",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220564,
+          "atSeconds": 1789221793,
+          "tiltBps": 246,
+          "mid": "392879725370215008465447334",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789220565,
+          "atSeconds": 1789221844,
+          "tiltBps": 246,
+          "mid": "392879725370215008465447334",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221110,
+          "atSeconds": 1789222073,
+          "tiltBps": 246,
+          "mid": "392853397334365997901266957",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221111,
+          "atSeconds": 1789222423,
+          "tiltBps": 247,
+          "mid": "392841818500050004813881465",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221368,
+          "atSeconds": 1789222653,
+          "tiltBps": 247,
+          "mid": "392838845076280959414297915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789221930,
+          "atSeconds": 1789222993,
+          "tiltBps": 247,
+          "mid": "392809426171946983544745558",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222212,
+          "atSeconds": 1789223273,
+          "tiltBps": 252,
+          "mid": "392633949579463965948146765",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222518,
+          "atSeconds": 1789223593,
+          "tiltBps": 255,
+          "mid": "392507929921938026393253285",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789222519,
+          "atSeconds": 1789223872,
+          "tiltBps": 248,
+          "mid": "392796788483343970378000712",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223074,
+          "atSeconds": 1789224203,
+          "tiltBps": 247,
+          "mid": "392840329168625011823638012",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223360,
+          "atSeconds": 1789224453,
+          "tiltBps": 248,
+          "mid": "392791319003764961794791883",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223670,
+          "atSeconds": 1789224824,
+          "tiltBps": 250,
+          "mid": "392703700545475005116938697",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789223671,
+          "atSeconds": 1789225053,
+          "tiltBps": 249,
+          "mid": "392764688962920001664995956",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224199,
+          "atSeconds": 1789225373,
+          "tiltBps": 254,
+          "mid": "392573197340907055562581915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224200,
+          "atSeconds": 1789225423,
+          "tiltBps": 254,
+          "mid": "392573197340907055562581915",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224522,
+          "atSeconds": 1789225753,
+          "tiltBps": 252,
+          "mid": "392576543143435975105307868",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789224820,
+          "atSeconds": 1789225962,
+          "tiltBps": 246,
+          "mid": "392818423500803023117767432",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225384,
+          "atSeconds": 1789226343,
+          "tiltBps": 264,
+          "mid": "392133316817725960853656395",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225385,
+          "atSeconds": 1789226553,
+          "tiltBps": 246,
+          "mid": "392833039759103026500995535",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225686,
+          "atSeconds": 1789226803,
+          "tiltBps": 246,
+          "mid": "392835995798206016213254589",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789225946,
+          "atSeconds": 1789227173,
+          "tiltBps": 251,
+          "mid": "392639756908266053193489783",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226486,
+          "atSeconds": 1789227433,
+          "tiltBps": 247,
+          "mid": "392797560152445056655042346",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226487,
+          "atSeconds": 1789227793,
+          "tiltBps": 241,
+          "mid": "393027924809169007989069532",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789226776,
+          "atSeconds": 1789228083,
+          "tiltBps": 241,
+          "mid": "393014953992091985754044289",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227058,
+          "atSeconds": 1789228373,
+          "tiltBps": 258,
+          "mid": "392383223734159031657330257",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227628,
+          "atSeconds": 1789228633,
+          "tiltBps": 258,
+          "mid": "392368102811899014899548752",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227918,
+          "atSeconds": 1789228973,
+          "tiltBps": 257,
+          "mid": "392412218630695997888507774",
+          "referenceChanged": false
+        },
+        {
+          "seq": 1789227919,
+          "atSeconds": 1789229024,
+          "tiltBps": 257,
+          "mid": "392412218630695997888507774",
           "referenceChanged": false
         }
       ],

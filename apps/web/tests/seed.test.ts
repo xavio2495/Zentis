@@ -136,9 +136,27 @@ test("a round where the reference changed source is marked, because its shift is
   // On 2026-09-11 the fast workflow moved from per-leg pool mids to one mainnet mid, and the
   // published mid jumped twelvefold in a single round. The shifts slammed into the band, which
   // reads as a market event and was not one.
+  //
+  // Whether that round is inside the recorded window depends on when the recording was taken — it
+  // is a day of publishes deep, and the cutover eventually falls out of the back of it. So what is
+  // asserted is the rule rather than the moment: every round the seed marks is one whose mid moved
+  // more than threefold from the round before it, and every round that did is marked. No market
+  // moves that far between two publishes minutes apart; a source change does.
   const replay = seed<Replay>("replay.json");
-  const marked = replay.legs.flatMap((leg) => leg.rounds.filter((round) => round.referenceChanged));
-  expect(marked.length).toBeGreaterThan(0);
-  // One cutover, not a flag on every other round.
-  expect(marked.length).toBeLessThanOrEqual(replay.legs.length * 2);
+  const moved = (now: string, before: string): boolean => {
+    const a = BigInt(now);
+    const b = BigInt(before);
+    if (a === BigInt(0) || b === BigInt(0)) return false;
+    return a > b * BigInt(3) || a * BigInt(3) < b;
+  };
+  let rounds = 0;
+  for (const leg of replay.legs) {
+    for (const [i, round] of leg.rounds.entries()) {
+      rounds += 1;
+      const previous = i === 0 ? null : leg.rounds[i - 1]!.mid;
+      expect(round.referenceChanged).toBe(previous !== null && moved(round.mid, previous));
+    }
+  }
+  // And there is a recording to say it about.
+  expect(rounds).toBeGreaterThan(0);
 });

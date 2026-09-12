@@ -4,7 +4,7 @@
     {
       "chainId": 11155111,
       "chain": "Sepolia",
-      "gas": "1153547572131628768",
+      "gas": "1150256153314447344",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
@@ -23,7 +23,7 @@
     {
       "chainId": 421614,
       "chain": "Arbitrum Sepolia",
-      "gas": "957771077025008477",
+      "gas": "956863489539344477",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
@@ -42,7 +42,7 @@
     {
       "chainId": 84532,
       "chain": "Base Sepolia",
-      "gas": "1083022082338052294",
+      "gas": "1083002751815637576",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,

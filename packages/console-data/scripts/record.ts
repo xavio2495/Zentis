@@ -6,6 +6,8 @@ import { swapsQuery } from "../src/pool.js";
 import { momentProblems } from "../src/moment.js";
 import { fetchRef } from "../src/registry.js";
 import { fetchWallet } from "../src/wallet.js";
+import { QUOTE_API_URL } from "../src/quotes.js";
+import { markHistoryUrl } from "../src/market.js";
 
 /**
  * Records the five sources as they answered, so the tests run on shapes the endpoints really
@@ -96,10 +98,79 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 const DEPTH = 400;
 
+/**
+ * The two windows of the market series that are recorded.
+ *
+ * A week, hourly, is what the chart opens on; six hours comes back per swap, and the two are not
+ * the same shape — an hourly series drawn over six hours is a handful of points joined by straight
+ * lines, which is not what the market did. Both are recorded so a surface can show either without
+ * asking the service anything.
+ */
+const MARKET_WINDOWS = [168, 6] as const;
+
+/**
+ * The quoted size, which is the console's own: 0.15 USDC, and the WETH the mark says that is.
+ *
+ * The B side is derived from the mark at the moment of recording rather than written down, so the
+ * two sides of the recorded quote are the same size in opposite directions and neither is a number
+ * somebody chose.
+ */
+const QUOTE_SIZE_A = 150_000n;
+
+/** A plain GET against the quote service, which answers json and is not rate limited. */
+const get = async (url: string): Promise<unknown> => {
+  const response = await fetch(url);
+  const text = await response.text();
+  if (!response.ok) throw new Error(`${url} answered ${response.status}: ${text.slice(0, 120)}`);
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(`${url} answered ${response.status} with non-json: ${text.slice(0, 120)}`);
+  }
+};
+
+/**
+ * The quote service's own answers: both sides of a quote, the mark, and the market series.
+ *
+ * These are what the recorded moment was missing. Everything else on the console's screen — the
+ * shift, the spread, the PnL — is computed here from recorded chain state, but the quoted price is
+ * the router's answer through the service that rebuilds the order, and the mark is a mainnet price.
+ * Neither can be derived from a subgraph fixture, so a surface replaying the moment either records
+ * them or invents them.
+ *
+ * No indexer allowance is spent: this is the maker's own service.
+ */
+const recordService = async () => {
+  const mark = (await get(`${QUOTE_API_URL}/mark`)) as { marks: { chainId: number; mid: string | null }[] };
+  write("mark", mark);
+  const mid = mark.marks.find((m) => m.mid !== null)?.mid ?? null;
+  if (mid === null) throw new Error("the quote service returned no mark, so the B side has no size");
+  // mid is raw tokenB per 1e18 raw tokenA, so this is the same size the other way round.
+  const sizeB = (QUOTE_SIZE_A * BigInt(mid)) / 10n ** 18n;
+  write("quote-sizes", { amountInA: String(QUOTE_SIZE_A), amountInB: String(sizeB), markMid: mid });
+  for (const [side, amount] of [
+    ["AtoB", QUOTE_SIZE_A],
+    ["BtoA", sizeB],
+  ] as const) {
+    const url = `${QUOTE_API_URL}/quote?positionId=${BOOK.positionId}&amountIn=${amount}&side=${side}`;
+    write(`quotes-${side.toLowerCase()}`, await get(url));
+  }
+  for (const hours of MARKET_WINDOWS) {
+    write(`market-${hours}h`, await get(markHistoryUrl(hours)));
+  }
+};
+
 const wanted = process.argv.slice(2);
 // `wallet` alone records just the maker's wallet, which is RPC only. That matters when an indexer's
 // allowance is spent: the wallet can still be captured without asking a subgraph anything.
 const walletOnly = wanted.length === 1 && wanted[0] === "wallet";
+// `service` alone records the quote service's answers, which cost no indexer allowance at all.
+const serviceOnly = wanted.length === 1 && wanted[0] === "service";
+if (serviceOnly) {
+  await recordService();
+  console.log("OK: recorded the quote service's quotes, mark and market series");
+  process.exit(0);
+}
 const chosen = wanted.length === 0 || walletOnly ? (walletOnly ? [] : LEGS) : LEGS.filter((leg) => wanted.includes(leg.name));
 if (chosen.length === 0 && !walletOnly) {
   throw new Error(`no leg matches ${wanted.join(", ")}; known: ${LEGS.map((l) => l.name).join(", ")}`);
@@ -154,6 +225,12 @@ if (chosen.length === LEGS.length || walletOnly) {
     })),
   });
   for (const caveat of wallet.caveats) console.log(`  wallet: ${caveat}`);
+}
+
+// The service's answers, whenever the whole moment is being refreshed: a recorded moment whose
+// quotes came from a different hour than its balances is two moments on one screen.
+if (chosen.length === LEGS.length && !walletOnly) {
+  await recordService();
 }
 
 // Only stamped when every leg was refreshed: a partial run leaves the previous stamp, so the
