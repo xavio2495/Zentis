@@ -80,3 +80,9 @@ __pycache__/
 
 # Partial output left by an interrupted bun build --compile
 *.bun-build
+
+# Cloned third-party reference sites (design study only, not project source)
+/reference/
+
+# The agents' working notes and design studies: never published, whatever their extension.
+/claude-docs/

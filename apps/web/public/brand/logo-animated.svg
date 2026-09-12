@@ -1,0 +1,49 @@
+<svg width="1000" height="1000" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Chain A reveals right -> left: fixed right edge, left edge sweeps inward -->
+    <clipPath id="clipChainA">
+      <rect x="999.999" y="545.828" width="0" height="272.727">
+        <animate attributeName="x" from="999.999" to="272.727" begin="0s" dur="1.2s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" keyTimes="0;1" values="999.999;272.727"/>
+        <animate attributeName="width" from="0" to="727.272" begin="0s" dur="1.2s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" keyTimes="0;1" values="0;727.272"/>
+      </rect>
+    </clipPath>
+
+    <!-- Chain B reveals left -> right: fixed left edge, width grows -->
+    <clipPath id="clipChainB">
+      <rect x="0" y="182" width="0" height="272.918">
+        <animate attributeName="width" from="0" to="727.249" begin="0s" dur="1.2s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" keyTimes="0;1" values="0;727.249"/>
+      </rect>
+    </clipPath>
+
+    <!-- Bridge grows from its vertical center outward to top and bottom -->
+    <clipPath id="clipBridge">
+      <rect x="336" y="500.435" width="327.282" height="0">
+        <animate attributeName="y" from="500.435" to="257" begin="1.3s" dur="1s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" keyTimes="0;1" values="500.435;257"/>
+        <animate attributeName="height" from="0" to="486.869" begin="1.3s" dur="1s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" keyTimes="0;1" values="0;486.869"/>
+      </rect>
+    </clipPath>
+  </defs>
+
+  <!-- Background: starts black, flips to Zentis green once the mark is complete -->
+  <rect id="bg" width="1000" height="1000" fill="#000000">
+    <animate attributeName="fill" from="#000000" to="#00ED64" begin="2.4s" dur="0.6s" fill="freeze"/>
+  </rect>
+
+  <!-- Chain A -->
+  <path clip-path="url(#clipChainA)" fill-rule="evenodd" clip-rule="evenodd"
+        d="M999.999 636.737H727.272L272.727 818.555V727.646L727.272 545.828H999.999V636.737Z" fill="#00ED64">
+    <animate attributeName="fill" from="#00ED64" to="#000000" begin="2.4s" dur="0.6s" fill="freeze"/>
+  </path>
+
+  <!-- Chain B -->
+  <path clip-path="url(#clipChainB)" fill-rule="evenodd" clip-rule="evenodd"
+        d="M0 364.009L272.727 363.938L727.225 182L727.249 272.909L272.751 454.847L0.0239091 454.918L0 364.009Z" fill="#00ED64">
+    <animate attributeName="fill" from="#00ED64" to="#000000" begin="2.4s" dur="0.6s" fill="freeze"/>
+  </path>
+
+  <!-- Connector bridge -->
+  <path clip-path="url(#clipBridge)"
+        d="M594 257L663.282 297L405.282 743.869L336 703.869L594 257Z" fill="#00ED64">
+    <animate attributeName="fill" from="#00ED64" to="#000000" begin="2.4s" dur="0.6s" fill="freeze"/>
+  </path>
+</svg>
