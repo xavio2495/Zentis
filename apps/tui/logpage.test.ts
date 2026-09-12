@@ -127,3 +127,14 @@ test("at eighty columns the log still shows a chain, a kind and a hash", async (
   expect(text).toMatch(/0x227404a1/);
   expect(frame.overflows).toBe(false);
 }, 60_000);
+
+test("a size is given up whole rather than cut in half", async () => {
+  // "0.15 USDC → 0.0000579…" is not a shorter way of saying the fill, it is a different number, and
+  // a log is read by somebody checking one. When the column cannot hold both sizes it drops the
+  // closing one and names the token instead: less said, nothing untrue.
+  const frame = await drive(100, 30, { keys: ["l"], txlog: recorded });
+  const text = frame.lines.join("\n");
+  expect(text).toMatch(/0\.15 USDC/);
+  // A hash is shortened on purpose and ends in one of these; a size never does.
+  expect(text).not.toMatch(/→ [\d.]+…/);
+}, 60_000);
