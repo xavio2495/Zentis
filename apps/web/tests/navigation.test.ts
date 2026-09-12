@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ROUTES } from "@/lib/copy";
+import { COPY, ROUTES } from "@/lib/copy";
 
 /**
  * Whether a reader can get anywhere.
@@ -66,3 +66,41 @@ describe("and they lead back", () => {
 /** Everything /sim's header is actually made of. */
 const simHeader = () => [source("app", "sim", "page.tsx"), source("components", "console", "Screen.tsx")].join("\n");
 
+
+describe("the closing section is the install line and two ways in", () => {
+  const page = () => source("app", "page.tsx");
+  const contact = () => {
+    const text = page();
+    return text.slice(text.indexOf('id="contact"'), text.indexOf("<footer"));
+  };
+
+  test("it opens with the invitation, not with a second tagline", () => {
+    expect(COPY.tryItOut).toBeTruthy();
+    expect(contact()).toContain("COPY.tryItOut");
+    // The serif contact line and the repo link were the clutter: three headings, a link, a label
+    // and two blurbs stacked over the install command the section exists for.
+    expect(contact()).not.toContain("COPY.contactLine");
+    expect(contact()).not.toContain("CopyLink");
+  });
+
+  test("it leaves the middle of the viewport empty for the install line to arrive in", () => {
+    // The dock is fixed and eases to `innerHeight / 2` as the page closes. Anything placed there
+    // would be underneath it.
+    expect(contact()).toMatch(/dock-room/);
+  });
+
+  test("the two calls to action are the routes, and nothing is said about them beyond their names", () => {
+    expect(contact()).toContain("ROUTES.map");
+    expect(contact()).not.toContain("route.blurb");
+  });
+
+  test("they are one size rather than two, so neither reads as the lesser", () => {
+    expect(contact()).toMatch(/basis-|min-w-|w-\[/);
+  });
+
+  test("the source is still reachable now that the section no longer carries it", () => {
+    // The nav's own Source entry has to lead somewhere real, or removing the link from the page
+    // quietly breaks a nav item rather than tidying a section.
+    expect(source("components", "Nav.tsx")).toContain("REPO_URL");
+  });
+});
