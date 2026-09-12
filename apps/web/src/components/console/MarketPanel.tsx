@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { clock } from "@/lib/format";
-import { clipSeries, legAgreement, plotMarket, publishSpan, type Marker, type Series } from "@/lib/market-chart";
+import { clipSeries, legAgreement, plotMarket, publishSpan, trackingGap, type Marker, type Series } from "@/lib/market-chart";
 import type { Leg, MarkHistory } from "@/lib/replay";
 import { Chip, Panel } from "./ui";
 
@@ -44,6 +44,7 @@ export function MarketPanel({
   const [shown, setShown] = useState<Span>("publishes");
   const agreement = useMemo(() => legAgreement(legs), [legs]);
   const span = useMemo(() => publishSpan(legs), [legs]);
+  const gap = useMemo(() => trackingGap(legs, market?.points ?? []), [legs, market]);
 
   const plot = useMemo(() => {
     if (market === undefined || market.points.length === 0) return null;
@@ -148,8 +149,11 @@ export function MarketPanel({
           <span className="text-em">the three legs&rsquo; published mids</span> are drawn over it, and{" "}
           <span className="text-side-a">fills</span> are marked where they landed in time.{" "}
           {agreement.coincide
-            ? `The legs share one reference by construction, and in this recording they never separate: all ${agreement.shared} publishes carried the same mid on every leg, so the three lines sit exactly under the market's.`
-            : `The legs share one reference by construction, but ${agreement.divergent.length} of ${agreement.shared} publishes did not carry the same mid on every leg — the first at seq ${agreement.divergent[0]}.`}
+            ? `The legs share one reference by construction and never separate from each other here: all ${agreement.shared} publishes carried the same mid on every leg, which is why there looks to be one green line rather than three.`
+            : `The legs share one reference by construction, but ${agreement.divergent.length} of ${agreement.shared} publishes did not carry the same mid on every leg — the first at seq ${agreement.divergent[0]}.`}{" "}
+          {gap.compared === 0
+            ? null
+            : `Against the market itself they run ${Math.round(gap.meanAbsBps)} bps away on average and ${Math.round(Math.abs(gap.worstBps))} bps at the widest, on ${clock(gap.worstAt)} — part of which is the comparison: the market is ${market.granularity === "hours" ? "hourly closes" : "per-swap"} and the legs publish every few minutes, so a fast move reads as a gap the width of ${market.granularity === "hours" ? "an hour" : "a swap"}.`}
         </p>
       </div>
     </Panel>

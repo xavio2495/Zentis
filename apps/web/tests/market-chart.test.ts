@@ -177,22 +177,21 @@ describe("how closely the legs track the market", () => {
       [100, "400000000000000000000000000"],
     ]);
     // A mid one per cent away is a hundred basis points away, whichever way the reciprocal runs.
-    const leg = { label: "a", rounds: [{ atSeconds: 50, mid: "404000000000000000000000000" }] };
-    const gap = trackingGap([leg], market);
+    const gap = trackingGap([{ rounds: [{ atSeconds: 50, mid: "404000000000000000000000000" }] }], market);
     expect(Math.abs(gap.worstBps)).toBeGreaterThan(90);
     expect(Math.abs(gap.worstBps)).toBeLessThan(110);
   });
 
   test("a leg that sits on the market has no gap", () => {
     const market = series([[0, "400000000000000000000000000"], [100, "400000000000000000000000000"]]);
-    const gap = trackingGap([{ label: "a", rounds: [{ atSeconds: 50, mid: "400000000000000000000000000" }] }], market);
+    const gap = trackingGap([{ rounds: [{ atSeconds: 50, mid: "400000000000000000000000000" }] }], market);
     expect(gap.worstBps).toBe(0);
     expect(gap.meanAbsBps).toBe(0);
   });
 
   test("nothing to compare is no gap rather than a divide by zero", () => {
     expect(trackingGap([], []).worstBps).toBe(0);
-    expect(Number.isFinite(trackingGap([{ label: "a", rounds: [] }], []).meanAbsBps)).toBe(true);
+    expect(Number.isFinite(trackingGap([{ rounds: [] }], []).meanAbsBps)).toBe(true);
   });
 
   test("in this recording the legs leave the market line by more than a hundred basis points", () => {

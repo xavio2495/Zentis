@@ -199,3 +199,65 @@ export function publishSpan(
   if (times.length === 0) return null;
   return { from: Math.min(...times), to: Math.max(...times) };
 }
+
+export interface TrackingGap {
+  /** the signed worst distance, in basis points of the market's own price */
+  readonly worstBps: number;
+  readonly worstAt: number;
+  readonly meanAbsBps: number;
+  readonly compared: number;
+}
+
+/**
+ * How far the legs' published mid runs from the market series, in basis points of the market.
+ *
+ * The panel needs this because the obvious legend is wrong. The three legs agree with each other
+ * exactly — one reference, by construction — and it is tempting to write that they therefore sit on
+ * the market line. They do not: in the recording committed today the published mid is several
+ * hundred basis points off the hourly close for the first hours of the window.
+ *
+ * Part of that is the comparison's own coarseness, and the panel says so: the market series is
+ * hourly closes and the legs publish every few minutes, so a fast move shows up as a gap that is
+ * really the hour's width. It is still the honest number to put under the chart, because the
+ * alternative is a sentence claiming a coincidence the reader can see is not there.
+ */
+export function trackingGap(
+  legs: readonly { rounds: readonly { atSeconds: number; mid: string }[] }[],
+  market: readonly { t: number; mid: string }[],
+): TrackingGap {
+  if (market.length === 0) return { worstBps: 0, worstAt: 0, meanAbsBps: 0, compared: 0 };
+
+  // The market's points are oldest first, so the nearest is found by walking rather than by
+  // scanning the series once per round — four hundred rounds against a week of hours otherwise.
+  const prices = market.map((point) => ({ t: point.t, price: priceOfMid(point.mid) }));
+  let worstBps = 0;
+  let worstAt = 0;
+  let total = 0;
+  let compared = 0;
+  let cursor = 0;
+
+  for (const leg of legs) {
+    cursor = 0;
+    for (const round of leg.rounds) {
+      while (cursor + 1 < prices.length && Math.abs(prices[cursor + 1]!.t - round.atSeconds) <= Math.abs(prices[cursor]!.t - round.atSeconds)) {
+        cursor += 1;
+      }
+      const nearest = prices[cursor]!;
+      if (nearest.price === 0) continue;
+      const bps = ((priceOfMid(round.mid) - nearest.price) / nearest.price) * 10_000;
+      total += Math.abs(bps);
+      compared += 1;
+      if (Math.abs(bps) > Math.abs(worstBps)) {
+        worstBps = bps;
+        worstAt = round.atSeconds;
+      }
+    }
+  }
+
+  return {
+    worstBps: compared === 0 ? 0 : worstBps,
+    worstAt,
+    meanAbsBps: compared === 0 ? 0 : total / compared,
+    compared,
+  };
+}
