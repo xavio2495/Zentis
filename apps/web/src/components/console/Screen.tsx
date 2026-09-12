@@ -7,6 +7,7 @@ import { useLegAt, useReplay } from "@/lib/store";
 import { FillsPanel } from "./FillsPanel";
 import { ShiftPanel } from "./ShiftPanel";
 import { SimPanel, type SimSeed } from "./SimPanel";
+import { MarketPanel } from "./MarketPanel";
 import { MarkGlyph } from "./MarkGlyph";
 import { Transport } from "./Transport";
 import { Chip, Panel, Stat } from "./ui";
@@ -77,7 +78,8 @@ export function Screen() {
       </div>
 
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-12">
-        <div className="grid min-h-0 grid-rows-[1.08fr_0.92fr] gap-2 xl:col-span-8">
+        <div className="grid min-h-0 grid-rows-[0.9fr_1fr_0.9fr] gap-2 xl:col-span-8">
+          <MarketPanel legs={replay?.legs ?? []} market={replay?.market} playedTo={now?.atSeconds ?? null} />
           <ShiftPanel leg={leg} />
           <FillsPanel leg={leg} />
         </div>

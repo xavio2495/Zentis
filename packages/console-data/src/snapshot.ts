@@ -210,9 +210,16 @@ export async function takeSnapshot(
     const shift = decomposition?.legs.find((l) => l.chainId === config.chainId) ?? null;
     if (shift !== null && !shift.agrees) {
       legCaveats.push(
-        shift.balancesMatchEnclave
-          ? "the recomputed shift differs from the published one although the balances match, so the gains in the enclave are not the ones assumed here"
-          : "the recomputed shift differs from the published one because a fill has landed since the enclave priced this leg",
+        // Three different reasons, and only one of them is a disagreement. A carried round is the
+        // slow workflow republishing the last fast round's tilt against a new boundary budget: the
+        // tilt was priced with one room and the boundary recovers another, so recomputing lands a
+        // few bps away on every leg at once. Calling that "the gains in the enclave are not the
+        // ones assumed here" would report a fault where the two models are in fact agreeing.
+        shift.carried
+          ? `this shift was carried from seq ${shift.carriedFromSeq} and its boundary re-budgeted, so it was priced against a different room than the one published beside it`
+          : shift.balancesMatchEnclave
+            ? "the recomputed shift differs from the published one although the balances match, so the gains in the enclave are not the ones assumed here"
+            : "the recomputed shift differs from the published one because a fill has landed since the enclave priced this leg",
       );
     }
 

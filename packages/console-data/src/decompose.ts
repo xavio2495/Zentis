@@ -44,6 +44,20 @@ export interface LegDecomposition {
   /** the enclave's, straight off the registry */
   readonly published: number;
   readonly agrees: boolean;
+  /**
+   * True when this leg's tilt was carried from the round before rather than recomputed.
+   *
+   * The slow workflow does not recompute the tilt: it republishes the last fast round's tilt against
+   * a freshly budgeted boundary. The slot then holds a tilt priced with one room beside a boundary
+   * that recovers a different one, and recomputing against the recovered room caps the concession
+   * differently — a few basis points, in the tilt's own direction, on every leg at once. That is not
+   * the console and the enclave disagreeing, and a screen that drew it as one would be reporting a
+   * fault that does not exist. It is recognised by what makes it one: the previous reference is this
+   * seq less one, and it published the same tilt.
+   */
+  readonly carried: boolean;
+  /** which round the tilt came from, when it was carried */
+  readonly carriedFromSeq: number | null;
   /** the boundary less the shift already quoted: how much this leg may still concede */
   readonly roomBps: bigint;
   /**
@@ -114,6 +128,10 @@ export function decomposeBook(inputs: LegInput[], gains: Gains, maxTiltBps: numb
     const tiltBps = applied[i]!.tiltBps;
     const published = input.ref.tiltBps;
     const referenceAge = input.history.position?.refUpdatedAt ?? null;
+    // The round before this one, by sequence rather than by time: a leg that missed a round has a
+    // gap there, and a gap is not a carry.
+    const previous = input.history.references.find((r) => r.seq === input.ref.seq - 1) ?? null;
+    const carried = previous !== null && previous.tiltBps === published;
 
     return {
       chainId: input.leg.chainId,
@@ -127,6 +145,8 @@ export function decomposeBook(inputs: LegInput[], gains: Gains, maxTiltBps: numb
       tiltBps,
       published,
       agrees: tiltBps === BigInt(published),
+      carried,
+      carriedFromSeq: carried ? previous!.seq : null,
       roomBps: rooms[i] ?? 0n,
       roomUnknownAtCap: rooms[i] === null,
       cappedByRoom: rooms[i] !== null && abs(concessionUncapped) > rooms[i]!,

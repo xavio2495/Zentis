@@ -129,6 +129,12 @@ const decompositionOf = (leg: LegSnapshot) =>
         clampedByMaxTilt: leg.shift.clampedByMaxTilt,
         balancesMatchEnclave: leg.shift.balancesMatchEnclave,
         referenceAgeSeconds: leg.shift.referenceAgeSeconds,
+        // A carried round is the slow workflow republishing the last fast round's tilt against a
+        // newly budgeted boundary. The recomputation then lands a few bps away on every leg at
+        // once, which is not the console and the enclave disagreeing — and a panel drawing it as
+        // one would report a fault that is not there.
+        carried: leg.shift.carried,
+        carriedFromSeq: leg.shift.carriedFromSeq,
       };
 
 const spreadOf = (leg: LegSnapshot) =>

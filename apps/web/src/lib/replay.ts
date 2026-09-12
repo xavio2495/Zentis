@@ -36,7 +36,102 @@ export interface Fill {
   readonly refTiltBps: number;
   /** whether this fill belongs to the generation now shipped, as the console counts it */
   readonly thisGeneration?: boolean;
+  /** the fill's size in raw tokenA, whichever side tokenA was on */
+  readonly sizeA?: string;
+  /** signed raw tokenA, positive where the maker did better than the reference at the time */
+  readonly edgeA?: string | null;
+  /** the same fill scored against the next reference published after it */
+  readonly markoutA?: string | null;
 }
+
+/**
+ * A price series as the seed carries it.
+ *
+ * `granularity` is not a detail: an hourly series drawn over six hours is a handful of points
+ * joined by straight lines, which is not what the market did, so the panel says which it is
+ * looking at and the seed carries both windows.
+ */
+export interface MarkHistory {
+  readonly points: { readonly t: number; readonly mid: string }[];
+  readonly source: string;
+  readonly hours: number;
+  readonly granularity: "swaps" | "hours";
+  /** set when the series is stale; the points are still the last good ones */
+  readonly error: string | null;
+}
+
+export interface LegQuote {
+  readonly amountIn: string;
+  readonly amountOut: string | null;
+  readonly tokenIn: string | null;
+  readonly tokenOut: string | null;
+  readonly reason: string | null;
+  readonly refMid: string | null;
+  readonly tiltBps: number | null;
+  readonly seq: number | null;
+  readonly refAgeSeconds: number | null;
+  readonly offMidBps: number | null;
+  readonly refusal: { error: string; args: string[]; sentence: string } | null;
+  readonly caveats: string[];
+}
+
+export interface Decomposition {
+  readonly weightA: string;
+  readonly correction: string;
+  readonly ownConcession: string;
+  readonly bookConcession: string;
+  readonly concessionUncapped: string;
+  readonly concession: string;
+  readonly tiltBps: string;
+  /** the enclave's own, straight off the registry */
+  readonly published: number;
+  readonly agrees: boolean;
+  readonly roomBps: string;
+  readonly roomUnknownAtCap: boolean;
+  readonly cappedByRoom: boolean;
+  readonly clampedByMaxTilt: boolean;
+  readonly balancesMatchEnclave: boolean;
+  readonly referenceAgeSeconds: number | null;
+}
+
+export interface SpreadStack {
+  readonly baseBps: number;
+  readonly volatilityBps: number;
+  readonly markoutBps: number;
+  /** the age ramp at the recorded moment, not at the reader's clock */
+  readonly stalenessBps: number;
+  readonly totalBps: number;
+  readonly referenceAgeSeconds: number;
+  readonly tooStaleToQuote: boolean;
+  readonly recomputedVolatilityBps: number | null;
+  readonly widenBpsPerMinute: number;
+  readonly maxWidenBps: number;
+  readonly maxStalenessSeconds: number;
+}
+
+export interface LegPnl {
+  readonly fills: number;
+  readonly volumeA: string;
+  readonly edgeA: string;
+  readonly markoutA: string | null;
+  readonly tradingA: string | null;
+  readonly holdA: string | null;
+  readonly totalA: string | null;
+  readonly unvaluedB: string | null;
+  /** why trading, hold or total are null, when they are */
+  readonly caveat: string | null;
+  readonly lifetime: {
+    readonly fills: number;
+    readonly volumeA: string;
+    readonly edgeA: string;
+    readonly markoutA: string | null;
+    readonly tradingA: string | null;
+    readonly generations: number | null;
+  };
+}
+
+/** The vocabulary a leg's state is said in. Colour is the screen's business, not the data's. */
+export type StatusKind = "live" | "docked" | "stale" | "unpriced" | "none" | "unread";
 
 export interface Leg {
   readonly chainId: number;
@@ -50,13 +145,53 @@ export interface Leg {
   readonly balanceB: string;
   /** when the generation now shipped was shipped */
   readonly shippedAtSeconds?: number | null;
+  /** the long form, carrying the age or the reason; the kind is the vocabulary */
+  readonly status?: string;
+  readonly statusKind?: StatusKind;
+  readonly quotes?: { aToB: LegQuote; bToA: LegQuote };
+  readonly decomposition?: Decomposition;
+  readonly spread?: SpreadStack;
+  readonly pnl?: LegPnl;
+  /** the mainnet price this leg's inventory is valued at, never its own testnet pool mid */
+  readonly mark?: { mid: string; source: string; readAtSeconds: number };
   readonly rounds: Round[];
   readonly fills: Fill[];
   readonly rejections: { atSeconds: number; transaction: string; reason: string }[];
 }
 
+export interface BookTotals {
+  readonly legs: number;
+  readonly legsActive: number;
+  readonly inventoryA: string | null;
+  readonly weightA: string | null;
+  readonly pnlA: string | null;
+  readonly tradingA: string | null;
+  readonly holdA: string | null;
+  readonly caveat: string | null;
+  readonly seq: number | null;
+  /** the reference's age at the recorded moment — never recomputed against the reader's clock,
+      or a recording ages into a staleness alarm on screen */
+  readonly ageSeconds: number;
+  readonly quoteSizeA: string;
+  readonly quoteSizeB: string;
+}
+
+export interface Provider {
+  readonly kind: string;
+  readonly name: string;
+  readonly state: "up" | "stale" | "down";
+  readonly reason: string | null;
+  readonly detail: string | null;
+}
+
 export interface Replay {
   readonly provenance: { recordedAtSeconds: number; sources: string[]; note: string };
+  /** the week, hourly */
+  readonly market?: MarkHistory;
+  /** the last hours, per swap; use this for any window under a day */
+  readonly marketRecent?: MarkHistory;
+  readonly book?: BookTotals;
+  readonly providers?: Provider[];
   readonly legs: Leg[];
 }
 
