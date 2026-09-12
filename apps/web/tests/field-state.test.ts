@@ -155,9 +155,24 @@ describe("the gate, and the mark held inside it", () => {
     for (const x of [-1, -0.5, 0, 0.5, 1]) {
       for (const y of [-1, -0.5, 0, 0.5, 1]) {
         const state = at(0, { x, y });
-        expect(insideGate(state.markOffsetX, state.markOffsetY)).toBe(true);
+        // the mark is further from the camera than the gate, so its allowance
+        // is the gate's shape as it appears on screen, not as it measures
+        const inGateSpace = {
+          x: state.markOffsetX / state.depthRatio,
+          y: state.markOffsetY / state.depthRatio,
+        };
+        expect(insideGate(inGateSpace.x, inGateSpace.y)).toBe(true);
       }
     }
+  });
+
+  test("the mark covers the gate on screen, not a patch in the middle of it", () => {
+    const gate = gateShape();
+    const state = at(0, { x: 1, y: 1 });
+    // as seen by the reader, the mark's travel matches the gate's own corner
+    expect(state.markOffsetX / state.depthRatio).toBeGreaterThan(gate.side * 0.45);
+    expect(state.markOffsetX).toBeGreaterThan(gate.side * 0.45 * state.depthRatio * 0.99);
+    expect(state.depthRatio).toBeGreaterThan(1.5);
   });
 
   test("the mark reaches the gate's corners, not just near them", () => {
@@ -165,11 +180,12 @@ describe("the gate, and the mark held inside it", () => {
     const topRight = at(0, { x: 1, y: 1 });
     const topLeft = at(0, { x: -1, y: 1 });
     // within a hair of the corner itself, rather than stopped short by padding
-    expect(topRight.markOffsetX).toBeGreaterThan(gate.side * 0.45);
-    expect(topLeft.markOffsetX).toBeLessThan(-gate.side * 0.45);
-    expect(topRight.markOffsetY).toBeGreaterThan(gate.topY * 0.9);
+    expect(topRight.markOffsetX / topRight.depthRatio).toBeGreaterThan(gate.side * 0.45);
+    expect(topLeft.markOffsetX / topLeft.depthRatio).toBeLessThan(-gate.side * 0.45);
+    expect(topRight.markOffsetY / topRight.depthRatio).toBeGreaterThan(gate.topY * 0.9);
     // and right down onto the point
-    expect(at(0, { x: 0, y: -1 }).markOffsetY).toBeLessThan(gate.apexY * 0.9);
+    const low = at(0, { x: 0, y: -1 });
+    expect(low.markOffsetY / low.depthRatio).toBeLessThan(gate.apexY * 0.9);
   });
 
   test("the mark has the run of the gate, not just its middle", () => {
@@ -177,14 +193,14 @@ describe("the gate, and the mark held inside it", () => {
     // it reaches out along the wide top edge
     const right = at(0, { x: 1, y: 0.55 });
     const left = at(0, { x: -1, y: 0.55 });
-    expect(right.markOffsetX).toBeGreaterThan(gate.side * 0.2);
-    expect(left.markOffsetX).toBeLessThan(-gate.side * 0.2);
+    expect(right.markOffsetX / right.depthRatio).toBeGreaterThan(gate.side * 0.2);
+    expect(left.markOffsetX / left.depthRatio).toBeLessThan(-gate.side * 0.2);
     // and down toward the point it stands on
-    const low = at(0, { x: 0, y: -1 });
-    expect(low.markOffsetY).toBeLessThan(gate.apexY * 0.45);
+    const lower = at(0, { x: 0, y: -1 });
+    expect(lower.markOffsetY / lower.depthRatio).toBeLessThan(gate.apexY * 0.45);
     // and up to the top edge
     const high = at(0, { x: 0, y: 1 });
-    expect(high.markOffsetY).toBeGreaterThan(gate.topY * 0.45);
+    expect(high.markOffsetY / high.depthRatio).toBeGreaterThan(gate.topY * 0.45);
   });
 
   test("the cursor's own position is reported for the light it casts", () => {
