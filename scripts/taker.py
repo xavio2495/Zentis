@@ -21,7 +21,7 @@ short, swap, quote again, and log the fill with the amounts the receipt carried.
 Sizes are deliberately tiny — 0.15 USDC or 0.00006 WETH, about a hundredth of a leg — so a run
 moves the curve by a few bps and the taker's balances last for weeks of alternating fills.
 """
-import json, os, subprocess, sys, datetime
+import fcntl, json, os, subprocess, sys, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -113,6 +113,16 @@ def main() -> None:
     dry = "--dry-run" in sys.argv
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     key, taker = taker_key()
+    # One taker at a time. The timer's first run and a manual run started together on 2026-09-12
+    # and raced the same nonce on Sepolia (one fill lost to "-32000"); the lock makes the second
+    # runner say so and leave, the same way scripts/publisher.sh does.
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    lock = (LOG_DIR / "taker.lock").open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        say("skipped: a previous taker run is still going")
+        return
     state = load_state()
     for name, rpc in RPCS.items():
         if only and name != only:
