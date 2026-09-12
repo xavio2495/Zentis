@@ -130,3 +130,19 @@ test("the shimmed process carries the listener surface Ink unmounts through", as
   globalThis.process = had.process;
   (globalThis as { setImmediate?: unknown }).setImmediate = had.setImmediate;
 }, 30_000);
+
+test("a write with a callback calls it, because Ink waits on that callback to finish closing", async () => {
+  // Ink's unmount resolves its exit promise from `stdout.write('', resolveOrReject)` whenever the
+  // stream looks writable, and falls back to a timer only when it does not. The shim ignored the
+  // callback, so on the page the promise never settled: `x` unmounted the console and then nothing
+  // said so, which reads as a page that broke rather than a console that closed. Bun's test took
+  // the timer path, so only the browser ever showed it.
+  const { streams } = await import("./src/browser.js");
+  const handle = terminal();
+  const { stdout } = streams(handle);
+  const called = await new Promise<boolean>((resolve) => {
+    (stdout as { write: (data: string, cb: () => void) => boolean }).write("", () => resolve(true));
+    setTimeout(() => resolve(false), 200);
+  });
+  expect(called).toBe(true);
+}, 30_000);

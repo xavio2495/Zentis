@@ -1,4 +1,4 @@
-import "./stubs/browser-globals.js";
+import { installBrowserGlobals } from "./stubs/browser-globals.js";
 import { render } from "ink";
 import { App } from "./App.js";
 import { parseTxLog } from "./txlog.js";
@@ -58,7 +58,7 @@ const watchActions: Action[] = [
 ];
 
 /** A minimal duplex pair over the terminal, carrying only what Ink actually touches. */
-function streams(terminal: TerminalHandle) {
+export function streams(terminal: TerminalHandle) {
   const out = emitter();
   const stdout = Object.assign(out, {
     columns: terminal.cols,
@@ -112,14 +112,21 @@ function streams(terminal: TerminalHandle) {
 }
 
 export function mount(terminal: TerminalHandle) {
+  // Again here, not only at import: the module body runs once, and a page that mounts a second
+  // console after something else deleted one of these would mount a broken one.
+  installBrowserGlobals();
   const { stdin, stdout } = streams(terminal);
   const store = fixedStore({
     ...fakeSnapshot("fresh"),
     caveats: ["recorded testnet reads, not live: this public console asks no endpoint anything"],
   });
+  // A console closed on the page is not a process that ended: there is nothing to exit, and a
+  // terminal that simply goes still reads as a page that broke. So the last thing written is a line
+  // saying what happened and how to get it back.
+  const closed = () => terminal.write("\r\n  console closed · reload to reopen\r\n");
   // The log page gets the recording too: there is no machine behind this console to have a file on,
   // and a visitor pressing `l` on an empty table learns nothing about what the page is for.
-  return render(
+  const app = render(
     <App
       actions={watchActions}
       runAction={null}
@@ -136,4 +143,6 @@ export function mount(terminal: TerminalHandle) {
       exitOnCtrlC: false,
     },
   );
+  void app.waitUntilExit().then(closed, closed);
+  return app;
 }
