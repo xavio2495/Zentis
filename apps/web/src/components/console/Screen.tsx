@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { bandState } from "@/lib/replay";
 import { ago, midAsPrice, signedBps, tokenAmount } from "@/lib/format";
 import { useLegAt, useReplay } from "@/lib/store";
-import { FillsPanel } from "./FillsPanel";
 import { ShiftPanel } from "./ShiftPanel";
 import { SimPanel, type SimSeed } from "./SimPanel";
 import { BookRow } from "./BookRow";
@@ -14,7 +13,7 @@ import { PnlPanel } from "./PnlPanel";
 import { MarketPanel } from "./MarketPanel";
 import { MarkGlyph } from "./MarkGlyph";
 import { Transport } from "./Transport";
-import { Chip, Panel, Stat } from "./ui";
+import { Chip, Stat } from "./ui";
 
 /**
  * One screen, four bands, nothing that scrolls.
@@ -24,7 +23,7 @@ import { Chip, Panel, Stat } from "./ui";
  * auto-plays, and every panel says where its numbers came from.
  */
 export function Screen() {
-  const { replay, legIndex, setLegIndex, playhead } = useReplay();
+  const { replay, legIndex, setLegIndex } = useReplay();
   const leg = replay?.legs[legIndex] ?? null;
   const state = useLegAt(leg);
   const [sim, setSim] = useState<SimSeed | null>(null);
@@ -83,45 +82,41 @@ export function Screen() {
 
       <BookRow book={replay?.book} providers={replay?.providers ?? []} />
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-12">
-        <div className="grid min-h-0 grid-rows-[0.9fr_1fr_0.9fr] gap-2 xl:col-span-8">
+      {/*
+        One screen, and nothing outside a panel scrolls.
+        
+        Below xl the page gives up and scrolls, because thirteen panels do not fit on a phone and a
+        screen that hides half its evidence is worse than one that is long. At xl — the judge's
+        laptop — the grid is screen height, every panel owns its own overflow, and the discipline
+        the reference established holds.
+      */}
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-12 xl:grid-rows-[minmax(0,1.05fr)_minmax(0,1.15fr)_minmax(0,0.8fr)] xl:overflow-hidden">
+        <div className="flex min-h-0 flex-col gap-2 xl:col-span-5 xl:row-span-1">
           <MarketPanel legs={replay?.legs ?? []} market={replay?.market} playedTo={now?.atSeconds ?? null} />
-          <ShiftPanel leg={leg} />
-          <FillsPanel leg={leg} />
         </div>
         <div className="flex min-h-0 flex-col gap-2 xl:col-span-4">
-          <Panel title="the position" tag={leg === null ? "waiting" : "deployment record"} className="flex-1">
-            {leg === null ? (
-              <p className="m-0 text-fs-0 text-ink-faint">waiting</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <Stat label="strategy hash" value={`${leg.strategyHash.slice(0, 10)}…${leg.strategyHash.slice(-4)}`} tone="soft" />
-                <div className="grid grid-cols-2 gap-3">
-                  <Stat label="committed A" value={`${tokenAmount(leg.balanceA, 6)} USDC`} />
-                  <Stat label="committed B" value={`${tokenAmount(leg.balanceB, 18)} WETH`} />
-                </div>
-                <Stat label="rounds played" value={`${Math.min(playhead + 1, leg.rounds.length)}/${leg.rounds.length}`} tone="faint" />
-                <p className="m-0 text-[10px] text-ink-faint">
-                  One position, three chains. The shift is the only thing that moves between them — nothing bridges.
-                </p>
-              </div>
-            )}
-          </Panel>
+          <ShiftPanel leg={leg} />
+        </div>
+        <div className="flex min-h-0 flex-col gap-2 xl:col-span-3">
+          <FeedPanel legs={replay?.legs ?? []} untilSeconds={now?.atSeconds ?? null} />
+        </div>
+
+        {/* The three legs across: one position, said three times. */}
+        {/* A row to themselves: three cards four columns wide, because at three columns the
+            holds, the quote and the decomposition collide. */}
+        {(replay?.legs ?? []).map((each) => (
+          <div key={each.chainId} className="flex min-h-0 flex-col xl:col-span-4">
+            <LegCard leg={each} />
+          </div>
+        ))}
+
+        <div className="flex min-h-0 flex-col gap-2 xl:col-span-8">
+          <PnlPanel legs={replay?.legs ?? []} book={replay?.book} />
+        </div>
+        <div className="flex min-h-0 flex-col gap-2 xl:col-span-4">
           <SimPanel sim={sim} />
         </div>
       </main>
-
-      <section className="grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 lg:grid-cols-2">
-        <FeedPanel legs={replay?.legs ?? []} untilSeconds={now?.atSeconds ?? null} />
-        <PnlPanel legs={replay?.legs ?? []} book={replay?.book} />
-      </section>
-
-      {/* The three legs across, below the charts: one position, said three times. */}
-      <section className="grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 lg:grid-cols-3">
-        {(replay?.legs ?? []).map((each) => (
-          <LegCard key={each.chainId} leg={each} />
-        ))}
-      </section>
 
       <Transport />
     </div>

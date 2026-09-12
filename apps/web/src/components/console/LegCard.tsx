@@ -18,7 +18,7 @@ export function LegCard({ leg }: { leg: Leg }) {
   const bars = leg.spread === undefined ? [] : spreadBars(leg.spread);
 
   return (
-    <Panel title={leg.label} tag={leg.status ?? "unread"} className="min-h-[420px]">
+    <Panel title={leg.label} tag={leg.status ?? "unread"} className="min-h-[420px] xl:min-h-0">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
         <Holds leg={leg} split={split} />
         {shift === null ? null : <Shift shift={shift} />}
@@ -33,7 +33,7 @@ export function LegCard({ leg }: { leg: Leg }) {
 /** Holds, and the inventory bar with the even split marked on it. */
 function Holds({ leg, split }: { leg: Leg; split: ReturnType<typeof inventorySplit> }) {
   return (
-    <section className="flex flex-col gap-1.5">
+    <section className="flex shrink-0 flex-col gap-1.5">
       <div className="grid grid-cols-2 gap-3">
         <Stat label="holds A" value={`${tokenAmount(leg.balanceA, 6)} USDC`} tone="soft" />
         <Stat label="holds B" value={`${tokenAmount(leg.balanceB, 18)} WETH`} tone="soft" />
@@ -61,11 +61,11 @@ function Holds({ leg, split }: { leg: Leg; split: ReturnType<typeof inventorySpl
 /** The pair the project rests on, with the working that produced it. */
 function Shift({ shift }: { shift: ReturnType<typeof shiftStack> }) {
   return (
-    <section className="flex flex-col gap-1.5 border-t border-stroke pt-2">
-      <div className="flex items-baseline gap-3">
-        <span className="tnum font-mono text-fs-2 leading-none text-em">{signedBps(shift.total)}</span>
+    <section className="flex shrink-0 flex-col gap-1.5 border-t border-stroke pt-2">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="tnum font-mono text-fs-2 leading-tight text-em">{signedBps(shift.total)}</span>
         <span className="label-sm text-ink-faint">bps recomputed</span>
-        <span className="tnum font-mono text-fs-1 leading-none text-ink-soft">{signedBps(shift.published)}</span>
+        <span className="tnum font-mono text-fs-1 leading-tight text-ink-soft">{signedBps(shift.published)}</span>
         <span className="label-sm text-ink-faint">published</span>
       </div>
 
@@ -114,7 +114,7 @@ function Shift({ shift }: { shift: ReturnType<typeof shiftStack> }) {
 /** Both sides of the book at the recorded size, with each side's distance from the mid. */
 function Quotes({ quotes }: { quotes: { aToB: LegQuote; bToA: LegQuote } }) {
   return (
-    <section className="flex flex-col gap-1.5 border-t border-stroke pt-2">
+    <section className="flex shrink-0 flex-col gap-1.5 border-t border-stroke pt-2">
       <span className="label-sm text-ink-faint">two-sided, at the recorded size</span>
       <Side quote={quotes.aToB} from="USDC" to="WETH" fromDecimals={6} toDecimals={18} />
       <Side quote={quotes.bToA} from="WETH" to="USDC" fromDecimals={18} toDecimals={6} />
@@ -148,14 +148,14 @@ function Side({
   }
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 leading-tight">
         <span className="text-[11px] text-ink-faint">
           {tokenAmount(quote.amountIn, fromDecimals)} {from} →
         </span>
         <span className="tnum font-mono text-[11px] text-ink">
           {tokenAmount(quote.amountOut, toDecimals)} {to}
         </span>
-        <span className={`tnum font-mono text-[11px] ${(quote.offMidBps ?? 0) < 0 ? "text-side-b" : "text-side-a"}`}>
+        <span className={`tnum ml-auto font-mono text-[11px] ${(quote.offMidBps ?? 0) < 0 ? "text-side-b" : "text-side-a"}`}>
           {quote.offMidBps === null ? "—" : `${signedBps(quote.offMidBps)} bps`}
         </span>
       </div>
@@ -167,7 +167,7 @@ function Side({
 /** The four terms the router adds up, each as its share of what it quotes. */
 function Spread({ bars, total, spread }: { bars: ReturnType<typeof spreadBars>; total: number; spread: NonNullable<Leg["spread"]> }) {
   return (
-    <section className="flex flex-col gap-1.5 border-t border-stroke pt-2">
+    <section className="flex shrink-0 flex-col gap-1.5 border-t border-stroke pt-2">
       <div className="flex items-baseline justify-between">
         <span className="label-sm text-ink-faint">spread</span>
         <span className="tnum font-mono text-[11px] text-ink-soft">{total} bps</span>
@@ -204,7 +204,7 @@ function Earned({ leg }: { leg: Leg }) {
   if (pnl === undefined) return null;
   const usdc = (raw: string | null) => (raw === null ? "—" : `${tokenAmount(raw, 6)} USDC`);
   return (
-    <section className="flex flex-col gap-1.5 border-t border-stroke pt-2">
+    <section className="flex shrink-0 flex-col gap-1.5 border-t border-stroke pt-2">
       <div className="grid grid-cols-3 gap-2">
         <Stat label="fills" value={String(pnl.fills)} tone="soft" />
         <Stat label="trading" value={usdc(pnl.tradingA)} tone={pnl.tradingA === null ? "faint" : "soft"} />

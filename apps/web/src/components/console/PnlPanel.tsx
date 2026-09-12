@@ -20,7 +20,7 @@ export function PnlPanel({ legs, book }: { legs: Leg[]; book: BookTotals | undef
   const table = useMemo(() => pnlTable(legs, book), [legs, book]);
 
   return (
-    <Panel title="pnl" tag="this generation · tokenA, from the fills subgraph" className="min-h-[240px]">
+    <Panel title="pnl" tag="this generation · tokenA, from the fills subgraph" className="min-h-[240px] xl:min-h-0">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
         <table className="w-full border-collapse text-[11px]">
           <thead>

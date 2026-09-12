@@ -78,7 +78,7 @@ export function MarketPanel({
 
   if (market === undefined || plot === null) {
     return (
-      <Panel title="market" tag="waiting" className="min-h-[260px]">
+      <Panel title="market" tag="waiting" className="min-h-[260px] xl:min-h-0">
         <p className="m-0 text-fs-0 text-ink-faint">no series recorded</p>
       </Panel>
     );
@@ -91,7 +91,7 @@ export function MarketPanel({
 
   return (
     <Panel
-      className="min-h-[260px]"
+      className="min-h-[260px] xl:min-h-0"
       title="market"
       tag={`${market.source} · ${market.hours}h, ${market.granularity === "hours" ? "hourly" : "per swap"} · USDC/WETH`}
     >

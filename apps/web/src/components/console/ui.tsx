@@ -61,7 +61,7 @@ export function Stat({
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="label-sm text-ink-faint">{label}</span>
-      <span className={`tnum font-mono text-fs-0 leading-none ${colour}`}>{value}</span>
+      <span className={`tnum font-mono text-fs-0 leading-tight ${colour}`}>{value}</span>
       {sub === undefined ? null : <span className="truncate text-[10px] text-ink-faint">{sub}</span>}
     </div>
   );

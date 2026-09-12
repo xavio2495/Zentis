@@ -19,7 +19,7 @@ export function FeedPanel({ legs, untilSeconds }: { legs: Leg[]; untilSeconds: n
   );
 
   return (
-    <Panel title="feed" tag={`${rows.length} shown · publishes folded by seq`} className="min-h-[240px]">
+    <Panel title="feed" tag={`${rows.length} shown · publishes folded by seq`} className="min-h-[240px] xl:min-h-0">
       {rows.length === 0 ? (
         <p className="m-0 text-fs-0 text-ink-faint">nothing yet at this point in the recording</p>
       ) : (
