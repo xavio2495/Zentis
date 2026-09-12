@@ -1,69 +1,83 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { clearDockTarget, dockY, setDockTarget } from "@/lib/dock";
+import { describe, expect, test } from "bun:test";
+import { dockPlacement } from "@/lib/dock";
 
 /**
- * Where the install line sits as the page closes.
+ * Where the install line is, and whether it is visible, as the page closes.
  *
- * Two attempts failed before this one, and both failed the same way: they computed the line's
- * position from something other than where it was going.
+ * Three attempts, and the first two are worth recording because each looked right in isolation.
  *
- * First it eased to `innerHeight / 2`, the middle of the viewport — which is the middle of the
+ * It first eased to `innerHeight / 2` — the middle of the viewport, which is the middle of the
  * closing section only if the reader stops scrolling at exactly the right place. At the foot of the
  * page they do not, so the line landed below the two buttons meant to sit under it.
  *
- * Then it eased from the foot toward the section's gap, interpolating between the two. That put it
- * at every position in between — including, for a stretch of the scroll, exactly on top of the
- * "Try it out." heading, which sits above the gap. A line of monospace sitting on a serif heading.
+ * It then interpolated from the foot toward the section's gap, which put it at every position in
+ * between — including, for a stretch of the scroll, directly on the "Try it out." heading.
  *
- * So it no longer interpolates at all. It waits at the foot until the gap it is going to has risen
- * to meet it, and from then on it *is* the gap. The invariant that follows is the one that matters:
- * the line is never above the gap, so it can never reach anything laid out above the gap.
+ * The obvious repair, `y = min(foot, gap)`, does not work either, and the arithmetic says why
+ * before a screenshot does. The heading sits about 118px above the gap and the foot is about 698px
+ * down a 758px viewport; while the gap is still below the foot the line holds at 698, and the
+ * heading passes through 698 on its way up. The line does not have to move to be hit — the page
+ * moves the heading into it.
+ *
+ * So the line is not in two places, it is in one place at a time: at the foot while the page is
+ * still running, and in the gap once the section has arrived. In between it is not shown at all,
+ * which is the only state in which nothing can overlap it.
  */
-beforeEach(() => clearDockTarget());
+const VIEW = 758;
+const FOOT = 698;
+const place = (gapCentre: number | null, topEdge: number | null) =>
+  dockPlacement({ footY: FOOT, viewportHeight: VIEW, gapCentre, topEdge });
 
-const FOOT = 700;
-
-describe("dockY", () => {
-  test("waits at the foot while the section is still below the fold", () => {
-    setDockTarget(1400);
-    expect(dockY(FOOT, 758)).toBe(FOOT);
+describe("while the page is still running", () => {
+  test("the line rides at the foot, fully visible", () => {
+    expect(place(null, null)).toEqual({ y: FOOT, opacity: 1 });
   });
 
-  test("sits at the foot when no section has claimed it", () => {
-    expect(dockY(FOOT, 758)).toBe(FOOT);
-  });
-
-  test("rides up with the gap once the gap has come to it", () => {
-    setDockTarget(300);
-    expect(dockY(FOOT, 758)).toBe(300);
-  });
-
-  test("meets the gap without a jump at the moment they coincide", () => {
-    setDockTarget(FOOT);
-    expect(dockY(FOOT, 758)).toBe(FOOT);
-  });
-
-  test("is never above the gap, which is what keeps it off the heading", () => {
-    // The heading is laid out above the gap. If the line is never above the gap, it can never be
-    // on the heading — at any scroll position, without knowing where the heading is.
-    for (let gap = -200; gap <= 1600; gap += 37) {
-      setDockTarget(gap);
-      expect(dockY(FOOT, 758)).toBeGreaterThanOrEqual(Math.min(FOOT, clampForTest(gap, 758)));
-      expect(dockY(FOOT, 758)).toBeLessThanOrEqual(Math.max(FOOT, clampForTest(gap, 758)));
-    }
-  });
-
-  test("a gap scrolled off the top does not drag the line off with it", () => {
-    setDockTarget(-400);
-    expect(dockY(FOOT, 758)).toBeGreaterThan(0);
-  });
-
-  test("nonsense is ignored rather than propagated into a transform", () => {
-    setDockTarget(Number.NaN);
-    expect(Number.isFinite(dockY(FOOT, 758))).toBe(true);
+  test("it stays there while the closing section is still below the fold", () => {
+    expect(place(VIEW + 240, VIEW + 120)).toEqual({ y: FOOT, opacity: 1 });
   });
 });
 
-/** The same on-screen clamp the module applies, for the invariant above. */
-const clampForTest = (y: number, viewportHeight: number) =>
-  Math.max(viewportHeight * 0.18, Math.min(viewportHeight - viewportHeight * 0.18, y));
+describe("while the closing section is arriving", () => {
+  test("the line goes out before the heading can reach it", () => {
+    // The heading is on screen and the gap has not come down to the foot yet: the one interval in
+    // which the two could collide, and the interval in which the line is not drawn.
+    const { opacity } = place(FOOT + 200, VIEW - 60);
+    expect(opacity).toBeLessThan(1);
+  });
+
+  test("it is completely gone by the time the heading reaches the foot", () => {
+    expect(place(FOOT + 118, FOOT).opacity).toBe(0);
+  });
+});
+
+describe("once the section has arrived", () => {
+  test("the line is the gap, and visible again", () => {
+    expect(place(300, 180)).toEqual({ y: 300, opacity: 1 });
+  });
+
+  test("it never sits above the gap it belongs to", () => {
+    for (let gap = -100; gap <= VIEW + 400; gap += 29) {
+      const { y, opacity } = place(gap, gap - 118);
+      if (opacity === 0) continue;
+      expect(y).toBeGreaterThanOrEqual(Math.min(FOOT, gap) - 0.001);
+    }
+  });
+
+  test("the heading and the line are never both drawn at the same height", () => {
+    // The property the whole design exists for, checked across the entire travel.
+    for (let top = VIEW + 200; top > -400; top -= 7) {
+      const gap = top + 118;
+      const { y, opacity } = place(gap, top);
+      if (opacity === 0) continue;
+      expect(Math.abs(y - top)).toBeGreaterThan(40);
+    }
+  });
+});
+
+describe("nonsense", () => {
+  test("is ignored rather than propagated into a transform", () => {
+    expect(Number.isFinite(place(Number.NaN, Number.NaN).y)).toBe(true);
+    expect(Number.isFinite(place(null, Number.NaN).y)).toBe(true);
+  });
+});
