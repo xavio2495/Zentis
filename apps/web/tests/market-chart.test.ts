@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { legAgreement, plotMarket, priceOfMid, type Series } from "@/lib/market-chart";
+import { clipSeries, legAgreement, plotMarket, priceOfMid, publishSpan, type Series } from "@/lib/market-chart";
 
 /**
  * The market panel's arithmetic, away from any pixels.
@@ -104,5 +104,50 @@ describe("what the legend is allowed to claim", () => {
     ]);
     expect(agreement.coincide).toBe(false);
     expect(agreement.divergent).toEqual([2]);
+  });
+});
+
+describe("the window the panel is read at", () => {
+  // The legs publish over about thirty hours; the market series covers a week. Drawn over the week,
+  // the legs are a fifth of the axis wide and the thing the panel exists to show — the legs sitting
+  // on the market — is unreadable. So the window is a choice, and clipping the market to it is
+  // arithmetic rather than a CSS crop: a clipped line must keep the points that straddle the edges
+  // or it detaches from the frame.
+  const points = series([
+    [0, "400000000000000000000000000"],
+    [10, "399000000000000000000000000"],
+    [20, "398000000000000000000000000"],
+    [30, "397000000000000000000000000"],
+    [40, "396000000000000000000000000"],
+  ]);
+
+  test("a clip keeps the points inside the window", () => {
+    expect(clipSeries(points, 15, 35).map((p) => p.t)).toEqual([20, 30]);
+  });
+
+  test("a clip that lands between points still spans the window", () => {
+    // Without the straddling points either side, a line clipped to 15..35 would start at 20 and
+    // leave a gap against the frame it was clipped to.
+    expect(clipSeries(points, 15, 35, { straddle: true }).map((p) => p.t)).toEqual([10, 20, 30, 40]);
+  });
+
+  test("a window with nothing in it clips to nothing rather than to everything", () => {
+    expect(clipSeries(points, 100, 200)).toEqual([]);
+  });
+
+  test("the legs' own span is where they actually published", () => {
+    const span = publishSpan(seed.legs);
+    expect(span).not.toBeNull();
+    expect(span!.to).toBeGreaterThan(span!.from);
+    const earliest = Math.min(...seed.legs.flatMap((l: { rounds: { atSeconds: number }[] }) => l.rounds.map((r) => r.atSeconds)));
+    expect(span!.from).toBe(earliest);
+  });
+
+  test("clipped to the legs' span, the market still covers the frame", () => {
+    const span = publishSpan(seed.legs)!;
+    const clipped = clipSeries(seed.market.points, span.from, span.to, { straddle: true });
+    expect(clipped.length).toBeGreaterThan(1);
+    expect(clipped[0]!.t).toBeLessThanOrEqual(span.from);
+    expect(clipped[clipped.length - 1]!.t).toBeGreaterThanOrEqual(span.to);
   });
 });
