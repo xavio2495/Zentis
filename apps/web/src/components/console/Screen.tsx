@@ -95,15 +95,17 @@ export function Screen() {
         at narrow widths, and the unit is the first thing to go.
       */}
       <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-b border-stroke bg-inset px-4 py-1">
+        {/* Which moment this band is, before any number in it. The band below shows the recorded
+            moment, where this leg reads −272 while this one reads +535: both true, hundreds of
+            rounds apart, and unlabelled they read as a screen contradicting itself. */}
+        <span className="label-sm whitespace-nowrap border border-line2 px-1.5 py-0.5 text-ink-faint">
+          replay · seq {now === null ? "—" : now.seq}
+        </span>
         <Stat label="shift" value={now === null ? "—" : `${signedBps(now.tiltBps)} bps`} tone="signal" />
         <VRule />
         <Stat label="band" value={band ?? "—"} tone={band === "clamped" ? "bad" : band === "near edge" ? "warn" : "soft"} />
         <VRule />
         <Stat label="cap" value={leg === null ? "—" : `±${leg.maxTiltBps} bps`} tone="faint" />
-        <VRule />
-        {/* Not "seq": the book row below carries the recorded moment's seq, and two different
-            numbers under one label on touching rows reads as one number that moved. */}
-        <Stat label="round" value={now === null ? "—" : String(now.seq)} tone="soft" />
         <VRule />
         <Stat label="mid" value={now === null ? "—" : `${midAsPrice(now.mid)} USDC/WETH`} tone="soft" />
         <div className="flex-1" />
@@ -118,6 +120,9 @@ export function Screen() {
         />
       </div>
 
+      {/* A heavier rule than the one between stats: these two bands are different times, and a hair
+          line between them is what made them read as one table. */}
+      <div className="border-t-2 border-line2" />
       <BookRow book={replay?.book} providers={replay?.providers ?? []} />
 
       {/*

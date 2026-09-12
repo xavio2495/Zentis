@@ -62,6 +62,10 @@ function Holds({ leg, split }: { leg: Leg; split: ReturnType<typeof inventorySpl
 function Shift({ shift }: { shift: ReturnType<typeof shiftStack> }) {
   return (
     <section className="flex shrink-0 flex-col gap-1.5 border-t border-stroke pt-2">
+      {/* The bar at the top of the screen is the replay, hundreds of rounds behind this. This is
+          the moment the fixtures were recorded at, which is the moment every other figure on this
+          card belongs to as well. */}
+      <span className="label-sm text-ink-faint">at the recorded moment</span>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="tnum font-mono text-fs-2 leading-tight text-em">{signedBps(shift.total)}</span>
         <span className="label-sm text-ink-faint">bps recomputed</span>

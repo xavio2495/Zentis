@@ -25,6 +25,11 @@ export function BookRow({ book, providers }: { book: BookTotals | undefined; pro
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-b border-stroke bg-inset px-4 py-1.5">
+      {/* Which moment this band is. The bar above follows the playhead and is hundreds of rounds
+          behind this; saying so is the difference between two readings and one contradiction. */}
+      <span className="label-sm whitespace-nowrap border border-line2 px-1.5 py-0.5 text-ink-faint">
+        recorded moment · seq {book.seq === null ? "—" : book.seq}
+      </span>
       <Stat label="inventory" value={usdc(book.inventoryA)} tone={book.inventoryA === null ? "faint" : "ink"} />
       <VRule />
       <Stat
@@ -34,7 +39,7 @@ export function BookRow({ book, providers }: { book: BookTotals | undefined; pro
         tone="soft"
       />
       <VRule />
-      <Stat label="seq" value={book.seq === null ? "—" : String(book.seq)} tone="soft" sub={`${ago(0, book.ageSeconds)} old at the read`} />
+      <Stat label="reference age" value={`${ago(0, book.ageSeconds)} old at the read`} tone="faint" />
       <VRule />
       <Stat label="PnL, this generation" value={usdc(book.pnlA)} tone={book.pnlA === null ? "faint" : "ink"} />
       <VRule />

@@ -16,6 +16,7 @@ import { join } from "node:path";
 const source = (...parts: string[]) => readFileSync(join(import.meta.dir, "..", "src", ...parts), "utf8");
 const screen = source("components", "console", "Screen.tsx");
 const card = source("components", "console", "LegCard.tsx");
+const bookRow = source("components", "console", "BookRow.tsx");
 
 test("the playhead's band says it is the replay, and which round", () => {
   expect(screen).toMatch(/replay/i);
@@ -24,7 +25,10 @@ test("the playhead's band says it is the replay, and which round", () => {
 });
 
 test("the book's band says it is the recorded moment, and which sequence", () => {
-  expect(screen).toMatch(/recorded moment/i);
+  // In the band's own component, where the sequence it belongs to is: the caption and the number
+  // have to move together or they can drift apart in a later edit.
+  expect(bookRow).toMatch(/recorded moment/i);
+  expect(bookRow).toMatch(/seq \{/);
 });
 
 test("the two bands are separated rather than stacked flush", () => {
