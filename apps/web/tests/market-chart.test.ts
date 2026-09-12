@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { clipSeries, legAgreement, plotMarket, priceOfMid, publishSpan, type Series } from "@/lib/market-chart";
+import { clipSeries, legAgreement, plotMarket, priceOfMid, publishSpan, trackingGap, type Series } from "@/lib/market-chart";
 
 /**
  * The market panel's arithmetic, away from any pixels.
@@ -159,5 +159,48 @@ describe("the window the panel is read at", () => {
     const last = clipped[clipped.length - 1]!;
     expect(last.t).toBeLessThanOrEqual(span.to);
     expect(seed.market.points.some((p: { t: number }) => p.t > span.to)).toBe(false);
+  });
+});
+
+describe("how closely the legs track the market", () => {
+  /**
+   * The legend's first draft said the legs "sit exactly under the market's" line. That conflated
+   * two different claims: the three legs agree with *each other* exactly, which is true and is what
+   * `legAgreement` measures, and the legs sit on the *market* line, which in this recording they
+   * plainly do not — the published mid runs several hundred basis points away from the hourly close
+   * for the first few hours of the window. A legend that says the second because the first is true
+   * is the panel misreading its own chart.
+   */
+  test("the gap is measured against the market's nearest point, in basis points of it", () => {
+    const market = series([
+      [0, "400000000000000000000000000"],
+      [100, "400000000000000000000000000"],
+    ]);
+    // A mid one per cent away is a hundred basis points away, whichever way the reciprocal runs.
+    const leg = { label: "a", rounds: [{ atSeconds: 50, mid: "404000000000000000000000000" }] };
+    const gap = trackingGap([leg], market);
+    expect(Math.abs(gap.worstBps)).toBeGreaterThan(90);
+    expect(Math.abs(gap.worstBps)).toBeLessThan(110);
+  });
+
+  test("a leg that sits on the market has no gap", () => {
+    const market = series([[0, "400000000000000000000000000"], [100, "400000000000000000000000000"]]);
+    const gap = trackingGap([{ label: "a", rounds: [{ atSeconds: 50, mid: "400000000000000000000000000" }] }], market);
+    expect(gap.worstBps).toBe(0);
+    expect(gap.meanAbsBps).toBe(0);
+  });
+
+  test("nothing to compare is no gap rather than a divide by zero", () => {
+    expect(trackingGap([], []).worstBps).toBe(0);
+    expect(Number.isFinite(trackingGap([{ label: "a", rounds: [] }], []).meanAbsBps)).toBe(true);
+  });
+
+  test("in this recording the legs leave the market line by more than a hundred basis points", () => {
+    // The number the legend has to carry. If a future recording tracks tightly this fails, and the
+    // legend's wording should soften with it rather than the test being deleted.
+    const gap = trackingGap(seed.legs, seed.market.points);
+    expect(Math.abs(gap.worstBps)).toBeGreaterThan(100);
+    expect(gap.meanAbsBps).toBeGreaterThan(0);
+    expect(gap.worstAt).toBeGreaterThan(0);
   });
 });
