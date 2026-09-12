@@ -12,6 +12,12 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { recordedMoment } from "../../../packages/console-data/src/recorded.js";
+import { legState } from "../../../packages/console-data/src/status.js";
+import { offMidBps } from "../../../packages/console-data/src/quotes.js";
+import { providersOf } from "../../../packages/console-data/src/providers.js";
+import type { LegQuote } from "../../../packages/console-data/src/quotes.js";
+import type { LegSnapshot } from "../../../packages/console-data/src/snapshot.js";
 
 const root = join(import.meta.dir, "..", "..", "..");
 const read = <T>(path: string): T => JSON.parse(readFileSync(join(root, path), "utf8")) as T;
@@ -70,8 +76,125 @@ const referenceChanged = (mid: string, previous: string | null): boolean => {
   return now > before * CHANGED_BY || now * CHANGED_BY < before;
 };
 
+/**
+ * Everything the instrument page draws, as the console computes it.
+ *
+ * Not recomputed for the web: the moment is assembled by `recordedMoment`, which is `takeSnapshot`'s
+ * own parts over the recorded fixtures, and what follows only serialises it. A number on the page
+ * and the same number on the console cannot drift apart, because there is only one of it.
+ *
+ * Bigints become decimal strings, and nulls stay null. A null here is a defined state with a caveat
+ * next to it saying why — "no mark, so inventory cannot be valued" — and a zero in its place would
+ * be a figure on screen that traces to nothing, which is the one thing this seed exists to prevent.
+ */
+const moment = recordedMoment();
+const big = (value: bigint | null | undefined): string | null => (value == null ? null : String(value));
+
+const quoteOf = (quote: LegQuote | null, isAToB: boolean) =>
+  quote === null
+    ? null
+    : {
+        amountIn: String(quote.amountIn),
+        amountOut: big(quote.amountOut),
+        tokenIn: quote.tokenIn,
+        tokenOut: quote.tokenOut,
+        reason: quote.reason,
+        refMid: big(quote.refMid),
+        tiltBps: quote.tiltBps,
+        seq: quote.seq,
+        refAgeSeconds: quote.refAgeSeconds,
+        // Computed here by the console's own function rather than left to the page: "how far off the
+        // mid" is a claim about the maker's pricing and belongs where the pricing is understood.
+        offMidBps: offMidBps(quote, isAToB),
+        refusal: quote.refusal,
+        caveats: quote.caveats,
+      };
+
+const decompositionOf = (leg: LegSnapshot) =>
+  leg.shift === null
+    ? null
+    : {
+        weightA: String(leg.shift.weightA),
+        correction: String(leg.shift.correction),
+        ownConcession: String(leg.shift.ownConcession),
+        bookConcession: String(leg.shift.bookConcession),
+        concessionUncapped: String(leg.shift.concessionUncapped),
+        concession: String(leg.shift.concession),
+        tiltBps: String(leg.shift.tiltBps),
+        published: leg.shift.published,
+        agrees: leg.shift.agrees,
+        roomBps: String(leg.shift.roomBps),
+        roomUnknownAtCap: leg.shift.roomUnknownAtCap,
+        cappedByRoom: leg.shift.cappedByRoom,
+        clampedByMaxTilt: leg.shift.clampedByMaxTilt,
+        balancesMatchEnclave: leg.shift.balancesMatchEnclave,
+        referenceAgeSeconds: leg.shift.referenceAgeSeconds,
+      };
+
+const spreadOf = (leg: LegSnapshot) =>
+  leg.spread === null
+    ? null
+    : {
+        baseBps: leg.spread.baseBps,
+        volatilityBps: leg.spread.volatilityBps,
+        markoutBps: leg.spread.markoutBps,
+        // The age ramp evaluated at the moment of recording, not at publish. A surface drawing it
+        // says so; the position's own widenBpsPerMinute and maxWidenBps travel with it so a surface
+        // that would rather recompute at its own clock can.
+        stalenessBps: leg.spread.stalenessBps,
+        totalBps: leg.spread.totalBps,
+        referenceAgeSeconds: leg.spread.referenceAgeSeconds,
+        tooStaleToQuote: leg.spread.tooStaleToQuote,
+        recomputedVolatilityBps: leg.spread.recomputedVolatilityBps,
+        widenBpsPerMinute: leg.position?.widenBpsPerMinute ?? null,
+        maxWidenBps: leg.position?.maxWidenBps ?? null,
+        maxStalenessSeconds: leg.position?.maxStalenessSeconds ?? null,
+      };
+
+const pnlOf = (leg: LegSnapshot) =>
+  leg.pnl === null
+    ? null
+    : {
+        fills: leg.pnl.fills,
+        volumeA: String(leg.pnl.volumeA),
+        edgeA: String(leg.pnl.edgeA),
+        markoutA: big(leg.pnl.markoutA),
+        tradingA: big(leg.pnl.tradingA),
+        holdA: big(leg.pnl.holdA),
+        totalA: big(leg.pnl.totalA),
+        unvaluedB: big(leg.pnl.unvaluedB),
+        caveat: leg.pnl.caveat,
+        // The position's whole life, said separately and labelled as the other span: this
+        // generation's hold and a lifetime's trading added together is the sum of two questions.
+        lifetime: {
+          fills: leg.pnl.lifetime.fills,
+          volumeA: String(leg.pnl.lifetime.volumeA),
+          edgeA: String(leg.pnl.lifetime.edgeA),
+          markoutA: big(leg.pnl.lifetime.markoutA),
+          tradingA: big(leg.pnl.lifetime.tradingA),
+          generations: leg.pnl.lifetime.generations,
+        },
+      };
+
+/** What each fill earned, by transaction, so a fill row and its economics cannot come apart. */
+const economicsOf = (leg: LegSnapshot) =>
+  new Map((leg.pnl?.perFill ?? []).map((fill) => [fill.transaction, fill]));
+
+const marketOf = (history: typeof moment.snapshot.market) =>
+  history === null
+    ? null
+    : {
+        points: history.points.map((point) => ({ t: Number(point.timestamp), mid: String(point.mid) })),
+        source: history.source,
+        hours: history.hours,
+        granularity: history.granularity,
+        error: history.error,
+      };
+
 const legs = LEGS.map((leg) => {
   const history = read<History>(leg.file);
+  const computed = moment.snapshot.legs.find((l) => l.config.chainId === leg.chainId)!;
+  const economics = economicsOf(computed);
   return {
     chainId: leg.chainId,
     name: leg.name,
@@ -83,6 +206,18 @@ const legs = LEGS.map((leg) => {
     balanceB: history.position.balanceB,
     // Oldest first: the indexer answers newest first and a replay plays forwards.
     shippedAtSeconds: shippedAt(leg.name),
+    // The console's own word for what state this leg is in, so the page draws a vocabulary rather
+    // than inventing one out of the booleans.
+    status: legState(computed).word,
+    statusKind: legState(computed).kind,
+    quotes: {
+      aToB: quoteOf(computed.quoteAToB, true),
+      bToA: quoteOf(computed.quoteBToA, false),
+    },
+    decomposition: decompositionOf(computed),
+    spread: spreadOf(computed),
+    pnl: pnlOf(computed),
+    mark: computed.mark === null ? null : { mid: String(computed.mark.mid), source: computed.mark.source, readAtSeconds: computed.mark.readAtSeconds },
     rounds: [...history.references]
       .map((r) => ({ seq: r.seq, atSeconds: Number(r.timestamp), tiltBps: r.tiltBps, mid: r.mid }))
       .sort((a, b) => a.atSeconds - b.atSeconds)
@@ -100,7 +235,13 @@ const legs = LEGS.map((leg) => {
         // What the leg was quoting when it was taken, which is the whole point of showing the fill
         // on the same axis as the shift.
         refTiltBps: f.refTiltBps,
-        thisGeneration: shippedAt(leg.name) !== null && Number(f.timestamp) >= shippedAt(leg.name)!,
+        thisGeneration: economics.get(f.transaction)?.thisGeneration ?? false,
+        // What this fill earned, from `fillEconomics`: the edge against the reference that priced
+        // it, and the same fill against the next reference published after it, which is the adverse
+        // selection the slow workflow charges for. Null where no later reference exists yet.
+        sizeA: String(economics.get(f.transaction)?.sizeA ?? BigInt(0)),
+        edgeA: big(economics.get(f.transaction)?.edgeA),
+        markoutA: big(economics.get(f.transaction)?.markoutA),
       }))
       .sort((a, b) => a.atSeconds - b.atSeconds),
     rejections: [...history.rejections]
@@ -115,6 +256,37 @@ const replay = {
     sources: [...LEGS.map((l) => l.file), "packages/console-data/fixtures/recorded-at.json"],
     note: "recorded testnet reads; no value here is synthesised",
   },
+  // The one mainnet series every leg prices from, in both windows the service draws: a week hourly,
+  // and the recent hours per swap.
+  market: marketOf(moment.snapshot.market),
+  marketRecent: marketOf(moment.recentMarket),
+  book: {
+    legs: moment.snapshot.book.legs,
+    legsActive: moment.snapshot.book.legsActive,
+    inventoryA: big(moment.snapshot.book.inventoryA),
+    weightA: big(moment.snapshot.book.weightA),
+    pnlA: big(moment.snapshot.book.pnlA),
+    tradingA: big(moment.snapshot.book.tradingA),
+    holdA: big(moment.snapshot.book.holdA),
+    caveat: moment.snapshot.book.caveat,
+    seq: moment.snapshot.seq,
+    // How old the reference was when this moment was recorded: the page says "3m old" from this
+    // rather than from the reader's own clock, which would age a recording into a staleness alarm.
+    ageSeconds:
+      moment.snapshot.legs[0]?.ref === null || moment.snapshot.legs[0] === undefined
+        ? null
+        : Math.max(0, moment.snapshot.takenAtSeconds - Number(moment.snapshot.legs[0].ref!.updatedAt)),
+    quoteSizeA: String(moment.quoteSizes.amountInA),
+    quoteSizeB: String(moment.quoteSizes.amountInB),
+  },
+  // The providers as they answered, so the page's dots are a reading rather than a decoration.
+  providers: providersOf(moment.snapshot).map((provider) => ({
+    kind: provider.kind,
+    name: provider.name,
+    state: provider.state,
+    reason: provider.reason,
+    detail: provider.detail,
+  })),
   legs,
 };
 

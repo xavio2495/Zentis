@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { BACKFILLING, BOOK, type LegSnapshot, type Snapshot, humanDuration, offMidBps, weightPercent } from "@zentis/console-data";
+import { BACKFILLING, BOOK, type LegSnapshot, type LegStateKind, type Snapshot, legState as legStateOf, offMidBps, weightPercent } from "@zentis/console-data";
 import { chooseFit, duration, pairPrice, signed, stackedGauge, tokenAmount, weightBar } from "../format.js";
 import { plot } from "../chart.js";
 import { plotSigned, shiftSeries } from "../shift-line.js";
@@ -19,21 +19,19 @@ import { STATE, TERM, UI, legColour } from "../theme.js";
  * five facts an operator watches: which chain and whether it is live, what it would pay right now,
  * what it holds, how far off the mid it is quoting, and how wide.
  */
+/** What each state looks like. Which state a leg is in is the data layer's; the colour is ours. */
+const TONES: Record<LegStateKind, string> = {
+  unread: STATE.refusing,
+  none: STATE.docked,
+  docked: STATE.docked,
+  stale: STATE.refusing,
+  unpriced: STATE.refusing,
+  live: STATE.live,
+};
+
 export function legState(leg: LegSnapshot): { word: string; short: string; tone: string } {
-  // A read that failed is not a position that is absent. Both arrive as a null `position`, and
-  // reporting the first as the second told a viewer, during a rate-limit outage, that the position
-  // this whole console is about had gone away.
-  if (leg.sources.fills !== null) {
-    return { word: `unavailable — ${leg.sources.fills}`, short: "unread", tone: STATE.refusing };
-  }
-  if (leg.position === null) return { word: "no position", short: "none", tone: STATE.docked };
-  if (!leg.position.active) return { word: "docked", short: "docked", tone: STATE.docked };
-  if (leg.spread?.tooStaleToQuote === true) {
-    const age = humanDuration(leg.spread.referenceAgeSeconds);
-    return { word: `stale ${age}`, short: `stale ${age}`, tone: STATE.refusing };
-  }
-  if (leg.ref === null) return { word: "no reference", short: "no ref", tone: STATE.refusing };
-  return { word: "live", short: "live", tone: STATE.live };
+  const state = legStateOf(leg);
+  return { word: state.word, short: state.short, tone: TONES[state.kind] };
 }
 
 /**
