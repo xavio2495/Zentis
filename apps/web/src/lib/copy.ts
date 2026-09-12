@@ -52,14 +52,24 @@ export const LOADER_WORDS = ["Quote", "Tilt", "Fill"] as const;
  */
 export const ROUTES = [
   {
+    href: "/deck",
+    label: "Deck",
+    blurb: "the argument as seven slides, for a room",
+    // The close asks the reader to try the thing. A deck is for a room with a presenter in it, so
+    // it belongs in the nav and not among the two doors at the foot of the page.
+    atClose: false,
+  },
+  {
     href: "/console",
     label: "Console",
     blurb: "the tool the maker runs, on the recorded moment",
+    atClose: true,
   },
   {
     href: "/sim",
     label: "Replay",
     blurb: "the same moment as one screen, for a reader in forty seconds",
+    atClose: true,
   },
 ] as const;
 

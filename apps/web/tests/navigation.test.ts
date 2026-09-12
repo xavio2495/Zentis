@@ -15,8 +15,8 @@ import { COPY, ROUTES } from "@/lib/copy";
 const source = (...parts: string[]) => readFileSync(join(import.meta.dir, "..", "src", ...parts), "utf8");
 
 describe("the routes are one set, named once", () => {
-  test("both routes are declared in copy, so no component invents a path", () => {
-    expect(ROUTES.map((route) => route.href).sort()).toEqual(["/console", "/sim"]);
+  test("every route is declared in copy, so no component invents a path", () => {
+    expect(ROUTES.map((route) => route.href).sort()).toEqual(["/console", "/deck", "/sim"]);
     for (const route of ROUTES) {
       expect(route.label).toBeTruthy();
       expect(route.blurb).toBeTruthy();
@@ -90,7 +90,7 @@ describe("the closing section is the install line and two ways in", () => {
   });
 
   test("the two calls to action are the routes, and nothing is said about them beyond their names", () => {
-    expect(contact()).toContain("ROUTES.map");
+    expect(contact()).toContain("ROUTES.filter");
     expect(contact()).not.toContain("route.blurb");
   });
 
@@ -102,6 +102,12 @@ describe("the closing section is the install line and two ways in", () => {
     const rule = css.slice(css.indexOf(".cta {"), css.indexOf("}", css.indexOf(".cta {")));
     expect(rule).toMatch(/min-width:/);
     expect(rule).toMatch(/justify-content:\s*center/);
+  });
+
+  test("the close offers two doors, and the deck is not one of them", () => {
+    // The deck is a thing you are shown by a presenter, not a thing you go and run. Adding it here
+    // because it happens to be in the same list is the list making a design decision by accident.
+    expect(ROUTES.filter((route) => route.atClose).map((route) => route.label)).toEqual(["Console", "Replay"]);
   });
 
   test("the source is still reachable now that the section no longer carries it", () => {

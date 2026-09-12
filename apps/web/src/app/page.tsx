@@ -172,7 +172,9 @@ export default function Home() {
             <DockRoom />
 
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              {ROUTES.map((route) => (
+              {/* Two doors, not three: the close asks the reader to run the thing, and the deck is
+                  for a room with a presenter in it. It is in the nav instead. */}
+              {ROUTES.filter((route) => route.atClose).map((route) => (
                 <a key={route.href} href={route.href} data-magnetic className="cta">
                   {route.label}
                 </a>
