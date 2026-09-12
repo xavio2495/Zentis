@@ -58,8 +58,13 @@ test("the feed merges three chains onto the one clock they share, newest first",
   expect(new Set(feed.map((e) => e.chainId)).size).toBe(3);
 });
 
+/** Every event the recording holds; the merge takes a limit and these tests want no limit. */
+const EVERYTHING = 100_000;
+
 test("the feed carries the rejections, with the registry's own reason string", () => {
-  const rejections = mergeFeed(histories, 200).filter((e) => e.kind === "rejection");
+  // The whole recording, not its first two hundred entries: a deeper recording is mostly publishes,
+  // so a fixed slice of the newest stopped containing the rare events these tests are about.
+  const rejections = mergeFeed(histories, EVERYTHING).filter((e) => e.kind === "rejection");
   expect(rejections.length).toBeGreaterThan(0);
   // The reasons are the contract's words. Paraphrasing them here would be inventing evidence.
   expect(rejections.every((r) => r.reason.length > 0)).toBe(true);
@@ -67,7 +72,7 @@ test("the feed carries the rejections, with the registry's own reason string", (
 });
 
 test("the Sepolia fill is in the feed with the reference that priced it", () => {
-  const fills = mergeFeed(histories, 200).filter(
+  const fills = mergeFeed(histories, EVERYTHING).filter(
     (e): e is IndexedFill => e.kind === "fill" && e.chainId === 11155111,
   );
   expect(fills.length).toBeGreaterThan(0);

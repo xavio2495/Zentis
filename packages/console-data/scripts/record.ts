@@ -82,6 +82,20 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * subgraphs run out at different times, so "the quota is exhausted" is rarely true of all of them
  * at once, and a run that insists on all three waits for the slowest.
  */
+/**
+ * How far back a recording reaches.
+ *
+ * The console asks for twenty-five of each, which is what its feed can draw. A recording is read
+ * once and replayed afterwards, so it is worth more: at a publish about every five minutes,
+ * twenty-five references cover under two hours — a window that contained no fill at all, which left
+ * the web replay drawing a shift with nothing happening to it. Four hundred covers about thirty
+ * hours, which holds a day's fills inside the window they are plotted against and leaves room for
+ * the recording to age before that stops being true.
+ *
+ * It costs nothing extra. Subgraph Studio bills a query, not a row.
+ */
+const DEPTH = 400;
+
 const wanted = process.argv.slice(2);
 // `wallet` alone records just the maker's wallet, which is RPC only. That matters when an indexer's
 // allowance is spent: the wallet can still be captured without asking a subgraph anything.
@@ -93,7 +107,7 @@ if (chosen.length === 0 && !walletOnly) {
 console.log(walletOnly ? "recording the maker's wallet" : `recording ${chosen.map((l) => l.name).join(", ")}`);
 
 for (const leg of chosen) {
-  write(`history-${leg.name}`, await post(leg.fillsSubgraphUrl, historyQuery(BOOK.positionId, 25)));
+  write(`history-${leg.name}`, await post(leg.fillsSubgraphUrl, historyQuery(BOOK.positionId, DEPTH)));
   // Only for a leg that still has a venue. Two of the three reference pools were retired when the
   // book moved to one mainnet mid, and a recorder that insisted on them would either crash or write
   // a week-old price as though it were current.
