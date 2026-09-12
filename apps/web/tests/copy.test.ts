@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { COPY, INSTALL_COMMAND, INTEGRATIONS, prose } from "../src/lib/copy";
+import { COPY, INSTALL_COMMAND, INTEGRATIONS, REPO_URL, prose } from "../src/lib/copy";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 describe("the page makes no claim it cannot source", () => {
   test("no figure appears anywhere in the prose", () => {
@@ -45,5 +47,19 @@ describe("the first screen", () => {
 
   test("has copy for readers without javascript", () => {
     expect(COPY.noscript.length).toBeGreaterThan(80);
+  });
+});
+
+describe("the contact", () => {
+  test("points at the repository the install line installs from", () => {
+    const script = readFileSync(join(import.meta.dir, "..", "public", "install.sh"), "utf8");
+    const slug = script.match(/ZENTIS_REPO_SLUG:-([\w.-]+\/[\w.-]+)/)?.[1];
+    expect(slug).toBeTruthy();
+    expect(REPO_URL).toBe(`https://github.com/${slug}`);
+  });
+
+  test("is an address rather than a claim, so it is kept out of prose", () => {
+    expect(prose()).not.toContain(REPO_URL);
+    expect(COPY.contactLine.length).toBeGreaterThan(0);
   });
 });
