@@ -1,8 +1,8 @@
-import { CopyCommand } from "@/components/CopyCommand";
 import { CopyLink } from "@/components/CopyLink";
 import { Cursor } from "@/components/Cursor";
 import { HeroLines } from "@/components/HeroLines";
 import { HeroWordmark } from "@/components/HeroWordmark";
+import { InstallDock } from "@/components/InstallDock";
 import { Nav } from "@/components/Nav";
 import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
@@ -29,6 +29,7 @@ export default function Home() {
       <Field />
       <div className="grain" />
       <Cursor />
+      <InstallDock />
       <Smoother />
 
       <Nav />
@@ -85,15 +86,6 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-          </Reveal>
-        </section>
-
-        <section id="install" className="mx-auto max-w-3xl px-8 py-[14vh]">
-          <Reveal>
-            <p className="label">{COPY.installLabel}</p>
-            <div className="mt-8">
-              <CopyCommand />
-            </div>
           </Reveal>
         </section>
 

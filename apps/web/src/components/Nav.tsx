@@ -6,7 +6,6 @@ import { COPY } from "@/lib/copy";
 const SECTIONS = [
   { id: "position", label: "Position" },
   { id: "built-on", label: "Built on" },
-  { id: "install", label: "Install" },
   { id: "contact", label: "Source" },
 ];
 

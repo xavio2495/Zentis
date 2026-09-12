@@ -166,6 +166,8 @@ export interface FieldState {
   pointerPresent: boolean;
   /** How much further from the camera the mark is than the gate. */
   depthRatio: number;
+  /** 0 while the install line rides the foot of the page, 1 once it is centred. */
+  installDock: number;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -220,10 +222,20 @@ export function fieldState({
   const roomBeside = neededPx <= viewportWidth / 2 + halfExtentPx * 0.35;
   const restingOpacity = roomBeside ? 0.4 : 0.02;
   const offscreenWorld = (viewportWidth / 2 + halfExtentPx) / perUnit;
-  const positionX = handoff * (roomBeside ? neededPx / perUnit : offscreenWorld);
+  // Off to one side while there are words to make room for, then back to the
+  // middle for the ending: coming apart at the edge of the screen reads as
+  // falling out of frame rather than as a conclusion.
+  const returning = easeOut(clamp((scrollY - outroFrom) / (viewportHeight * 0.8), 0, 1));
+  const positionX =
+    handoff * (roomBeside ? neededPx / perUnit : offscreenWorld) * (1 - returning);
 
   const past = clamp((scrollY - proseFrom) / (viewportHeight * 2), 0, 1);
   const scatter = easeOut(clamp((scrollY - outroFrom) / (viewportHeight * 1.4), 0, 1));
+
+  // The install line rides at the foot of the page and comes to the middle as
+  // the page closes, arriving a little ahead of the scatter so it is already
+  // there when the mark comes apart around it.
+  const installDock = easeOut(clamp((scrollY - outroFrom) / (viewportHeight * 1.1), 0, 1));
 
   // Brightness falls to its resting value across the handoff, then comes back
   // for the scatter, which is the one moment the field is the subject again.
@@ -280,6 +292,7 @@ export function fieldState({
     pointerWorldY,
     pointerPresent: !!pointer,
     depthRatio,
+    installDock,
     proseFrom,
     outroFrom,
   };

@@ -542,3 +542,20 @@ body.has-cursor [contenteditable] {
 #smooth-content {
   overflow-x: hidden;
 }
+
+/* The install line rides the page. It carries no border of its own — the field
+   draws one out of points around wherever it has got to. */
+.install-dock {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s var(--ease-out);
+}
+
+body.ready .install-dock {
+  opacity: 1;
+  pointer-events: auto;
+}

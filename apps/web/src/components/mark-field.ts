@@ -17,6 +17,7 @@ import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state"
 import { markPosition } from "@/lib/mark-position";
 import { scrollNow } from "@/lib/scroll";
 import { calmRect } from "@/lib/calm";
+import { dockRect } from "@/lib/dock";
 
 /**
  * The field: a doorway, the mark, and the light behind both.
@@ -39,6 +40,7 @@ const GATE_RISING = 320;
 /** How readily the gate takes the cursor's green. */
 const GATE_STAIN = 0.85;
 
+const BORDER_POINTS = 620;
 const STARS_NEAR = 700;
 const STARS_FAR = 900;
 
@@ -369,6 +371,36 @@ function buildGate(): Cloud {
   return cloud;
 }
 
+/**
+ * The border the install line wears. The points hold a position along a
+ * perimeter and an offset from it; where that perimeter actually is gets
+ * written every frame, because the line moves.
+ */
+function buildBorder(): { cloud: Cloud; along: Float32Array; offset: Float32Array } {
+  const cloud = emptyCloud(BORDER_POINTS);
+  const along = new Float32Array(BORDER_POINTS);
+  const offset = new Float32Array(BORDER_POINTS);
+
+  for (let i = 0; i < BORDER_POINTS; i++) {
+    along[i] = (i + Math.random() * 0.85) / BORDER_POINTS;
+    // most sit on the line, a few drift off it
+    offset[i] = (Math.random() * 2 - 1) * Math.abs(Math.random()) * 0.09;
+
+    const shade = 0.72 + Math.random() * 0.28;
+    cloud.colors[i * 3] = shade;
+    cloud.colors[i * 3 + 1] = shade;
+    cloud.colors[i * 3 + 2] = shade * 0.99;
+    cloud.stain[i] = 1;
+
+    const spot = bokehFocus();
+    cloud.sizes[i] = spot.size * 0.55;
+    cloud.softness[i] = spot.soft;
+    cloud.phases[i] = Math.random() * 6.283;
+  }
+
+  return { cloud, along, offset };
+}
+
 /** A shell of distant light, flattened a little and pushed behind the camera plane. */
 function buildStars(count: number, near: number, far: number): Cloud {
   const cloud = emptyCloud(count);
@@ -437,16 +469,23 @@ export function mountMarkField(host: HTMLElement): () => void {
   const doorGroup = new Group();
   doorGroup.add(doorPoints);
 
+  const border = buildBorder();
+  const borderGeometry = toGeometry(border.cloud);
+  const borderMaterial = makeMaterial(reduced, door);
+  const borderPoints = new Points(borderGeometry, borderMaterial);
+  borderPoints.frustumCulled = false;
+
   const near = new Points(nearGeometry, starMaterial);
   const far = new Points(farGeometry, starMaterial);
   near.frustumCulled = false;
   far.frustumCulled = false;
 
-  scene.add(group, doorGroup, near, far);
+  scene.add(group, doorGroup, borderPoints, near, far);
 
   const setScale = () => {
     const scale = renderer.domElement.height * 0.5;
     markMaterial.uniforms.uScale.value = scale;
+    borderMaterial.uniforms.uScale.value = scale;
     doorMaterial.uniforms.uScale.value = scale;
     starMaterial.uniforms.uScale.value = scale;
   };
@@ -551,9 +590,74 @@ export function mountMarkField(host: HTMLElement): () => void {
     );
     markMaterial.uniforms.uDisperseAmount.value = disperse;
 
+    // Lay the border onto wherever the install line has got to. Its points are
+    // written in world units at the camera's own plane, so a pixel on screen is
+    // a pixel wherever the line has moved to.
+    if (dockRect.on) {
+      const perWorld = innerHeight / (2 * Math.tan((FOV_DEGREES / 2) * (Math.PI / 180)) * CAMERA_Z);
+      const halfWidth = dockRect.width / 2 / perWorld;
+      const halfHeight = dockRect.height / 2 / perWorld;
+      const centreX = (dockRect.left + dockRect.width / 2 - innerWidth / 2) / perWorld;
+      const centreY = (innerHeight / 2 - (dockRect.top + dockRect.height / 2)) / perWorld;
+      const perimeter = 4 * halfWidth + 4 * halfHeight;
+      const positions = borderGeometry.attributes.position.array as Float32Array;
+
+      for (let i = 0; i < BORDER_POINTS; i++) {
+        let walk = border.along[i] * perimeter;
+        let x: number;
+        let y: number;
+        let outX: number;
+        let outY: number;
+        if (walk < 2 * halfWidth) {
+          x = -halfWidth + walk;
+          y = halfHeight;
+          outX = 0;
+          outY = 1;
+        } else if ((walk -= 2 * halfWidth) < 2 * halfHeight) {
+          x = halfWidth;
+          y = halfHeight - walk;
+          outX = 1;
+          outY = 0;
+        } else if ((walk -= 2 * halfHeight) < 2 * halfWidth) {
+          x = halfWidth - walk;
+          y = -halfHeight;
+          outX = 0;
+          outY = -1;
+        } else {
+          x = -halfWidth;
+          y = -halfHeight + (walk - 2 * halfWidth);
+          outX = -1;
+          outY = 0;
+        }
+
+        positions[i * 3] = centreX + x + outX * border.offset[i];
+        positions[i * 3 + 1] = centreY + y + outY * border.offset[i];
+        positions[i * 3 + 2] = 0;
+      }
+      borderGeometry.attributes.position.needsUpdate = true;
+
+      borderMaterial.uniforms.uOpacity.value = 0.9;
+      borderMaterial.uniforms.uTime.value = time;
+      // the cursor's light and the space it clears, in the same world units
+      borderMaterial.uniforms.uStain.value.set(
+        state.pointerWorldX,
+        state.pointerWorldY,
+        halfWidth * 0.9,
+        disperse,
+      );
+      borderMaterial.uniforms.uDisperse.value.set(
+        state.pointerWorldX,
+        state.pointerWorldY,
+        0,
+        halfHeight * 1.6,
+      );
+      borderMaterial.uniforms.uDisperseAmount.value = disperse * 0.55;
+    }
+    borderPoints.visible = dockRect.on;
+
     // The type's quiet applies to everything drawn behind it.
     const aspect = innerWidth / innerHeight;
-    for (const material of [markMaterial, doorMaterial, starMaterial]) {
+    for (const material of [markMaterial, doorMaterial, starMaterial, borderMaterial]) {
       material.uniforms.uCalm.value.set(
         calmRect.x,
         calmRect.y,
@@ -600,10 +704,10 @@ export function mountMarkField(host: HTMLElement): () => void {
     removeEventListener("pointermove", onPointerMove);
     removeEventListener("pointerleave", onPointerLeave);
     host.removeChild(renderer.domElement);
-    for (const geometry of [markGeometry, doorGeometry, nearGeometry, farGeometry]) {
+    for (const geometry of [markGeometry, doorGeometry, borderGeometry, nearGeometry, farGeometry]) {
       geometry.dispose();
     }
-    for (const material of [markMaterial, doorMaterial, starMaterial]) material.dispose();
+    for (const material of [markMaterial, doorMaterial, starMaterial, borderMaterial]) material.dispose();
     renderer.dispose();
   };
 }
