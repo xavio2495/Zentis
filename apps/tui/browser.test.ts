@@ -15,13 +15,17 @@ import type { TerminalHandle } from "./src/browser.js";
  */
 const terminal = () => {
   const written: string[] = [];
-  const handle: TerminalHandle & { written: string[] } = {
+  const typists: ((data: string) => void)[] = [];
+  const handle: TerminalHandle & { written: string[]; type(data: string): void } = {
     written,
     cols: 120,
     rows: 40,
     write: (data: string) => written.push(data),
-    onData: () => undefined,
+    onData: (handler) => typists.push(handler),
     onResize: () => undefined,
+    type: (data: string) => {
+      for (const typist of typists) typist(data);
+    },
   };
   return handle;
 };
@@ -37,7 +41,7 @@ test("the public console draws the recorded moment without reaching for a single
   globalThis.fetch = (() => {
     reached += 1;
     throw new Error("the public console must not read anything");
-  }) as typeof fetch;
+  }) as unknown as typeof fetch;
 
   const handle = terminal();
   const app = mount(handle);
@@ -52,4 +56,23 @@ test("the public console draws the recorded moment without reaching for a single
   expect(screen).toMatch(/seq \d{6,}/);
   // And it says what it is, so a recorded moment never passes for a live one.
   expect(screen).toMatch(/recorded/i);
+}, 30_000);
+
+test("a visitor's keystrokes reach the console, because a console nobody can press is a screenshot", async () => {
+  // Ink does not listen for `data`. It listens for `readable` and then calls `read()` — so a stdin
+  // shim that fires `data` and answers `read()` with null is one every key falls into silently.
+  // The screen still drew, which is why this went unnoticed: only pressing something finds it.
+  const handle = terminal();
+  const app = mount(handle);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  handle.written.length = 0;
+  handle.type("p");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const screen = strip(handle.written.join(""));
+  app.unmount();
+
+  // `p` is the positions page, which names things the live view never does.
+  expect(screen).toMatch(/positions/);
+  expect(screen).toMatch(/strategy/);
 }, 30_000);
