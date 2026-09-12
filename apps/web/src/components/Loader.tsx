@@ -35,6 +35,7 @@ export function Loader() {
       }
       document.body.classList.remove("locked");
       document.body.classList.add("ready");
+      dispatchEvent(new Event("zentis:ready"));
       setDone(true);
     };
 

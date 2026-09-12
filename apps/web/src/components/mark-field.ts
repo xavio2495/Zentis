@@ -15,6 +15,7 @@ import {
 import { BAR, sampleMark } from "@/lib/mark-geometry";
 import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state";
 import { markPosition } from "@/lib/mark-position";
+import { scrollNow } from "@/lib/scroll";
 
 /**
  * The field: a doorway, the mark, and the light behind both.
@@ -481,7 +482,7 @@ export function mountMarkField(host: HTMLElement): () => void {
     // Where everything stands, and how brightly, is computed apart from here so
     // the rule that the mark never sits on the text can be held to by test.
     const state = fieldState({
-      scrollY,
+      scrollY: scrollNow(),
       viewportWidth: innerWidth,
       viewportHeight: innerHeight,
       docHeight: document.documentElement.scrollHeight,

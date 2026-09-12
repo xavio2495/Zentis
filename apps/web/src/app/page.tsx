@@ -7,6 +7,7 @@ import { Nav } from "@/components/Nav";
 import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
+import { Smoother } from "@/components/Smoother";
 import { COPY, INTEGRATIONS, INSTALL_COMMAND, REPO_LABEL, REPO_URL } from "@/lib/copy";
 
 /** The four corner brackets that stand in for a card border. */
@@ -28,9 +29,12 @@ export default function Home() {
       <Field />
       <div className="grain" />
       <Cursor />
+      <Smoother />
 
       <Nav />
 
+      <div id="smooth-wrapper">
+        <div id="smooth-content">
       <main className="relative z-3">
         {/* The first screen is server-rendered at its final metrics, so the
             wordmark is in the source and nothing shifts when React arrives. */}
@@ -120,6 +124,8 @@ export default function Home() {
           <p className="label-sm text-ink-faint">{COPY.footer}</p>
         </footer>
       </main>
+        </div>
+      </div>
 
       <noscript>
         <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-6 bg-bg px-8 text-center">
