@@ -1,6 +1,6 @@
 "use client";
 
-import { SPEEDS, firstClamp } from "@/lib/replay";
+import { SPEEDS } from "@/lib/replay";
 import { clock } from "@/lib/format";
 import { useReplay } from "@/lib/store";
 import { Chip } from "./ui";
@@ -13,11 +13,19 @@ import { Chip } from "./ui";
  * before you get there.
  */
 export function Transport() {
-  const { replay, playhead, playing, speed, length, legIndex, toggle, reset, scrub, setSpeed, jumpToClamp } =
+  const { replay, playhead, playing, speed, length, legIndex, toggle, reset, scrub, setSpeed, jumpToHighlight, highlightAt } =
     useReplay();
   const leg = replay?.legs[legIndex] ?? null;
-  const clampAt = leg === null ? null : firstClamp(leg);
+  const highlight = replay?.highlight ?? null;
   const now = leg?.rounds[Math.min(playhead, leg.rounds.length - 1)] ?? null;
+  // What the chip calls the round it goes to. The seed decides which round deserves the jump and
+  // writes the sentence; this only chooses three words for the face of the button.
+  const jumpLabel =
+    highlight?.kind === "reference-change"
+      ? "⤒ reference change"
+      : highlight?.kind === "capped"
+        ? "⤒ on the cap"
+        : "⤒ widest lean";
 
   return (
     <div className="flex h-12 shrink-0 items-center gap-3 border-t border-stroke bg-inset px-3">
@@ -27,8 +35,12 @@ export function Transport() {
       <Chip onClick={reset} title="back to the first round">
         ↺ reset
       </Chip>
-      <Chip onClick={jumpToClamp} disabled={clampAt === null} title="jump to the first round that hit the cap">
-        ⤒ clamp
+      <Chip
+        onClick={jumpToHighlight}
+        disabled={highlightAt === null}
+        title={highlight === null ? "this recording has no round worth jumping to" : highlight.why}
+      >
+        {jumpLabel}
       </Chip>
 
       <div className="flex items-center gap-1">
@@ -49,11 +61,15 @@ export function Transport() {
           onChange={(event) => scrub(Number(event.target.value))}
           aria-label="scrub the replay"
         />
-        {clampAt !== null && length > 1 && (
+        {highlightAt !== null && length > 1 && (
           <span
-            className="pointer-events-none absolute top-0 h-full w-px bg-bad"
-            style={{ left: `${(clampAt / (length - 1)) * 100}%` }}
-            title="the first round that hit the cap"
+            /* Brightness, not the accent: the accent on this screen means "this is what Zentis
+               computed", and a marker saying where to look is navigation rather than a number. It
+               was `bg-bad` before, which claimed the round was a fault; most of the time it is
+               simply the most interesting one. */
+            className="pointer-events-none absolute top-0 h-full w-px bg-ink-soft"
+            style={{ left: `${(highlightAt / (length - 1)) * 100}%` }}
+            title={highlight?.why}
           />
         )}
       </div>

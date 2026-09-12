@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { SPEEDS, TICK_MS, type Leg, type Replay, type Step, at, firstClamp, step, visible } from "./replay";
+import { SPEEDS, TICK_MS, type Leg, type Replay, type Step, at, highlightIndex, step, visible } from "./replay";
 
 /**
  * The replay, as React sees it: one integer and a timer.
@@ -25,7 +25,10 @@ interface ReplayState {
   scrub: (to: number) => void;
   setSpeed: (stride: number) => void;
   setLegIndex: (index: number) => void;
-  jumpToClamp: () => void;
+  /** to the round the seed named, or nothing when the recording does not hold one */
+  jumpToHighlight: () => void;
+  /** where that round is on the rail, so the marker and the jump cannot disagree */
+  readonly highlightAt: number | null;
 }
 
 const Ctx = createContext<ReplayState | null>(null);
@@ -69,6 +72,9 @@ export function ReplayProvider({ children }: { children: React.ReactNode }) {
 
   const spine = spineOf(replay);
   const length = spine?.rounds.length ?? 0;
+  // Against the spine, which is the leg the playhead runs over: the marker on the rail and the jump
+  // have to be the same index or the chip lands somewhere the marker is not.
+  const highlightAt = highlightIndex(spine?.rounds ?? [], replay?.highlight);
 
   useEffect(() => {
     if (!playing || length === 0) return undefined;
@@ -150,15 +156,16 @@ export function ReplayProvider({ children }: { children: React.ReactNode }) {
       },
       setSpeed,
       setLegIndex,
-      jumpToClamp: () => {
-        const leg = replay?.legs[legIndex] ?? null;
-        const index = leg === null ? null : firstClamp(leg);
-        if (index === null) return;
+      highlightAt,
+      jumpToHighlight: () => {
+        if (highlightAt === null) return;
         setPlaying(false);
-        setPlayhead(Math.min(length - 1, index + 2));
+        // A couple of rounds before it, so the reader arrives just ahead of the thing they came to
+        // see rather than on top of it with no idea what it moved from.
+        setPlayhead(Math.max(0, Math.min(length - 1, highlightAt - 2)));
       },
     }),
-    [replay, playhead, playing, speed, length, legIndex],
+    [replay, playhead, playing, speed, length, legIndex, highlightAt],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

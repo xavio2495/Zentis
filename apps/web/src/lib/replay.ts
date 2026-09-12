@@ -193,8 +193,39 @@ export interface Provider {
   readonly detail: string | null;
 }
 
+/**
+ * The round worth jumping to, named by the seed rather than hunted for here.
+ *
+ * `why` is a sentence, not a label: it is what the chip says a reader is about to look at, and the
+ * seed is where the reasoning about which round deserves it belongs — the surface only draws it.
+ */
+export interface Highlight {
+  readonly seq: number;
+  readonly atSeconds: number;
+  readonly kind: "reference-change" | "capped" | "largest-shift" | string;
+  readonly why: string;
+}
+
+/**
+ * Where that round sits in a leg's rounds, by sequence.
+ *
+ * By sequence and not by position: the legs share a sequence, not an index, and a leg that missed a
+ * round would otherwise send the playhead somewhere adjacent and plausible. Null when the recording
+ * does not hold it, which is a jump that should not be offered rather than a jump to round zero.
+ */
+export function highlightIndex(
+  rounds: readonly { seq: number }[],
+  highlight: Highlight | null | undefined,
+): number | null {
+  if (highlight == null) return null;
+  const index = rounds.findIndex((round) => round.seq === highlight.seq);
+  return index === -1 ? null : index;
+}
+
 export interface Replay {
   readonly provenance: { recordedAtSeconds: number; sources: string[]; note: string };
+  /** the round worth jumping to, with the reason in words */
+  readonly highlight?: Highlight | null;
   /** the week, hourly */
   readonly market?: MarkHistory;
   /** the last hours, per swap; use this for any window under a day */
