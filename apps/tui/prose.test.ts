@@ -82,3 +82,13 @@ test("the status page carries the record's own sentence about the opening mark, 
   expect(status).toContain("not read at ship time");
 }, 60_000);
 
+test("the pnl page names the inventory hold does not cover, in the leg's own units", async () => {
+  // A leg pushed to after it shipped holds tokenB that hold says nothing about, and the book's hold
+  // understates by whatever that inventory has done since. The page cannot value it — no record
+  // carries a mark from the moment of the push — but leaving it unsaid is the one option that makes
+  // the total look complete when it is not.
+  const pnl = await pageText("n");
+  expect(pnl).toMatch(/pushed after|not in hold|hold covers/i);
+  expect(pnl).toMatch(/WETH/);
+}, 60_000);
+
