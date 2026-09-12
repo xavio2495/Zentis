@@ -168,3 +168,31 @@ test("a push with nothing to wrap and an allowance that covers it is one transac
   );
   expect(sent).toEqual(["push"]);
 });
+
+test("the child writes down what it sent, in the shape the scripts beside it write", async () => {
+  // The console draws the log; the child is the only process that knows a hash the moment it exists.
+  // So the child writes the line — the same line the headless taker and the rebalance scripts write
+  // — and the console reads the file rather than being told by whichever process happened to send.
+  const journalled: { kind: string; tx: string | null; status: number | null; chainId: number | null }[] = [];
+  await runIntent(
+    {
+      kind: "push",
+      chainId: LEGS[0]!.chainId,
+      amount: "1000",
+      approval: "3000",
+      wrap: "500",
+      needsApproval: true,
+      keyName: "TAKER_PRIVATE_KEY",
+    },
+    keyFile,
+    () => undefined,
+    recordingTransport([], []),
+    undefined,
+    (line) => journalled.push(line),
+  );
+  expect(journalled.map((l) => l.kind)).toEqual(["wrap", "approve", "push"]);
+  expect(journalled.every((l) => l.tx !== null && l.status === 1)).toBe(true);
+  expect(journalled.every((l) => l.chainId === LEGS[0]!.chainId)).toBe(true);
+  // Every field of it, together, holds no key: this file is read by other processes and by a person.
+  expect(JSON.stringify(journalled)).not.toContain(SECRET.slice(2));
+});
