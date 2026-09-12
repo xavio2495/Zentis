@@ -3,7 +3,7 @@
 import { ago, signedBps, tokenAmount } from "@/lib/format";
 import { inventorySplit } from "@/lib/leg-cards";
 import type { BookTotals, Provider } from "@/lib/replay";
-import { Stat } from "./ui";
+import { Stat, VRule } from "./ui";
 
 /**
  * The book above the legs: one position, totalled.
@@ -24,18 +24,24 @@ export function BookRow({ book, providers }: { book: BookTotals | undefined; pro
   const usdc = (raw: string | null) => (raw === null ? "—" : `${tokenAmount(raw, 6)} USDC`);
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-1 divide-x divide-stroke border-b border-stroke bg-inset px-4 py-1.5">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-b border-stroke bg-inset px-4 py-1.5">
       <Stat label="inventory" value={usdc(book.inventoryA)} tone={book.inventoryA === null ? "faint" : "ink"} />
+      <VRule />
       <Stat
         label="USDC share"
         value={split === null ? "—" : `${(split.shareA * 100).toFixed(1)}%`}
         sub={split === null ? undefined : "even split is 50%"}
         tone="soft"
       />
+      <VRule />
       <Stat label="seq" value={book.seq === null ? "—" : String(book.seq)} tone="soft" sub={`${ago(0, book.ageSeconds)} old at the read`} />
+      <VRule />
       <Stat label="PnL, this generation" value={usdc(book.pnlA)} tone={book.pnlA === null ? "faint" : "ink"} />
+      <VRule />
       <Stat label="trading" value={usdc(book.tradingA)} tone="soft" />
+      <VRule />
       <Stat label="hold" value={usdc(book.holdA)} tone="soft" />
+      <VRule />
       <Stat label="legs" value={`${book.legsActive}/${book.legs}`} tone={book.legsActive === book.legs ? "signal" : "warn"} />
       <div className="flex-1" />
       <div className="flex flex-wrap items-center gap-1.5">

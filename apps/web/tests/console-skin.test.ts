@@ -158,9 +158,15 @@ describe("the bars across the top", () => {
 
   test("no divider is drawn on the spacer that holds the two groups apart", () => {
     // `divide-x` borders every child but the first — including a `flex-1` spacer, which then
-    // draws a rule floating in the empty middle of the bar.
-    const bar = screen().slice(screen().indexOf('<div className="flex'), screen().indexOf("<BookRow"));
-    if (bar.includes("flex-1")) expect(bar).not.toMatch(/divide-x/);
+    // draws a rule floating in the empty middle of the bar. Checked against class attributes
+    // rather than the file's text, or the comment explaining the rule fails the rule.
+    for (const file of ["Screen.tsx", "BookRow.tsx"]) {
+      const markup = source("components", "console", file).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      for (const [, classes] of markup.matchAll(/className="([^"]*)"/g)) {
+        if (classes.includes("flex-1")) continue;
+        expect(classes).not.toContain("divide-x");
+      }
+    }
   });
 
   test("the stat bar can grow rather than clipping its own numbers", () => {

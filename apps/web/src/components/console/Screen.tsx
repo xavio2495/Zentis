@@ -13,7 +13,7 @@ import { PnlPanel } from "./PnlPanel";
 import { MarketPanel } from "./MarketPanel";
 import { MarkGlyph } from "./MarkGlyph";
 import { Transport } from "./Transport";
-import { Chip, Stat } from "./ui";
+import { Chip, Stat, VRule } from "./ui";
 
 /**
  * One screen, four bands, nothing that scrolls.
@@ -42,37 +42,62 @@ export function Screen() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-ink">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-stroke px-4">
-        <div className="flex items-center gap-3">
+      {/*
+        Three groups, and the middle one genuinely in the middle.
+
+        `justify-between` puts a middle group wherever the outer two leave it, which drifts every
+        time the identity or the sponsor chips change width. A grid whose outer tracks are equal
+        pins the leg switcher to the centre of the bar and keeps it there.
+      */}
+      <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-stroke px-4">
+        <div className="flex min-w-0 items-center gap-3">
           <MarkGlyph className="text-ink" />
-          <span className="label text-ink">Zentis</span>
-          <span className="label-sm text-ink-faint">replay · recorded testnet reads</span>
+          <span className="label whitespace-nowrap text-ink">Zentis</span>
+          {/* Dropped rather than wrapped: three lines of subtitle push the bar out of its own
+              height, and the words are the least load-bearing thing on the screen. */}
+          <span className="label-sm hidden truncate text-ink-faint lg:inline">replay · recorded testnet reads</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           {(replay?.legs ?? []).map((option, index) => (
             <Chip key={option.chainId} active={index === legIndex} onClick={() => setLegIndex(index)}>
               {option.label}
             </Chip>
           ))}
         </div>
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center justify-end gap-2 md:flex">
           {["1inch · Aqua", "The Graph · subgraphs", "Chainlink · CRE"].map((chip) => (
-            <span key={chip} className="label-sm border border-stroke px-2 py-1 text-ink-faint">
+            <span key={chip} className="label-sm whitespace-nowrap border border-stroke px-2 py-1 text-ink-faint">
               {chip}
             </span>
           ))}
         </div>
       </header>
 
-      <div className="flex h-9 shrink-0 items-center gap-6 divide-x divide-stroke border-b border-stroke bg-inset px-4">
+      {/*
+        The playhead's own row, which moves as the replay runs.
+
+        Dividers are drawn between the stats rather than with `divide-x`, which borders every child
+        but the first — including the spacer, leaving a rule floating in the empty middle. The bar
+        has a floor rather than a fixed height: a two-line stat in a fixed 36px clips its own value
+        at narrow widths, and the unit is the first thing to go.
+      */}
+      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-b border-stroke bg-inset px-4 py-1">
         <Stat label="shift" value={now === null ? "—" : `${signedBps(now.tiltBps)} bps`} tone="signal" />
+        <VRule />
         <Stat label="band" value={band ?? "—"} tone={band === "clamped" ? "bad" : band === "near edge" ? "warn" : "soft"} />
+        <VRule />
         <Stat label="cap" value={leg === null ? "—" : `±${leg.maxTiltBps} bps`} tone="faint" />
-        <Stat label="seq" value={now === null ? "—" : String(now.seq)} tone="soft" />
+        <VRule />
+        {/* Not "seq": the book row below carries the recorded moment's seq, and two different
+            numbers under one label on touching rows reads as one number that moved. */}
+        <Stat label="round" value={now === null ? "—" : String(now.seq)} tone="soft" />
+        <VRule />
         <Stat label="mid" value={now === null ? "—" : `${midAsPrice(now.mid)} USDC/WETH`} tone="soft" />
         <div className="flex-1" />
         <Stat label="fills" value={String(fills.length)} tone="ink" />
+        <VRule />
         <Stat label="taken" value={`${tokenAmount(String(volume), 6)} USDC`} tone="soft" />
+        <VRule />
         <Stat
           label="recorded"
           value={replay === null ? "—" : `${ago(now?.atSeconds ?? 0, replay.provenance.recordedAtSeconds)} before the read`}

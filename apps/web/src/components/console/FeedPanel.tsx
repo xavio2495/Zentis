@@ -23,7 +23,7 @@ export function FeedPanel({ legs, untilSeconds }: { legs: Leg[]; untilSeconds: n
       {rows.length === 0 ? (
         <p className="m-0 text-fs-0 text-ink-faint">nothing yet at this point in the recording</p>
       ) : (
-        <div className="h-full overflow-y-auto">
+        <div className="h-full overflow-y-auto scroll">
           <table className="w-full border-collapse text-[11px]">
             <tbody>
               {rows.map((row) => (

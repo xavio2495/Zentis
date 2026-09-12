@@ -99,3 +99,12 @@ export function Chip({
 }
 
 export const Rule = () => <div className="h-px w-full bg-stroke" />;
+
+/**
+ * A divider between two things standing side by side.
+ *
+ * Its own primitive rather than `divide-x`, which borders every child but the first — including a
+ * `flex-1` spacer, and then draws a rule floating in the empty middle of a bar. Placed by hand, a
+ * divider only ever appears between two things.
+ */
+export const VRule = () => <div aria-hidden className="h-6 w-px shrink-0 self-center bg-stroke" />;

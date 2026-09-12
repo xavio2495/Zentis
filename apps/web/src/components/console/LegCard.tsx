@@ -19,7 +19,7 @@ export function LegCard({ leg }: { leg: Leg }) {
 
   return (
     <Panel title={leg.label} tag={leg.status ?? "unread"} className="min-h-[420px] xl:min-h-0">
-      <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
+      <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto scroll">
         <Holds leg={leg} split={split} />
         {shift === null ? null : <Shift shift={shift} />}
         {leg.quotes === undefined ? null : <Quotes quotes={leg.quotes} />}

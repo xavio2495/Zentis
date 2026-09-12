@@ -356,8 +356,6 @@ body.ready .rise-4 {
   bottom: -4px;
 }
 
-/* Tabular numerals, so no digit changes width as the playhead moves. A figure
-   that shifts by a pixel every tick is a figure nobody can read. */
 /* The console's one transition. `transition-colors` on its own eases on the browser's
    default curve, which is not the curve the landing uses anywhere else — and a screen
    that eases two ways reads as two screens stitched together. */
@@ -368,6 +366,8 @@ body.ready .rise-4 {
     opacity 0.2s var(--ease-out);
 }
 
+/* Tabular numerals, so no digit changes width as the playhead moves. A figure
+   that shifts by a pixel every tick is a figure nobody can read. */
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
@@ -592,4 +592,89 @@ body.ready .install-dock {
 .dock-icon svg {
   width: 100%;
   height: 100%;
+}
+
+/* Scrollbars, ours rather than the operating system's.
+
+   Five panels on this screen scroll, and the default bar is the one surface the token
+   system does not reach — a pale rounded slab in the OS palette, on a near-black
+   instrument. They are also the only signal that a panel holds more evidence below its
+   fold, so on a screen claiming every number is present and traceable they have to be
+   visible rather than hidden away. Slim, square like everything else here, and dim until
+   the cursor is on them.
+
+   Why this is written twice. The standard properties and the ::-webkit pseudo-elements are
+   not two spellings of one thing: in Blink, declaring `scrollbar-width`/`scrollbar-color`
+   switches the pseudo-elements off entirely. Measured in Chrome 152 — with `thin` the
+   gutter is 10px and the ::-webkit width of 6px is ignored, and removing `thin` gives 16px
+   rather than 6px, so the pseudo-element rules were inert and the hover state never fired.
+   So Firefox, which has no pseudo-elements, gets the standard pair; every engine that does
+   have them takes the standard pair back off and gets the real thing. */
+.scroll {
+  scrollbar-width: thin;
+  /* thumb, then track. Firefox takes no pseudo-elements, so this pair is all it gets. */
+  scrollbar-color: var(--color-line2) transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .scroll {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  .scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scroll::-webkit-scrollbar-thumb {
+    background: var(--color-line2);
+    border: none;
+    transition: background 0.2s var(--ease-out);
+  }
+
+  .scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-dim);
+  }
+
+  /* Where a panel scrolls both ways, the square where the bars meet is the page, not a
+     third scrollbar. */
+  .scroll::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* The page's own bar, for the stacked layout below xl where the screen gives up and
+   scrolls. Same bar, so the two do not disagree. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line2) var(--color-bg);
+}
+
+@supports selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  html::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+
+  html::-webkit-scrollbar-thumb {
+    background: var(--color-line2);
+  }
+
+  html::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-dim);
+  }
 }
