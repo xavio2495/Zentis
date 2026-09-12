@@ -52,6 +52,10 @@ const TSX_ALLOWED: Record<string, { uses: number; why: string }> = {
   "components/console/PnlPanel.tsx": { uses: 1, why: "the book's own total" },
   "components/console/MarketPanel.tsx": { uses: 2, why: "the legs' published-mid line, and the legend word keyed to it" },
   "components/console/FillsPanel.tsx": { uses: 1, why: "the shift a fill was taken at" },
+  // The landing's diagrams. Same rule as the console's: the accent marks what Zentis computed —
+  // the published shift and the concession that produced it — and nothing else on the drawing.
+  "components/diagrams/MidAndLegs.tsx": { uses: 2, why: "each leg's published shift: its tick and the dot on it" },
+  "components/diagrams/Tilt.tsx": { uses: 1, why: "the concession, the part of the shift the leg chose" },
   // The mark itself, which the reference spends the accent on as the star particles.
   "components/Field.tsx": { uses: 3, why: "the mark drawn flat when there is no WebGL for the field" },
   "app/opengraph-image.tsx": { uses: 1, why: "the connector in the share card's mark" },

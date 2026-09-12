@@ -1,4 +1,9 @@
 import { Cursor } from "@/components/Cursor";
+import { MidAndLegs } from "@/components/diagrams/MidAndLegs";
+import { NoBridge } from "@/components/diagrams/NoBridge";
+import { Spread } from "@/components/diagrams/Spread";
+import { Tilt } from "@/components/diagrams/Tilt";
+import { readMoment } from "@/lib/moment";
 import { DockRoom } from "@/components/DockRoom";
 import { HeroLines } from "@/components/HeroLines";
 import { HeroWordmark } from "@/components/HeroWordmark";
@@ -23,6 +28,8 @@ function Brackets() {
 }
 
 export default function Home() {
+  // Read on the server at build time: the drawings take real numbers, none of them typed.
+  const moment = readMoment();
   return (
     <>
       <Loader />
@@ -62,35 +69,70 @@ export default function Home() {
         {/* The traverse: the field comes toward the reader and opens out. */}
         <div aria-hidden="true" style={{ height: "120vh" }} />
 
-        <section id="position" className="mx-auto max-w-3xl px-8 py-[20vh]">
+        {/*
+          The middle of the page is asymmetric, the way the reference is: nothing between the hero
+          and the close sits in the centre. Each figure takes one side and leaves the other to the
+          field, and the side alternates, so the mark has somewhere to be on every screen rather
+          than being pushed behind the words.
+        */}
+        <section id="position" className="mx-auto w-full max-w-6xl px-8 py-[16vh]">
           <Reveal>
-            <h2 className="serif text-fs-5 leading-tight text-ink md:text-fs-6">{COPY.statement}</h2>
-            <p className="mt-8 text-fs-1 font-light leading-relaxed text-ink-soft">
-              {COPY.statementBody}
-            </p>
+            <div className="max-w-2xl">
+              <h2 className="serif text-fs-5 leading-tight text-ink md:text-fs-6">{COPY.statement}</h2>
+              <p className="mt-6 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.statementLead}</p>
+            </div>
+            <div className="mt-12 max-w-2xl">
+              <MidAndLegs moment={moment} />
+            </div>
           </Reveal>
         </section>
 
-        <section id="quote" className="mx-auto max-w-3xl px-8 py-[14vh]">
+        <section id="quote" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
           <Reveal>
-            <p className="label text-ink-faint">{COPY.mechanismLabel}</p>
-            <p className="mt-6 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.mechanismBody}</p>
+            {/* The opposite side, so the field changes hands as the reader descends. */}
+            <div className="ml-auto max-w-2xl">
+              <p className="label text-ink-faint">{COPY.mechanismLabel}</p>
+              <p className="mt-4 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.mechanismLead}</p>
+              <div className="mt-10">
+                <Tilt moment={moment} />
+              </div>
+            </div>
           </Reveal>
         </section>
 
-        <section id="dial" className="mx-auto max-w-3xl px-8 py-[14vh]">
+        <section id="spread" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
           <Reveal>
-            <p className="label text-ink-faint">{COPY.dialLabel}</p>
-            <p className="mt-6 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.dialBody}</p>
+            <div className="max-w-2xl">
+              <Spread moment={moment} />
+            </div>
+          </Reveal>
+        </section>
+
+        <section id="dial" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
+          <Reveal>
+            <div className="ml-auto max-w-2xl">
+              <p className="label text-ink-faint">{COPY.dialLabel}</p>
+              <p className="mt-4 text-fs-1 font-light leading-relaxed text-ink-soft">{COPY.dialLead}</p>
+              <div className="mt-10">
+                <NoBridge moment={moment} />
+              </div>
+            </div>
           </Reveal>
         </section>
 
         <section id="built-on" className="mx-auto max-w-5xl px-8 py-[12vh]">
           <Reveal>
             <p className="label">{COPY.integrationsLabel}</p>
-            <ul className="mt-10 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-3">
-              {INTEGRATIONS.map((integration) => (
-                <li key={integration.name} className="relative border border-stroke p-6">
+            {/* Staggered, not a centred row: left, right, left, the way the reference alternates
+                its project cards down the page. */}
+            <ul className="mt-10 flex list-none flex-col gap-8 p-0">
+              {INTEGRATIONS.map((integration, i) => (
+                <li
+                  key={integration.name}
+                  className={`relative border border-stroke p-6 md:max-w-md ${
+                    i % 2 === 1 ? "md:ml-auto md:mr-0" : "md:ml-0 md:mr-auto"
+                  }`}
+                >
                   <Brackets />
                   <p className="label-sm text-ink-faint">{integration.role}</p>
                   <h3 className="serif mt-2 text-fs-3">{integration.name}</h3>

@@ -69,14 +69,20 @@ export const COPY = {
   tagline: "One mid everywhere. No bridge anywhere.",
 
   statement: "One position. Three legs. One book.",
+  statementLead:
+    "One position, quoted in three places from one mainnet reference, with the inventory carried as a single book. The legs are allowed to differ; nothing has to move for the position to stay whole.",
   statementBody:
     "A market maker holding one position in several places has to decide what to do when the legs drift apart. The usual answer is to move inventory across a bridge, which costs time, fees and the risk of being mid-transfer when the market turns. Zentis does not move it. Every leg quotes the same mid — one mainnet reference, published from one confidential policy, and the inventory is carried as a single book — so the legs are allowed to differ, and nothing has to move for the position to stay whole.",
 
   mechanismLabel: "The quote",
+  mechanismLead:
+    "A correction back onto the mid, then a concession for what the leg is long of — bounded by what moving the inventory would have cost.",
   mechanismBody:
     "Each leg's quote is tilted off the mid by two kinds of number. First a correction, which puts the leg's own curve back on the mid it drifted from. Then a concession, which is the leg paying to shed what it is long of — its own, and a smaller one for the book as a whole. The concession is bounded by a budget priced off a real bridge quote, so the most a leg will ever give away is what moving the inventory would have cost. Around that sits a spread: a base, a term for volatility, and a markout term for how the reference moved after the last fills were taken.",
 
   dialLabel: "What the cross-chain term buys",
+  dialLead:
+    "The book-wide term is a dial on risk, not a source of profit. The edge is earned leg by leg; what the shared reference adds is the mid, and a way to lean the whole book at once.",
   dialBody:
     "The book-wide concession is a dial on risk, not a source of profit. The edge a maker earns is earned leg by leg; what the shared reference adds is the mid every leg anchors to, and a way to lean the whole book the same direction when it is lopsided. How often that reference is published matters more to the outcome than any other choice in the system.",
 
