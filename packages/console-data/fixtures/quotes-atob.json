@@ -10,21 +10,21 @@
       "tokenIn": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
       "tokenOut": "0x4200000000000000000000000000000000000006",
       "amountIn": "150000",
-      "amountOut": "58317892265951",
-      "reason": "the leg is over-weight tokenA at 256 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
-      "seq": 1789227919,
-      "tiltBps": 256,
-      "refMid": "392412218630695997888507774",
-      "refAgeSeconds": 1261,
+      "amountOut": "58526307143983",
+      "reason": "the leg is over-weight tokenA at 205 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
+      "seq": 1789240172,
+      "tiltBps": 205,
+      "refMid": "394434004344160976612410034",
+      "refAgeSeconds": 1718,
       "caveats": [
-        "the reference is 1261s old and the quoted spread has widened with its age"
+        "the reference is 1718s old and the quoted spread has widened with its age"
       ],
       "refusal": null,
       "_meta": {
         "block": {
-          "number": 46730444,
-          "hash": "0x39bc36066a733005952e846b8b976bf2c9c9511873992f52fb26ec1b65beceb1",
-          "timestamp": 1789229176
+          "number": 46736798,
+          "hash": "0x984598690b7c8a887f62a5a3e38e0a8db161bd667ecf8a26fd42bca3aa550ae1",
+          "timestamp": 1789241884
         },
         "hasIndexingErrors": false
       }
@@ -36,21 +36,21 @@
       "tokenIn": "0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d",
       "tokenOut": "0x980b62da83eff3d4576c647993b0c1d7faf17c73",
       "amountIn": "150000",
-      "amountOut": "57161836961476",
-      "reason": "the leg is over-weight tokenA at 257 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
-      "seq": 1789227919,
-      "tiltBps": 257,
-      "refMid": "392412218630695997888507774",
-      "refAgeSeconds": 1261,
+      "amountOut": "57366256871661",
+      "reason": "the leg is over-weight tokenA at 206 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
+      "seq": 1789240172,
+      "tiltBps": 206,
+      "refMid": "394434004344160976612410034",
+      "refAgeSeconds": 1718,
       "caveats": [
-        "the reference is 1261s old and the quoted spread has widened with its age"
+        "the reference is 1718s old and the quoted spread has widened with its age"
       ],
       "refusal": null,
       "_meta": {
         "block": {
-          "number": 308161513,
-          "hash": "0x77d732114b08e23289683bb3805e4752409d248dc27aca95a53faad99496f4e7",
-          "timestamp": 1789229172
+          "number": 308212414,
+          "hash": "0x9237db6d52d4c29833fc251965737ae30bbf73b66e08dc215165d4c5052fa176",
+          "timestamp": 1789241887
         },
         "hasIndexingErrors": false
       }
@@ -62,21 +62,21 @@
       "tokenIn": "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
       "tokenOut": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
       "amountIn": "150000",
-      "amountOut": "57680366155528",
-      "reason": "the leg is over-weight tokenB at 220 bps of tilt and wants takers to put tokenA into it, so this side is discounted",
-      "seq": 1789227919,
-      "tiltBps": -220,
-      "refMid": "392412218630695997888507774",
-      "refAgeSeconds": 1261,
+      "amountOut": "57902094098033",
+      "reason": "the leg is over-weight tokenB at 272 bps of tilt and wants takers to put tokenA into it, so this side is discounted",
+      "seq": 1789240172,
+      "tiltBps": -272,
+      "refMid": "394434004344160976612410034",
+      "refAgeSeconds": 1718,
       "caveats": [
-        "the reference is 1261s old and the quoted spread has widened with its age"
+        "the reference is 1718s old and the quoted spread has widened with its age"
       ],
       "refusal": null,
       "_meta": {
         "block": {
-          "number": 11689965,
-          "hash": "0xc7334c9581987d29f3748e0623152ec62d7e29a5880ceca232bae5fad77f4ceb",
-          "timestamp": 1789229160
+          "number": 11690994,
+          "hash": "0x562106360bf422af0cb5576381e22737e8d03a088090495d6c9b16d3b7638230",
+          "timestamp": 1789241880
         },
         "hasIndexingErrors": false
       }
