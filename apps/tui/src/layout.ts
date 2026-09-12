@@ -220,3 +220,17 @@ export function fitSegments(variants: Seg[][], width: number): Seg[] {
   }
   return out;
 }
+
+/**
+ * What the row below the feed is showing.
+ *
+ * The keys and the command line share one slot rather than stacking. The operator presses `:` to
+ * say "I am giving an instruction", and the key hints are the answer to a question they have just
+ * stopped asking — so the hints give way to the prompt rather than sitting above it. It also keeps
+ * the height budget exact: `fit()` divides the terminal between the status, the chart, the feed and
+ * this one row, and a prompt rendered underneath all of them is a row nobody allowed for.
+ */
+export function bottomSlot(typing: string | null): "keys" | "command" {
+  // The empty string is a command line with nothing typed into it yet, not the absence of one.
+  return typing === null ? "keys" : "command";
+}

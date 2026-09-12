@@ -37,7 +37,7 @@ import { StatusBar, hints } from "./components/StatusBar.js";
 import { Segments } from "./components/Segments.js";
 import { type Pending, landed } from "./landed.js";
 import { chooseFit, pairPrice, signed, tokenAmount } from "./format.js";
-import { MIN_COLS, MIN_ROWS, fit, trunc, useSize } from "./layout.js";
+import { MIN_COLS, MIN_ROWS, bottomSlot, fit, trunc, useSize } from "./layout.js";
 import { type Command, parseCommand } from "./command.js";
 import { resolve } from "./keymap.js";
 import { spinnerAt } from "./spinner.js";
@@ -938,16 +938,35 @@ export function App({
         )}
 
         {regions.keyRows > 0 && (
-          <Panel title="keys" width={regions.rightWidth} height={regions.keyRows + 2}>
+          /*
+           * One row, two things it can be saying.
+           *
+           * The command line used to be rendered after this panel, which put the prompt below a
+           * list of keys the operator had just stopped needing, and added a row `fit()` had not
+           * budgeted for — and an over-budget row makes Ink repaint the whole terminal on every
+           * keystroke. The hints give way instead.
+           */
+          <Panel
+            title={bottomSlot(typing) === "command" ? "command" : "keys"}
+            right={bottomSlot(typing) === "command" ? "esc to close" : undefined}
+            width={regions.rightWidth}
+            height={regions.keyRows + 2}
+          >
             <Box width={panelInner(regions.rightWidth, regions.keyRows + 2).width} height={regions.keyRows} overflow="hidden">
-              <Segments segs={hints(actions, panelInner(regions.rightWidth, regions.keyRows + 2).width)} />
+              {bottomSlot(typing) === "command" ? (
+                <CommandLine
+                  text={typing ?? ""}
+                  answer={answer}
+                  running={running !== null}
+                  width={panelInner(regions.rightWidth, regions.keyRows + 2).width}
+                />
+              ) : (
+                <Segments segs={hints(actions, panelInner(regions.rightWidth, regions.keyRows + 2).width)} />
+              )}
             </Box>
           </Panel>
         )}
 
-        {typing !== null && (
-          <CommandLine text={typing} answer={answer} running={running !== null} width={regions.rightWidth} />
-        )}
       </Box>
     </Box>
   );
