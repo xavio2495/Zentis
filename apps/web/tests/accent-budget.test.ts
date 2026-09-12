@@ -46,12 +46,15 @@ const TSX_ALLOWED: Record<string, { uses: number; why: string }> = {
   "app/console/page.tsx": { uses: 1, why: "the mark in the bar" },
   // The console's own rule, from console-tokens.test.ts: the accent means "this is what Zentis
   // computed". Numbers the model produced may wear it; states, health and row types may not.
-  "components/console/ui.tsx": { uses: 2, why: "the `signal` stat tone, and the active chip" },
-  "components/console/ShiftPanel.tsx": { uses: 1, why: "the published shift — the signal itself" },
-  "components/console/LegCard.tsx": { uses: 2, why: "the recomputed shift, and the concession it produced" },
+  "components/console/ui.tsx": { uses: 3, why: "the `signal` stat tone, and the active chip's border and text" },
+  "components/console/ShiftPanel.tsx": { uses: 3, why: "the published shift: its number, its line, and the playhead on it" },
+  "components/console/LegCard.tsx": { uses: 2, why: "the recomputed shift, and the concession that produced it" },
   "components/console/PnlPanel.tsx": { uses: 1, why: "the book's own total" },
-  "components/console/MarketPanel.tsx": { uses: 1, why: "the legend word keyed to the accent line it names" },
+  "components/console/MarketPanel.tsx": { uses: 2, why: "the legs' published-mid line, and the legend word keyed to it" },
   "components/console/FillsPanel.tsx": { uses: 1, why: "the shift a fill was taken at" },
+  // The mark itself, which the reference spends the accent on as the star particles.
+  "components/Field.tsx": { uses: 3, why: "the mark drawn flat when there is no WebGL for the field" },
+  "app/opengraph-image.tsx": { uses: 1, why: "the connector in the share card's mark" },
 };
 
 const PATTERNS = [/#00ED64/gi, /var\(--color-em[^)]*\)/g, /\b(?:text|bg|border|fill|stroke)-em\b/g];

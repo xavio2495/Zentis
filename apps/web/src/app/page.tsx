@@ -64,7 +64,7 @@ export default function Home() {
 
         <section id="position" className="mx-auto max-w-3xl px-8 py-[20vh]">
           <Reveal>
-            <h2 className="serif text-fs-5 leading-tight text-em md:text-fs-6">{COPY.statement}</h2>
+            <h2 className="serif text-fs-5 leading-tight text-ink md:text-fs-6">{COPY.statement}</h2>
             <p className="mt-8 text-fs-1 font-light leading-relaxed text-ink-soft">
               {COPY.statementBody}
             </p>

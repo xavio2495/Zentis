@@ -54,7 +54,7 @@ export function BookRow({ book, providers }: { book: BookTotals | undefined; pro
             <span
               aria-hidden
               className={`inline-block h-1.5 w-1.5 rounded-full ${
-                provider.state === "up" ? "bg-em" : provider.state === "stale" ? "bg-warn" : "bg-bad"
+                provider.state === "up" ? "bg-ink-dim" : provider.state === "stale" ? "bg-warn" : "bg-bad"
               }`}
             />
             {provider.name}

@@ -46,22 +46,16 @@ describe("palette", () => {
   }
 });
 
-describe("the accent budget", () => {
-  // The reference spends its highlight in eight places. Nine is the ceiling here:
-  // the token definition itself, plus the eight surfaces allowed to wear it.
-  test("the accent is used in under ten declarations", () => {
-    const uses = declarations().filter((d) => d.value.toUpperCase().includes(ACCENT));
-    expect(uses.length).toBeLessThan(10);
-  });
-
-  test("no body copy is accented", () => {
-    const copy = /(^|,\s*)(body|p|li|h[1-6]|blockquote)(\s|,|$)/i;
-    const offenders = declarations().filter(
-      (d) => copy.test(d.selector) && d.value.toUpperCase().includes(ACCENT),
-    );
-    expect(offenders).toEqual([]);
-  });
-});
+/*
+ * The accent budget moved to `accent-budget.test.ts`, and the reason is worth keeping.
+ *
+ * What used to stand here counted CSS declarations whose *value* contained the literal `#00ED64`
+ * and asserted there were fewer than ten. Exactly one does — the token definition — because every
+ * real use goes through `var(--color-em)` or a `text-em` class. So it read `1 < 10` and passed
+ * unconditionally; it would have passed with the accent on every element on the page. It was a
+ * test that named the rule without testing it, which is worse than no test, because the suite
+ * being green was taken as the rule being kept.
+ */
 
 describe("scale and motion", () => {
   test("all eight type steps are defined", () => {

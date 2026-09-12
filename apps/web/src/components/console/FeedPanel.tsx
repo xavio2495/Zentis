@@ -32,7 +32,7 @@ export function FeedPanel({ legs, untilSeconds }: { legs: Leg[]; untilSeconds: n
                   <td className="py-1 pr-3">
                     <span
                       className={
-                        row.kind === "publish" ? "text-em" : row.kind === "fill" ? "text-side-a" : "text-bad"
+                        row.kind === "publish" ? "text-ink-soft" : row.kind === "fill" ? "text-side-a" : "text-bad"
                       }
                     >
                       {row.kind}

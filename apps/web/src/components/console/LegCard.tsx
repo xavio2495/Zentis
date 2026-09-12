@@ -94,7 +94,7 @@ function Shift({ shift }: { shift: ReturnType<typeof shiftStack> }) {
       </p>
 
       {shift.agrees ? (
-        <p className="m-0 text-[10px] text-em">
+        <p className="m-0 text-[10px] text-ink-soft">
           the console recomputes the enclave&rsquo;s shift exactly, from the same balances
         </p>
       ) : shift.carriedFromSeq !== null ? (
