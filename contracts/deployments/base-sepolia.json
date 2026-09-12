@@ -54,7 +54,10 @@
     },
     "widenBpsPerMinute": 2,
     "maxTiltBps": 5000,
-    "note": "Balances here are the shipped amounts; live balances come from the fills subgraph."
+    "note": "Balances here are the shipped amounts; live balances come from the fills subgraph.",
+    "markAtShip": "406739534865471949822225588",
+    "markAtShipAt": 1789100906,
+    "markAtShipSource": "Uniswap v3 mainnet USDC/WETH hourly close for the hour starting 2026-09-11T04:00Z, via The Graph (the series the book is measured on). Backfilled 2026-09-12 from the ship block's timestamp, not read at ship time; the closing mark the console uses is 1inch spot on the leg's mainnet counterpart, which sits within a few tenths of a percent of this series, so hold carries that much uncertainty."
   },
   "fills": [
     {
