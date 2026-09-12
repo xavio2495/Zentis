@@ -106,3 +106,56 @@ describe("the PnL table", () => {
     for (const fill of table.fills) expect(fill.label).toBeTruthy();
   });
 });
+
+describe("a publish still arriving is not a publish one leg missed", () => {
+  /**
+   * The legs publish the same seq seconds apart. Cut the feed at a moment between them and the row
+   * has been carried by one leg so far — but the recording knows all three carried it, and a row
+   * reading "Arbitrum Sepolia" alone invites exactly the wrong conclusion about a book whose whole
+   * claim is that one reference reaches three chains. The row has to distinguish "one leg has it so
+   * far" from "one leg ever had it".
+   */
+  const three: Leg[] = [0, 1, 2].map((i) => ({
+    ...legs[i]!,
+    label: ["a", "b", "c"][i]!,
+    chainId: i,
+    rounds: [{ seq: 7, atSeconds: 100 + i * 10, tiltBps: 5, mid: "1" }],
+    fills: [],
+    rejections: [],
+  }));
+
+  test("cut between the legs, the row says how many have it against how many will", () => {
+    const row = buildFeed(three, 105)[0]!;
+    expect(row.legs.length).toBe(1);
+    expect(row.legsEver).toBe(3);
+    expect(row.stillArriving).toBe(true);
+    expect(row.acrossAll).toBe(false);
+  });
+
+  test("cut after all of them, the row is simply the whole book's publish", () => {
+    const row = buildFeed(three, 200)[0]!;
+    expect(row.legs.length).toBe(3);
+    expect(row.legsEver).toBe(3);
+    expect(row.stillArriving).toBe(false);
+    expect(row.acrossAll).toBe(true);
+  });
+
+  test("a seq only one leg ever carried is not reported as still arriving", () => {
+    // The honest case the flag must not swallow: a leg that genuinely never published this seq.
+    const partial: Leg[] = [
+      { ...three[0]!, rounds: [{ seq: 7, atSeconds: 100, tiltBps: 5, mid: "1" }] },
+      { ...three[1]!, rounds: [] },
+      { ...three[2]!, rounds: [] },
+    ];
+    const row = buildFeed(partial, 500)[0]!;
+    expect(row.legsEver).toBe(1);
+    expect(row.stillArriving).toBe(false);
+  });
+
+  test("on the real recording, no row claims more legs so far than ever carried it", () => {
+    for (const row of buildFeed(legs, Number.POSITIVE_INFINITY)) {
+      if (row.kind !== "publish") continue;
+      expect(row.legs.length).toBeLessThanOrEqual(row.legsEver);
+    }
+  });
+});
