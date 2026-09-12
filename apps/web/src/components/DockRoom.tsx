@@ -21,7 +21,11 @@ export function DockRoom() {
     let raf = 0;
     const frame = () => {
       const box = node.getBoundingClientRect();
-      setDockTarget(box.top + box.height / 2);
+      // The gap's middle, and the top of the section's content — which is where the heading is, and
+      // the thing the line must never be drawn beside.
+      const section = node.closest("section");
+      const top = section ? section.getBoundingClientRect().top : box.top;
+      setDockTarget(box.top + box.height / 2, top);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

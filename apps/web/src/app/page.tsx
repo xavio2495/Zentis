@@ -89,8 +89,10 @@ export default function Home() {
           </Reveal>
         </section>
 
-        {/* The outro: the field scatters as the page ends. */}
-        <div aria-hidden="true" style={{ height: "60vh" }} />
+        {/* The outro: the field scatters as the page ends. Short, because a whole viewport of
+            nothing but the scattered mark is dead space rather than a pause — the scatter reads
+            in the room the close leaves around its own words. */}
+        <div aria-hidden="true" style={{ height: "22vh" }} />
 
         {/*
           The close: one invitation, the command, and the two places it runs.

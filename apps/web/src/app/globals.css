@@ -689,19 +689,26 @@ html {
   align-items: center;
   justify-content: center;
   min-width: 12.5rem;
-  padding: 0.85rem 1.75rem;
-  border: 1px solid var(--color-stroke);
+  padding: 0.9rem 1.75rem;
+  /* A hairline in --stroke vanishes against the particle field behind it — the field is brighter
+     than the border was. These are the two doors out of the page, so they get a surface of their
+     own to sit on rather than an outline that competes with the starfield for contrast. */
+  border: 1px solid var(--color-line2);
+  background: rgba(18, 18, 18, 0.82);
+  backdrop-filter: blur(3px);
   color: var(--color-ink);
-  font-size: var(--text-fs-0);
+  font-size: var(--text-fs-1);
+  letter-spacing: 0.01em;
   text-decoration: none;
   transition:
     border-color 0.25s var(--ease-out),
-    background-color 0.25s var(--ease-out);
+    background-color 0.25s var(--ease-out),
+    color 0.25s var(--ease-out);
 }
 
 .cta:hover {
-  border-color: var(--color-line2);
-  background: var(--color-inset);
+  border-color: var(--color-ink-faint);
+  background: rgba(30, 30, 30, 0.92);
 }
 
 /* The room the install line arrives in. The dock is fixed and eases to the middle of the

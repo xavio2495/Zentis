@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { COPY, INSTALL_COMMAND } from "@/lib/copy";
-import { dockLandingY, dockRect } from "@/lib/dock";
+import { dockNow, dockRect } from "@/lib/dock";
 import { fieldState } from "@/lib/field-state";
 import { scrollNow } from "@/lib/scroll";
 
@@ -38,9 +38,10 @@ export function InstallDock() {
 
       const height = node.offsetHeight || 1;
       const atFoot = innerHeight - 40 - height / 2;
-      // Where the closing section says its gap is, not where the viewport's middle happens to be.
-      const atCentre = dockLandingY(innerHeight);
-      const y = atFoot + (atCentre - atFoot) * installDock;
+      // One place at a time: the foot, or the section's gap, and nothing drawn in between. dock.ts.
+      const { y, opacity } = dockNow(atFoot, innerHeight);
+      node.style.opacity = opacity.toFixed(3);
+      node.style.pointerEvents = opacity < 0.5 ? "none" : "auto";
       const scale = 1 + installDock * 0.14;
 
       node.style.transform = `translate(-50%, -50%) translate(0, ${y.toFixed(1)}px) scale(${scale.toFixed(3)})`;
@@ -50,7 +51,8 @@ export function InstallDock() {
       dockRect.top = box.top;
       dockRect.width = box.width;
       dockRect.height = box.height;
-      dockRect.on = box.width > 0;
+      // The field draws the line's border out of points; a faded line has no border to draw.
+      dockRect.on = box.width > 0 && opacity > 0.5;
 
       raf = requestAnimationFrame(frame);
     };
