@@ -42,11 +42,16 @@ export default function ConsolePage() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-ink">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-stroke px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-stroke px-4">
         <a href="/" className="flex items-center gap-3 no-underline" aria-label="Zentis">
           <Mark />
           <span className="label text-ink">ZENTIS</span>
         </a>
+        {/* The keyboard is the whole interface here and it is live from the moment the page loads.
+            Said out loud because a terminal in a page looks exactly like a picture of one, and the
+            keys are listed along the bottom of the console where a reader has no reason to trust
+            they do anything. */}
+        <span className="label-sm text-ink-faint">the keys are live · ? for help</span>
       </header>
       <main className="min-h-0 flex-1 p-2">
         <Terminal />

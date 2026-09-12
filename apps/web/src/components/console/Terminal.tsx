@@ -46,6 +46,10 @@ export function Terminal() {
       term.loadAddon(fit);
       term.open(element);
       fit.fit();
+      // Taken on mount, not on the first click: every key the console advertises is dead until this
+      // textarea has focus, and nothing on screen says a click is needed. A reader who presses `p`,
+      // sees nothing and decides the page is a screenshot is what the alternative produces.
+      term.focus();
 
       const handle = {
         write: (data: string) => term.write(data),
@@ -76,8 +80,14 @@ export function Terminal() {
 
       const onResize = () => fit.fit();
       window.addEventListener("resize", onResize);
+      // And taken back afterwards: clicking the bar, or the margin beside the terminal, moves focus
+      // out of it and silently kills the keyboard again. This page is a terminal and a title —
+      // there is nowhere else focus usefully belongs, so a click anywhere returns it.
+      const onPointerDown = () => term.focus();
+      window.addEventListener("pointerdown", onPointerDown);
       dispose = () => {
         window.removeEventListener("resize", onResize);
+        window.removeEventListener("pointerdown", onPointerDown);
         const app = (window as unknown as { __zentisConsole?: { unmount?: () => void } }).__zentisConsole;
         app?.unmount?.();
         script.remove();

@@ -32,5 +32,7 @@ test("a click anywhere on the page returns focus to the terminal", () => {
 });
 
 test("the page says the keys are live, so nobody has to discover it", () => {
-  expect(page).toMatch(/keys/i);
+  // A terminal in a page looks exactly like a picture of one. One line, in the bar, where a reader
+  // looking for what to do next is already looking.
+  expect(page).toMatch(/the keys are live/);
 });
