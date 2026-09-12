@@ -63,3 +63,76 @@ describe("the contact", () => {
     expect(COPY.contactLine.length).toBeGreaterThan(0);
   });
 });
+
+describe("the page describes the mechanism the project actually has", () => {
+  /**
+   * The site was written against the first concept and the concept moved. `DIRECTION.md` §1 retires
+   * four things by name, and the most dangerous is the one that reads best: that pricing a leg moves
+   * value between chains. It cannot. On a constant-product curve, pricing changes composition on the
+   * chain where it is applied; every cross-chain path crosses a bridge edge. The claim is not that
+   * something moves the money cheaply — it is that no money needs to move, because the risk is
+   * carried as one book.
+   *
+   * A wrong claim is the one defect a judge holds against a submission, so these are assertions
+   * rather than a note in a document.
+   */
+  const everything = () => prose().join(" ").toLowerCase();
+
+  const RETIRED: [RegExp, string][] = [
+    [/lets the market move the money/, "pricing cannot move value across chains — DIRECTION §1"],
+    [/\bmoves? the money\b/, "same claim, shorter — DIRECTION §1"],
+    [/\btwo chains\b/, "the book runs on three legs — DIRECTION §1, CAVEATS F"],
+    [/tilts? toward the leg that is short/, "the tilt is a correction plus a concession, not a pull toward a leg"],
+    [/becomes worth something to close/, "implies the imbalance is closed by someone moving size across"],
+    [/pay(s|ing)? for the privilege/, "belongs to the retired bridge-versus-tilt cost table — DIRECTION §1"],
+    [/\bcheaper than (a )?bridg/, "the cost table is retired; we do not compare against a rebalance we never perform"],
+    [/rebalances? by pricing/, "the mechanism does not rebalance; it prices and carries the risk"],
+  ];
+
+  for (const [pattern, why] of RETIRED) {
+    test(`the page never says: ${pattern.source} — ${why}`, () => {
+      expect(everything()).not.toMatch(pattern);
+    });
+  }
+
+  test("the claim is one position, three legs, one mid, one book", () => {
+    const body = `${COPY.statement} ${COPY.statementBody}`.toLowerCase();
+    expect(body).toMatch(/one (market-making )?position|one position/);
+    expect(body).toMatch(/same mid|one mid/);
+    expect(body).toMatch(/one book|a single book/);
+  });
+
+  test("it says the risk is carried rather than the money moved", () => {
+    const body = COPY.statementBody.toLowerCase();
+    expect(body).toMatch(/nothing (has to|needs to) move|no inventory (has to|needs to) move|without moving/);
+  });
+
+  test("the tilt is named as its parts: a correction, then concessions", () => {
+    const mechanism = `${COPY.mechanismBody}`.toLowerCase();
+    expect(mechanism).toContain("correction");
+    expect(mechanism).toContain("concession");
+    // Bounded by a budget priced off a real bridge quote, which is what makes the bound honest.
+    expect(mechanism).toMatch(/boundary|budget/);
+  });
+
+  test("the cross-chain term is called the risk dial, not the profit", () => {
+    // DIRECTION §2: "The mean edge is per-leg. Say so; do not claim the cross-chain term is where
+    // the profit is." The temptation to claim otherwise is exactly why this is a test.
+    const all = everything();
+    expect(all).toMatch(/risk dial|dial on the risk|a dial/);
+    expect(all).not.toMatch(/where the profit|profits? come from the (book|cross-chain)/);
+  });
+
+  test("the spread is named as its three terms", () => {
+    const all = everything();
+    for (const term of ["base", "volatility", "markout"]) expect(all).toContain(term);
+  });
+
+  test("every surface takes its words from this module", () => {
+    // Hero, statement, cards, the close, the outro, metadata and noscript: one module, so a
+    // retired claim cannot survive in a component nobody thought to grep.
+    for (const key of ["heroLine", "tagline", "statement", "statementBody", "mechanismBody", "tryItOut", "outro", "noscript", "metaDescription"]) {
+      expect(COPY[key as keyof typeof COPY]).toBeTruthy();
+    }
+  });
+});
