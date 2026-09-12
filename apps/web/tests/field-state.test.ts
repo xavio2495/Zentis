@@ -91,3 +91,38 @@ describe("the field still does its job", () => {
     ).toBe(true);
   });
 });
+
+describe("the doorway and the field behind it", () => {
+  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const height = docHeight(viewport.viewportHeight);
+  const at = (scrollY: number) => fieldState({ scrollY, ...viewport, docHeight: height });
+
+  test("the door stands whole on the first screen", () => {
+    const state = at(0);
+    expect(state.doorOpacity).toBeGreaterThan(0.9);
+    expect(state.doorScale).toBeCloseTo(1, 2);
+  });
+
+  test("the reader passes through it: it opens out and goes", () => {
+    const middle = at(viewport.viewportHeight * 0.6);
+    expect(middle.doorScale).toBeGreaterThan(1);
+    expect(middle.doorOpacity).toBeLessThan(at(0).doorOpacity);
+  });
+
+  test("it is gone before the first paragraph, and stays gone", () => {
+    for (const scrollY of [at(0).proseFrom, at(0).proseFrom + viewport.viewportHeight, height]) {
+      expect(at(scrollY).doorOpacity).toBe(0);
+    }
+  });
+
+  test("the starfield is faint at the start and opens up through the traverse", () => {
+    expect(at(0).starfieldOpacity).toBeLessThan(0.3);
+    expect(at(at(0).proseFrom).starfieldOpacity).toBeGreaterThan(0.5);
+  });
+
+  test("the starfield stays: it is the room the page happens in", () => {
+    for (const scrollY of [at(0).proseFrom, at(0).outroFrom, height]) {
+      expect(at(scrollY).starfieldOpacity).toBeGreaterThan(0.4);
+    }
+  });
+});
