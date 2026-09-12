@@ -80,11 +80,16 @@ test("nothing in the moment is constructed: no beat, no sine wave, no placeholde
   }
 });
 
-test("the feed is the collapsed one the console draws, over every leg", () => {
+test("the feed is the collapsed one the console draws: one publish across the legs is one row", () => {
   const moment = recordedMoment();
-  expect(moment.snapshot.feed.length).toBeGreaterThan(0);
-  const chains = new Set(moment.snapshot.feed.flatMap((row) => ("chainId" in row ? [row.chainId] : [])));
-  expect(chains.size).toBeGreaterThan(0);
+  const rounds = moment.snapshot.feed.filter((row) => row.kind === "round");
+  expect(rounds.length).toBeGreaterThan(0);
+  // A round carries what each leg published in it, which is what makes it one row rather than three.
+  expect(rounds.every((round) => round.legs.length === round.count && round.count > 0)).toBe(true);
+  // Newest first, because that is the end an operator reads from.
+  for (let i = 1; i < moment.snapshot.feed.length; i += 1) {
+    expect(moment.snapshot.feed[i - 1]!.timestamp >= moment.snapshot.feed[i]!.timestamp).toBe(true);
+  }
 });
 
 test("the book totals are the sum the console shows, not a second addition", () => {
