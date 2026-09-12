@@ -143,11 +143,21 @@ describe("the window the panel is read at", () => {
     expect(span!.from).toBe(earliest);
   });
 
-  test("clipped to the legs' span, the market still covers the frame", () => {
+  test("clipped to the legs' span, the market reaches back past the window's start", () => {
     const span = publishSpan(seed.legs)!;
     const clipped = clipSeries(seed.market.points, span.from, span.to, { straddle: true });
     expect(clipped.length).toBeGreaterThan(1);
     expect(clipped[0]!.t).toBeLessThanOrEqual(span.from);
-    expect(clipped[clipped.length - 1]!.t).toBeGreaterThanOrEqual(span.to);
+  });
+
+  test("the market series may end before the legs stop publishing, and is not padded to hide it", () => {
+    // The legs' last publish is minutes after the last hourly close, so there is no market point
+    // after it. Extending the line to the frame would draw a price the series never carried; the
+    // honest picture is a market line that stops where the series stops.
+    const span = publishSpan(seed.legs)!;
+    const clipped = clipSeries(seed.market.points, span.from, span.to, { straddle: true });
+    const last = clipped[clipped.length - 1]!;
+    expect(last.t).toBeLessThanOrEqual(span.to);
+    expect(seed.market.points.some((p: { t: number }) => p.t > span.to)).toBe(false);
   });
 });

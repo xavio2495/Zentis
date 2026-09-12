@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { clock } from "@/lib/format";
-import { legAgreement, plotMarket, type Marker, type Series } from "@/lib/market-chart";
+import { clipSeries, legAgreement, plotMarket, publishSpan, type Marker, type Series } from "@/lib/market-chart";
 import type { Leg, MarkHistory } from "@/lib/replay";
-import { Panel } from "./ui";
+import { Chip, Panel } from "./ui";
 
 const WIDTH = 800;
 const HEIGHT = 220;
@@ -21,6 +21,16 @@ const HEIGHT = 220;
  * compares the legs on shared seq, and the legend says what it found. A legend that promised a
  * divergence the seed does not contain would be the panel lying about its own subject.
  */
+/**
+ * Which slice of time the panel is read at.
+ *
+ * Over the whole week the legs are a fifth of the axis wide, because a week of market is what the
+ * enclave reads and thirty hours of publishing is what this generation has done. Both are worth
+ * seeing and neither is the right default for the other, so it is a choice rather than a
+ * compromise, and it opens on the span where the legs actually published.
+ */
+type Span = "publishes" | "week";
+
 export function MarketPanel({
   legs,
   market,
@@ -31,30 +41,43 @@ export function MarketPanel({
   /** the wall time the playhead is on, so the chart can mark where the replay has reached */
   playedTo: number | null;
 }) {
+  const [shown, setShown] = useState<Span>("publishes");
   const agreement = useMemo(() => legAgreement(legs), [legs]);
+  const span = useMemo(() => publishSpan(legs), [legs]);
 
   const plot = useMemo(() => {
     if (market === undefined || market.points.length === 0) return null;
+    const clip = shown === "publishes" && span !== null;
     const legSeries: Series[] = legs.map((leg) => ({
       label: leg.label,
       points: leg.rounds.map((round) => ({ t: round.atSeconds, mid: round.mid })),
     }));
+    const marketPoints = clip ? clipSeries(market.points, span.from, span.to, { straddle: true }) : market.points;
     const markers: Marker[] = legs.flatMap((leg) =>
-      leg.fills.map((fill, index) => ({
-        t: fill.atSeconds,
-        // A fill lands at the market's price at that moment, not at a price of its own: what the
-        // marker says is *when* it happened against the series, and the series is the only thing
-        // on this axis it can honestly be placed against.
-        mid: nearestMid(market, fill.atSeconds),
-        key: `${leg.chainId}-${index}`,
-      })),
+      leg.fills
+        .filter((fill) => !clip || (fill.atSeconds >= span.from && fill.atSeconds <= span.to))
+        .map((fill, index) => ({
+          t: fill.atSeconds,
+          // A fill lands at the market's price at that moment, not at a price of its own: what the
+          // marker says is *when* it happened against the series, and the series is the only thing
+          // on this axis it can honestly be placed against.
+          mid: nearestMid(market, fill.atSeconds),
+          key: `${leg.chainId}-${index}`,
+        })),
     );
-    return plotMarket({ market: { label: "market", points: market.points }, legs: legSeries, markers }, { width: WIDTH, height: HEIGHT });
-  }, [legs, market]);
+    return plotMarket({ market: { label: "market", points: marketPoints }, legs: legSeries, markers }, { width: WIDTH, height: HEIGHT });
+  }, [legs, market, shown, span]);
+
+  // Said rather than silently dropped: on the publishing window some fills are older than the
+  // oldest round, and a marker quietly missing is a fill the screen has hidden.
+  const hidden =
+    shown === "publishes" && span !== null
+      ? legs.reduce((n, leg) => n + leg.fills.filter((f) => f.atSeconds < span.from || f.atSeconds > span.to).length, 0)
+      : 0;
 
   if (market === undefined || plot === null) {
     return (
-      <Panel title="market" tag="waiting">
+      <Panel title="market" tag="waiting" className="min-h-[260px]">
         <p className="m-0 text-fs-0 text-ink-faint">no series recorded</p>
       </Panel>
     );
@@ -67,15 +90,29 @@ export function MarketPanel({
 
   return (
     <Panel
+      className="min-h-[260px]"
       title="market"
       tag={`${market.source} · ${market.hours}h, ${market.granularity === "hours" ? "hourly" : "per swap"} · USDC/WETH`}
     >
       <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className="flex shrink-0 items-center gap-2">
+          <Chip active={shown === "publishes"} onClick={() => setShown("publishes")} title="the span the legs published over">
+            publishes
+          </Chip>
+          <Chip active={shown === "week"} onClick={() => setShown("week")} title="the whole recorded market series">
+            {market.hours}h
+          </Chip>
+          {hidden === 0 ? null : (
+            <span className="text-[10px] text-ink-faint">
+              {hidden} earlier {hidden === 1 ? "fill is" : "fills are"} outside this window
+            </span>
+          )}
+        </div>
         {market.error === null ? null : (
           <p className="m-0 text-[10px] text-warn">series stale — {market.error}. The points below are the last good ones.</p>
         )}
 
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className="w-full flex-1 min-h-[150px]" role="img" aria-label="market price with each leg's published mid">
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className="min-h-0 w-full flex-1" role="img" aria-label="market price with each leg's published mid">
           {plot.ticks.map((tick) => (
             <line key={tick.price} x1={0} x2={WIDTH} y1={tick.y} y2={tick.y} stroke="var(--color-stroke)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           ))}

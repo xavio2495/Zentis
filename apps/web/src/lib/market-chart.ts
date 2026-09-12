@@ -169,3 +169,33 @@ export function legAgreement(legs: readonly { label: string; rounds: readonly { 
   }
   return { shared, identical, divergent: divergent.sort((a, b) => a - b), coincide: divergent.length === 0 };
 }
+
+/**
+ * The points inside a window.
+ *
+ * `straddle` keeps the last point before the window and the first after it, which is what stops a
+ * clipped line detaching from the frame it was clipped to: an hourly series clipped to a span that
+ * starts at 08:53 would otherwise begin at 09:00 and leave a gap the reader would take for missing
+ * data rather than for the edge of an hour.
+ */
+export function clipSeries<T extends { t: number }>(
+  points: readonly T[],
+  from: number,
+  to: number,
+  { straddle = false }: { straddle?: boolean } = {},
+): T[] {
+  const inside = points.filter((p) => p.t >= from && p.t <= to);
+  if (!straddle || inside.length === 0) return inside;
+  const before = [...points].filter((p) => p.t < from).pop();
+  const after = points.find((p) => p.t > to);
+  return [...(before ? [before] : []), ...inside, ...(after ? [after] : [])];
+}
+
+/** The span the legs actually published over: the union of their rounds, or null if none did. */
+export function publishSpan(
+  legs: readonly { rounds: readonly { atSeconds: number }[] }[],
+): { from: number; to: number } | null {
+  const times = legs.flatMap((leg) => leg.rounds.map((round) => round.atSeconds));
+  if (times.length === 0) return null;
+  return { from: Math.min(...times), to: Math.max(...times) };
+}
