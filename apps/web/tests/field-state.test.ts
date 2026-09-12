@@ -160,6 +160,18 @@ describe("the gate, and the mark held inside it", () => {
     }
   });
 
+  test("the mark reaches the gate's corners, not just near them", () => {
+    const gate = gateShape();
+    const topRight = at(0, { x: 1, y: 1 });
+    const topLeft = at(0, { x: -1, y: 1 });
+    // within a hair of the corner itself, rather than stopped short by padding
+    expect(topRight.markOffsetX).toBeGreaterThan(gate.side * 0.45);
+    expect(topLeft.markOffsetX).toBeLessThan(-gate.side * 0.45);
+    expect(topRight.markOffsetY).toBeGreaterThan(gate.topY * 0.9);
+    // and right down onto the point
+    expect(at(0, { x: 0, y: -1 }).markOffsetY).toBeLessThan(gate.apexY * 0.9);
+  });
+
   test("the mark has the run of the gate, not just its middle", () => {
     const gate = gateShape();
     // it reaches out along the wide top edge
