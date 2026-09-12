@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   MARK_HALF_EXTENT,
   fieldState,
+  gateShape,
   pixelsPerWorldUnit,
   textColumnHalfWidth,
 } from "../src/lib/field-state";
@@ -124,5 +125,52 @@ describe("the doorway and the field behind it", () => {
     for (const scrollY of [at(0).proseFrom, at(0).outroFrom, height]) {
       expect(at(scrollY).starfieldOpacity).toBeGreaterThan(0.4);
     }
+  });
+});
+
+describe("the gate, and the mark held inside it", () => {
+  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const height = docHeight(viewport.viewportHeight);
+  const at = (scrollY: number, pointer?: { x: number; y: number }) =>
+    fieldState({ scrollY, ...viewport, docHeight: height, pointer });
+
+  test("the gate is an equilateral triangle standing on its point", () => {
+    const gate = gateShape();
+    // height of an equilateral triangle is side * sqrt(3) / 2
+    expect(gate.height).toBeCloseTo((gate.side * Math.sqrt(3)) / 2, 4);
+    // apex below, flat edge above
+    expect(gate.apexY).toBeLessThan(gate.topY);
+  });
+
+  test("the mark follows the cursor", () => {
+    const left = at(0, { x: -0.6, y: 0 });
+    const right = at(0, { x: 0.6, y: 0 });
+    expect(left.markOffsetX).toBeLessThan(0);
+    expect(right.markOffsetX).toBeGreaterThan(0);
+    expect(at(0, { x: 0, y: 0 }).markOffsetX).toBeCloseTo(0, 6);
+  });
+
+  test("but never outside the gate, however far the cursor goes", () => {
+    const gate = gateShape();
+    for (const x of [-1, -0.5, 0, 0.5, 1]) {
+      for (const y of [-1, -0.5, 0, 0.5, 1]) {
+        const state = at(0, { x, y });
+        const markRadius = MARK_HALF_EXTENT * state.scale;
+        const fromCentre = Math.hypot(
+          state.markOffsetX,
+          state.markOffsetY - gate.incircleCenterY,
+        );
+        expect(fromCentre).toBeLessThanOrEqual(gate.incircleRadius - markRadius * 0.9 + 1e-9);
+      }
+    }
+  });
+
+  test("the cursor lets go once the reader is through the gate", () => {
+    expect(Math.abs(at(at(0).proseFrom, { x: 1, y: 1 }).markOffsetX)).toBeLessThan(0.001);
+  });
+
+  test("no cursor, no offset", () => {
+    expect(at(0).markOffsetX).toBe(0);
+    expect(at(0).markOffsetY).toBe(0);
   });
 });
