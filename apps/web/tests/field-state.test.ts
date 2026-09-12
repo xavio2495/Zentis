@@ -296,3 +296,32 @@ describe("the mark gathers itself", () => {
     }
   });
 });
+
+describe("the mark comes alive once it has a shape", () => {
+  const viewport = { viewportWidth: 1440, viewportHeight: 900 };
+  const height = docHeight(viewport.viewportHeight);
+  const at = (scrollY: number) => fieldState({ scrollY, ...viewport, docHeight: height });
+
+  test("it is barely awake while it is still gathering", () => {
+    expect(at(0).markLife).toBeLessThan(0.25);
+    expect(at(0).markLife).toBeGreaterThan(0);
+  });
+
+  test("it wakes as the shape settles rather than the moment it appears", () => {
+    const gathering = at(viewport.viewportHeight * 0.5);
+    const settled = at(viewport.viewportHeight * 1.1);
+    expect(settled.markLife).toBeGreaterThan(gathering.markLife);
+  });
+
+  test("it is fully awake by the time the reader reaches the words", () => {
+    expect(at(at(0).proseFrom).markLife).toBe(1);
+    expect(at(height).markLife).toBe(1);
+  });
+
+  test("it never runs past either end", () => {
+    for (let y = 0; y <= height; y += viewport.viewportHeight / 8) {
+      expect(at(y).markLife).toBeGreaterThanOrEqual(0);
+      expect(at(y).markLife).toBeLessThanOrEqual(1);
+    }
+  });
+});
