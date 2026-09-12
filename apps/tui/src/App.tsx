@@ -28,7 +28,7 @@ import { CommandLine } from "./components/CommandLine.js";
 import { Panel, panelInner } from "./components/Panel.js";
 import { Pnl } from "./pages/Pnl.js";
 import { Logo, logoRows } from "./components/Logo.js";
-import { ONBOARDING_ROWS, Onboarding } from "./pages/Onboarding.js";
+import { CHOICES, ONBOARDING_ROWS, Onboarding, choiceAt } from "./pages/Onboarding.js";
 import { Positions } from "./pages/Positions.js";
 import { Status } from "./pages/Status.js";
 import { Simulation } from "./pages/Simulation.js";
@@ -189,6 +189,8 @@ export function App({
   // state rather than the command row's, because the command row belongs to a console that is
   // already running and this one has not started yet.
   const [asking, setAsking] = useState<string | null>(null);
+  // Which of the three the cursor is on. The page is three buttons, so there is a cursor.
+  const [choiceIndex, setChoiceIndex] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
   // What the console became once a wallet was made mid-run; null until then, and what it was started
   // with is used. Named over the props so that every line below reads the same either way — a
@@ -475,16 +477,52 @@ export function App({
         goOn();
         return;
       }
+      /**
+       * Taking the choice the cursor is on, or the one a number named.
+       *
+       * The numbers still work. They were on screen from the first day, somebody has learned them,
+       * and a key that quietly stopped doing what it used to is worse than one that never existed.
+       */
+      const take = (index: number) => {
+        const chosen = CHOICES[index]?.key;
+        if (chosen === "3") {
+          goOn();
+          return;
+        }
+        if (chosen === "2" && onChoose != null) {
+          setAsking("");
+          return;
+        }
+        if (chosen === "1" && !choosing && onChoose != null) {
+          setChoosing(true);
+          void onChoose("generate")
+            .then((said) => setChose(said))
+            .catch((cause: unknown) => setChose(String(cause)))
+            .finally(() => setChoosing(false));
+        }
+      };
+
+      // The field, once it is open, has the keyboard — including the arrows, which move within a
+      // path rather than between buttons. So the cursor's own keys are read only while it is shut.
+      if (asking === null && chose === null) {
+        if (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow) {
+          setChoiceIndex((current) => choiceAt(current, key.rightArrow || key.downArrow ? "right" : "left"));
+          return;
+        }
+        if (key.return) {
+          take(choiceIndex);
+          return;
+        }
+        const numbered = CHOICES.findIndex((choice) => choice.key === input);
+        if (numbered !== -1) {
+          setChoiceIndex(numbered);
+          take(numbered);
+          return;
+        }
+      }
       if (input === "3" && asking === null) {
         goOn();
         return;
-      }
-      if (input === "1" && !choosing && onChoose != null) {
-        setChoosing(true);
-        void onChoose("generate")
-          .then((said) => setChose(said))
-          .catch((cause: unknown) => setChose(String(cause)))
-          .finally(() => setChoosing(false));
       }
       // The field, once it is open, has the keyboard: a path contains the same characters the
       // choices are, and "/home/3" must not be read as choosing to watch.
@@ -515,10 +553,6 @@ export function App({
           return;
         }
         if (input !== "" && !key.ctrl && !key.meta) setAsking((current) => (current ?? "") + input);
-        return;
-      }
-      if (input === "2" && onChoose != null) {
-        setAsking("");
         return;
       }
       if (key.escape || input === "x") exit();
@@ -724,6 +758,7 @@ export function App({
           <Onboarding
             running={choosing}
             said={chose}
+            focus={choiceIndex}
             asking={asking}
             problem={problem}
             {...panelInner(width, panelHeight)}

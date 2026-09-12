@@ -58,8 +58,10 @@ test("where the screen is short the choices win, because a choice nobody can see
   // can be spared: it says whose console this is, and they are already looking at it.
   const frame = await drive(80, 24, { onboarding: true });
   const text = frame.lines.join("\n");
-  for (const choice of ["make one here", "use a key you already have", "watch only"]) {
-    expect(text).toContain(choice);
+  // All three are offered — the buttons are the offer. What each one *does* is said under the
+  // cursor, one at a time, so only the focused option's words are on screen here.
+  for (const face of ["make a wallet", "use my own key", "watch only"]) {
+    expect(text).toContain(face);
   }
   expect(frame.overflows).toBe(false);
 }, 60_000);

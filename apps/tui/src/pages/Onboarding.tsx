@@ -16,22 +16,95 @@ import { UI } from "../theme.js";
  * address, and the address follows from the key.
  */
 /**
- * The rows the choices need: a title, a blank, and three choices of a heading and up to three
- * wrapped lines each. The mark above gets whatever is left, and nothing when that is too little —
- * a choice a reader cannot see is not offered, and the mark is the part that can be spared.
+ * The rows the choices need: a title, a blank, three rows of buttons, and the words for whichever
+ * one is under the cursor. The mark above gets whatever is left, and nothing when that is too
+ * little — a choice a reader cannot see is not offered, and the mark is the part that can be spared.
  */
-export const ONBOARDING_ROWS = 17;
+export const ONBOARDING_ROWS = 14;
+
+/** The three, in the order they are shown and in the order the numbers have always meant. */
+export const CHOICES = [
+  {
+    key: "1",
+    face: "make a wallet",
+    title: "make one here",
+    detail:
+      "Writes ~/.zentis/wallet.env, mode 600, and shows you the address. The key stays in that " +
+      "file and will not be shown again — not by this screen and not in any log it writes.",
+  },
+  {
+    key: "2",
+    face: "use my own key",
+    title: "use a key you already have",
+    detail:
+      "Give the path to an env file with TAKER_PRIVATE_KEY in it. It is read by the process that " +
+      "signs, never by the one drawing this, and the path is remembered so you are not asked again.",
+  },
+  {
+    key: "3",
+    face: "watch only",
+    title: "watch only",
+    detail: "Straight to the live view. Nothing that signs is offered.",
+  },
+] as const;
+
+/**
+ * Where the cursor goes next.
+ *
+ * It stops at both ends rather than wrapping. Three is a row a reader takes in whole, and a cursor
+ * that reappears at the far end reads as a keystroke that did something other than move.
+ */
+export function choiceAt(current: number, direction: "left" | "right"): number {
+  const moved = current + (direction === "right" ? 1 : -1);
+  return Math.max(0, Math.min(CHOICES.length - 1, moved));
+}
+
+/**
+ * Three buttons on three rows: the tops, the faces, the bottoms.
+ *
+ * Drawn as segments rather than as Ink boxes for the reason every row here is: an overlong row makes
+ * Ink delete characters inside it, and a border built out of nested boxes is the row most likely to
+ * be one cell too wide. The one under the cursor is the only thing on the page wearing the accent,
+ * which is what makes it read as chosen rather than merely first.
+ */
+const GAP = 2;
+
+function buttons(width: number, focus: number): Seg[][] {
+  const each = Math.max(6, Math.floor((width - GAP * (CHOICES.length - 1)) / CHOICES.length));
+  const inner = each - 2;
+  const rows: Seg[][] = [[], [], []];
+  for (const [i, choice] of CHOICES.entries()) {
+    const colour = i === focus ? UI.signal : UI.frame;
+    const face = trunc(`${choice.key}  ${choice.face}`, inner);
+    const pad = inner - face.length;
+    const before = Math.max(0, Math.floor(pad / 2));
+    if (i > 0) for (const row of rows) row.push({ text: " ".repeat(GAP) });
+    rows[0]!.push({ text: `┌${"─".repeat(inner)}┐`, color: colour });
+    rows[1]!.push(
+      { text: "│", color: colour },
+      { text: " ".repeat(before) },
+      { text: face, color: i === focus ? UI.heading : UI.muted, bold: i === focus },
+      { text: " ".repeat(Math.max(0, pad - before)) },
+      { text: "│", color: colour },
+    );
+    rows[2]!.push({ text: `└${"─".repeat(inner)}┘`, color: colour });
+  }
+  return rows;
+}
 
 export function Onboarding({
   width,
   height,
   running,
   said,
+  focus = 0,
   asking = null,
   problem = null,
 }: {
   width: number;
   height: number;
+  /** which of the three the cursor is on; its words are the ones shown underneath */
+  focus?: number;
   /** true while the signing child is making a wallet */
   running: boolean;
   /** what that child said: the address, the path, and the mode */
@@ -42,25 +115,6 @@ export function Onboarding({
   problem?: string | null;
 }) {
   const rows: React.ReactNode[] = [];
-  const choice = (key: string, title: string, detail: string): void => {
-    rows.push(
-      <Segments
-        key={key}
-        segs={[
-          { text: `  ${key}  `, color: UI.action, bold: true },
-          { text: title, color: UI.heading },
-        ] satisfies Seg[]}
-      />,
-    );
-    for (const line of wrapLines(detail, width - 6, 3)) {
-      rows.push(
-        <Text key={`${key}-${line.slice(0, 8)}`} color={UI.muted}>
-          {`     ${line}`}
-        </Text>,
-      );
-    }
-    rows.push(<Text key={`${key}-sp`}> </Text>);
-  };
 
   rows.push(
     <Text key="title" color={UI.heading} bold>
@@ -124,20 +178,33 @@ export function Onboarding({
         </Text>,
       );
     }
-  } else {
-    choice(
-      "1",
-      "make one here",
-      "Writes ~/.zentis/wallet.env, mode 600, and shows you the address. The key stays in that " +
-        "file and will not be shown again — not by this screen and not in any log it writes.",
+  } else if (said === null) {
+    const chosen = CHOICES[Math.max(0, Math.min(CHOICES.length - 1, focus))]!;
+    for (const [i, row] of buttons(width, focus).entries()) {
+      rows.push(<Segments key={`button-row-${i}`} segs={row} />);
+    }
+    rows.push(<Text key="sp-tip"> </Text>);
+    // The words belong to the button under the cursor, and only to it. Three blocks of reasoning on
+    // screen at once is a reader comparing paragraphs; one at a time is a reader considering an
+    // option — and it is the same page either way, minus the wall.
+    rows.push(
+      <Text key="tip-title" color={UI.heading} bold>
+        {trunc(chosen.title, width)}
+      </Text>,
     );
-    choice(
-      "2",
-      "use a key you already have",
-      "Give the path to an env file with TAKER_PRIVATE_KEY in it. It is read by the process that " +
-        "signs, never by the one drawing this, and the path is remembered so you are not asked again.",
+    for (const [i, line] of wrapLines(chosen.detail, width, 3).entries()) {
+      rows.push(
+        <Text key={`tip-${i}`} color={UI.muted}>
+          {line}
+        </Text>,
+      );
+    }
+    rows.push(<Text key="sp-keys"> </Text>);
+    rows.push(
+      <Text key="keys" color={UI.action}>
+        {trunc("← → to choose · enter to take it · 1 2 3 · x to quit", width)}
+      </Text>,
     );
-    choice("3", "watch only", "Straight to the live view. Nothing that signs is offered.");
   }
 
   if (running) {

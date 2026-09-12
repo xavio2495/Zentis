@@ -16,9 +16,12 @@ const said = (lines: string[]) => lines.join(" ").replace(/[│┌┐╰╯─]/
 test("with no wallet and no env file, the console opens on the choice rather than the live view", async () => {
   const frame = await drive(120, 40, { onboarding: true });
   const text = said(frame.lines);
-  expect(text).toMatch(/make one here/i);
-  expect(text).toMatch(/use a key you already have/i);
+  // Three buttons, all three offered at once; the words belong to whichever is under the cursor.
+  expect(text).toMatch(/make a wallet/i);
+  expect(text).toMatch(/use my own key/i);
   expect(text).toMatch(/watch only/i);
+  // And the cursor starts on the first, so its own title is the one being explained.
+  expect(text).toMatch(/make one here/i);
   // Not the live view: no cards, no feed, until one of the three is chosen.
   expect(frame.lines.join("\n")).not.toContain("┌ feed");
   expect(frame.overflows).toBe(false);
