@@ -9,6 +9,10 @@
 
 export const INSTALL_COMMAND = "curl -fsSL https://zentis-eth.vercel.app/install.sh | bash";
 
+/** The repository the install line pulls its release from. */
+export const REPO_URL = "https://github.com/xavio2495/Zentis";
+export const REPO_LABEL = "github.com/xavio2495/Zentis";
+
 export interface Integration {
   name: string;
   role: string;
@@ -53,6 +57,10 @@ export const COPY = {
   installHint: "Click to copy",
   installCopied: "Copied",
 
+  contactLine: "Read it for yourself.",
+  contactHint: "Click to copy",
+  contactCopied: "Copied",
+
   outro: "Three legs. One book. Nothing in transit.",
   footer: "Zentis · Aqua · SwapVM",
 
@@ -61,9 +69,9 @@ export const COPY = {
 } as const;
 
 /**
- * The prose the no-figure rule applies to. The install line is a command rather
- * than a claim, and a sponsor's name is a proper noun even when it opens with a
- * numeral, so neither is prose.
+ * The prose the no-figure rule applies to. The install line and the repository
+ * are addresses rather than claims, and a sponsor's name is a proper noun even
+ * when it opens with a numeral, so none of them is prose.
  */
 export function prose(): string[] {
   return [...Object.values(COPY), ...LOADER_WORDS, ...INTEGRATIONS.flatMap((i) => [i.role, i.claim])];

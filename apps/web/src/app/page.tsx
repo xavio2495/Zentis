@@ -1,4 +1,5 @@
 import { CopyCommand } from "@/components/CopyCommand";
+import { CopyLink } from "@/components/CopyLink";
 import { Cursor } from "@/components/Cursor";
 import { HeroLines } from "@/components/HeroLines";
 import { HeroWordmark } from "@/components/HeroWordmark";
@@ -6,7 +7,7 @@ import { Nav } from "@/components/Nav";
 import { Field } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Reveal } from "@/components/Reveal";
-import { COPY, INTEGRATIONS, INSTALL_COMMAND } from "@/lib/copy";
+import { COPY, INTEGRATIONS, INSTALL_COMMAND, REPO_LABEL, REPO_URL } from "@/lib/copy";
 
 /** The four corner brackets that stand in for a card border. */
 function Brackets() {
@@ -95,9 +96,26 @@ export default function Home() {
         {/* The outro: the field scatters as the page ends. */}
         <div aria-hidden="true" style={{ height: "60vh" }} />
 
-        <footer className="flex min-h-[70vh] flex-col items-center justify-center gap-10 px-8 text-center">
+        <section
+          id="contact"
+          className="flex min-h-[80vh] flex-col items-center justify-center gap-8 px-8 text-center"
+        >
           <Reveal>
-            <p className="serif text-fs-2 text-ink-soft md:text-fs-4">{COPY.outro}</p>
+            <p className="serif text-fs-2 text-ink-soft md:text-fs-4">{COPY.contactLine}</p>
+            <div className="mt-8">
+              <CopyLink
+                href={REPO_URL}
+                label={REPO_LABEL}
+                hint={COPY.contactHint}
+                copied={COPY.contactCopied}
+              />
+            </div>
+          </Reveal>
+        </section>
+
+        <footer className="flex min-h-[40vh] flex-col items-center justify-center gap-6 px-8 text-center">
+          <Reveal>
+            <p className="serif text-fs-2 text-ink-soft md:text-fs-3">{COPY.outro}</p>
           </Reveal>
           <p className="label-sm text-ink-faint">{COPY.footer}</p>
         </footer>
