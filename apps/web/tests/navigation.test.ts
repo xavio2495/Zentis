@@ -139,3 +139,41 @@ describe("the last screen is one screen", () => {
     expect(contact).not.toMatch(/min-h-screen/);
   });
 });
+
+describe("the rhythm between figures", () => {
+  /*
+   * The complaint was a viewport with a diagram in the bottom third and black above it. The obvious
+   * cause — too much padding — was not it: measured in the page, the gaps were already a quarter of
+   * a viewport. Nor was the first repair, giving each section a minimum height and centring its
+   * block inside it; that only added slack above short figures and pushed two gaps to a third of a
+   * screen.
+   *
+   * What actually keeps them together is that a section is exactly as tall as its own content plus
+   * a modest pad, so there is no room inside it for the block to drift, and the pad is small enough
+   * that the next figure is always within half a screen. Both are asserted, because the first one
+   * is the part that is easy to undo by adding a height later.
+   */
+  const page = () => source("app", "page.tsx");
+  const figures = () => [...page().matchAll(/<section id="(position|quote|spread|dial|built-on)"([^>]*)>/g)];
+
+  test("a figure section is the height of its content, with nowhere for it to drift", () => {
+    const found = figures();
+    expect(found.length).toBeGreaterThanOrEqual(4);
+    for (const [, id, attrs] of found) {
+      expect({ id, fixedHeight: /min-h-\[|h-screen/.test(attrs) }).toEqual({ id, fixedHeight: false });
+    }
+  });
+
+  test("two facing sections never leave half a viewport of black between them", () => {
+    const pads = figures().map(([, id, attrs]) => ({ id, pad: Number(attrs.match(/py-\[(\d+)vh\]/)?.[1] ?? 999) }));
+    for (const { id, pad } of pads) expect({ id, pad }).toEqual({ id, pad: expect.any(Number) });
+    for (let i = 1; i < pads.length; i += 1) {
+      expect(pads[i - 1]!.pad + pads[i]!.pad).toBeLessThanOrEqual(50);
+    }
+  });
+
+  test("each figure's lead, drawing and caption are one block, so they travel together", () => {
+    // A caption in a separate wrapper is a caption that can be on screen without its figure.
+    expect((page().match(/data-dock-clear/g) ?? []).length).toBeGreaterThanOrEqual(5);
+  });
+});

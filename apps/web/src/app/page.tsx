@@ -75,7 +75,7 @@ export default function Home() {
           field, and the side alternates, so the mark has somewhere to be on every screen rather
           than being pushed behind the words.
         */}
-        <section id="position" className="mx-auto w-full max-w-6xl px-8 py-[16vh]">
+        <section id="position" className="mx-auto w-full max-w-6xl px-8 py-[10vh]">
           <Reveal>
             <div data-dock-clear className="max-w-2xl">
               <h2 className="serif text-fs-5 leading-tight text-ink md:text-fs-6">{COPY.statement}</h2>
@@ -87,7 +87,7 @@ export default function Home() {
           </Reveal>
         </section>
 
-        <section id="quote" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
+        <section id="quote" className="mx-auto w-full max-w-6xl px-8 py-[10vh]">
           <Reveal>
             {/* The opposite side, so the field changes hands as the reader descends. */}
             <div data-dock-clear className="ml-auto max-w-2xl">
@@ -100,7 +100,7 @@ export default function Home() {
           </Reveal>
         </section>
 
-        <section id="spread" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
+        <section id="spread" className="mx-auto w-full max-w-6xl px-8 py-[10vh]">
           <Reveal>
             <div data-dock-clear className="max-w-2xl">
               <Spread moment={moment} />
@@ -108,7 +108,7 @@ export default function Home() {
           </Reveal>
         </section>
 
-        <section id="dial" className="mx-auto w-full max-w-6xl px-8 py-[12vh]">
+        <section id="dial" className="mx-auto w-full max-w-6xl px-8 py-[10vh]">
           <Reveal>
             <div data-dock-clear className="ml-auto max-w-2xl">
               <p className="label text-ink-faint">{COPY.dialLabel}</p>
@@ -120,7 +120,7 @@ export default function Home() {
           </Reveal>
         </section>
 
-        <section id="built-on" className="mx-auto max-w-5xl px-8 py-[12vh]">
+        <section id="built-on" className="mx-auto max-w-5xl px-8 py-[10vh]">
           <Reveal>
             <p className="label">{COPY.integrationsLabel}</p>
             {/* Staggered, not a centred row: left, right, left, the way the reference alternates
