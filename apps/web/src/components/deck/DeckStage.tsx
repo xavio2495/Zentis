@@ -37,7 +37,11 @@ export function DeckStage() {
   const goTo = useCallback((target: number) => {
     const node = sections.current[target];
     if (!node) return;
-    node.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Every other motion on this site asks first, and a smooth scroll is motion: for a reader who
+    // has asked for less of it, a deck that eases through a whole viewport on every arrow press is
+    // the worst offender on the page rather than the one exception to the rule.
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
   }, []);
 
   // The live position, read from what is actually on screen.
