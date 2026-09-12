@@ -76,3 +76,33 @@ test("a visitor's keystrokes reach the console, because a console nobody can pre
   expect(screen).toMatch(/positions/);
   expect(screen).toMatch(/strategy/);
 }, 30_000);
+
+test("pressing x closes the console instead of reaching for a timer no browser has", async () => {
+  // Ink resolves its exit promise through `setImmediate`, which is Node's and not the platform's.
+  // In the browser that threw "ReferenceError: setImmediate is not defined" out of the unmount path
+  // and left the page with a console that could not be closed. Bun has the function, so the browser
+  // is what the test has to be: take it away, and put back whatever the bundle installs.
+  const had = (globalThis as { setImmediate?: unknown }).setImmediate;
+  delete (globalThis as { setImmediate?: unknown }).setImmediate;
+  const thrown: unknown[] = [];
+  const onError = (event: PromiseRejectionEvent | ErrorEvent) => thrown.push(event);
+  process.on("uncaughtException", onError as never);
+  process.on("unhandledRejection", onError as never);
+
+  const handle = terminal();
+  const app = mount(handle);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  handle.type("x");
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const screen = strip(handle.written.join(""));
+
+  process.off("uncaughtException", onError as never);
+  process.off("unhandledRejection", onError as never);
+  (globalThis as { setImmediate?: unknown }).setImmediate = had;
+  app.unmount();
+
+  expect(thrown).toEqual([]);
+  // And it says what happened: a console that vanished on a keystroke reads as a page that broke.
+  expect(screen).toMatch(/console closed/i);
+  expect(screen).toMatch(/reload/i);
+}, 30_000);
