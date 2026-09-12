@@ -34,14 +34,42 @@ test("the fixtures are one book: three legs under a single seq", () => {
   expect(inputs.map((i) => i.leg.label)).toEqual(["Sepolia", "Arbitrum Sepolia", "Base Sepolia"]);
 });
 
-test("the recomputed shift reproduces the enclave's published shift on every leg", () => {
+test("the recomputed shift reproduces the enclave's published shift, except where the tilt was carried", () => {
+  // The claim this whole project rests on: the console recomputes the enclave's number from the
+  // same inputs and gets the same answer. There is one state in which it cannot, and it is not a
+  // disagreement — the slow workflow republishes the last fast round's tilt against a *new* boundary
+  // budget, so the slot holds a tilt priced with one room beside a boundary that recovers a
+  // different one. Recomputing against the recovered room then caps the concession differently and
+  // lands a few basis points away, in the tilt's own direction, on every leg at once.
+  //
+  // So a carried round is named rather than tolerated: no threshold is widened, and a leg that is
+  // not carried must still reproduce the published number exactly.
   const book = decomposeBook(inputs, ASSUMED_GAINS, BOOK.maxTiltBps);
   for (const leg of book.legs) {
+    if (leg.carried) {
+      expect(leg.carriedFromSeq).toBe(inputs[0]!.ref.seq - 1);
+      continue;
+    }
     expect({ leg: leg.label, tilt: leg.tiltBps, agrees: leg.agrees }).toEqual({
       leg: leg.label,
       tilt: BigInt(leg.published),
       agrees: true,
     });
+  }
+});
+
+test("a carried round is recognised by what makes it one: the seq before it, publishing the same tilt", () => {
+  // Constructed, because whether the recorder happened to catch a slow round is a fact about the
+  // minute it ran. What is asserted is the recognition rule: the previous reference is this seq
+  // less one, and it published the same tilt this one does. A fast round recomputes, so its tilt
+  // moves; a slow round carries, so it does not.
+  const book = decomposeBook(inputs, ASSUMED_GAINS, BOOK.maxTiltBps);
+  for (const [i, leg] of book.legs.entries()) {
+    const references = inputs[i]!.history.references;
+    const previous = references.find((r) => r.seq === inputs[i]!.ref.seq - 1) ?? null;
+    const carried = previous !== null && previous.tiltBps === inputs[i]!.ref.tiltBps;
+    expect(leg.carried).toBe(carried);
+    expect(leg.carriedFromSeq).toBe(carried ? previous!.seq : null);
   }
 });
 
