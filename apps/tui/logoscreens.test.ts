@@ -90,11 +90,17 @@ test("the mark goes on the three pages that are the wallet's, and on no other", 
   // Wallet, simulation and status end well short of their panel and are the pages a reader lingers
   // on. Positions and pnl are tables to be read against each other; the mark under one of them is
   // decoration where a number was expected.
-  for (const key of ["w", "m", "d"]) {
+  for (const key of ["w", "m"]) {
     const frame = await drive(120, 40, { keys: [key] });
     expect(marked(frame.lines)).toBeGreaterThan(3);
     expect(frame.overflows).toBe(false);
   }
+  // Status earns its mark only where its own content leaves the room: it grew a provenance note for
+  // the mark each leg was shipped against, which at a hundred and twenty columns takes the rows the
+  // mark had. Words before decoration, every time — and at a hundred and ninety there is room for
+  // both.
+  expect(marked((await drive(120, 40, { keys: ["d"] })).lines)).toBe(0);
+  expect(marked((await drive(190, 50, { keys: ["d"] })).lines)).toBeGreaterThan(3);
   for (const key of ["p", "n"]) {
     expect(marked((await drive(120, 40, { keys: [key] })).lines)).toBe(0);
   }

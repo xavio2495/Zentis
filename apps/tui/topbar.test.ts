@@ -40,8 +40,10 @@ test("the row of marks says nothing more when everything is answering", async ()
 }, 60_000);
 
 test("the book line does not point at a page the keys row already offers", async () => {
+  // The book now has a profit to show — every leg carries the mark it was shipped against — so what
+  // this guards is the pointer, not the word that happened to be beside it.
   const rows = panelOf((await drive(190, 50, {})).lines, "zentis").join("\n");
-  expect(rows).toContain("profit unknown");
+  expect(rows).toMatch(/profit ([-+][\d.]|unknown)/);
   expect(rows).not.toContain("n for why");
 }, 60_000);
 

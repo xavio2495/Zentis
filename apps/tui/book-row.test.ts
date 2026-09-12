@@ -55,15 +55,23 @@ test("the even split is marked, so a lean is read against it rather than guessed
   expect(row).toMatch(/even/);
 }, 60_000);
 
-test("a profit that cannot be separated from the hold effect is unknown, never a zero", async () => {
-  // Hold is null on every generation shipped before the mark was recorded, so the book has no total.
-  // A row that printed 0 would claim the maker broke even, which nothing read says.
-  const snapshot = fakeSnapshot("fresh");
-  expect(snapshot.book.pnlA).toBeNull();
-  const row = rowWith((await drive(190, 50, { armed: true })).lines, "book")!;
+test("a profit that cannot be valued is unknown, never a zero", async () => {
+  // A row that printed 0 would claim the maker broke even, which nothing read says. This used to be
+  // every generation, because none carried the mark it was shipped against; they all carry it now,
+  // so the case to hold the line on is the one where the closing mark is missing instead.
+  const dark = fakeSnapshot("outage");
+  expect(dark.book.pnlA).toBeNull();
+  const row = rowWith((await drive(190, 50, { armed: true, scenario: "outage" })).lines, "book")!;
   expect(row).toContain("profit");
   expect(row).toMatch(/profit unknown/);
   expect(row).not.toMatch(/profit [-+]?[\d.]/);
+}, 60_000);
+
+test("a book that can be valued says what it made, since every leg now carries its opening mark", async () => {
+  const snapshot = fakeSnapshot("fresh");
+  expect(snapshot.book.pnlA).not.toBeNull();
+  const row = rowWith((await drive(190, 50, { armed: true })).lines, "book")!;
+  expect(row).toMatch(/profit [-+][\d.]/);
 }, 60_000);
 
 test("the overall view's numbers survive the narrowest terminal whole", async () => {

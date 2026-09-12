@@ -3,7 +3,7 @@ import { markRows } from "../components/Logo.js";
 import { type Snapshot, humanDuration, providersOf } from "@zentis/console-data";
 import type { PublisherMode } from "../actions.js";
 import { type Role, roleReason } from "../role.js";
-import { type Seg, fitSegments, padRows, trunc } from "../layout.js";
+import { type Seg, fitSegments, padRows, trunc, wrapLines } from "../layout.js";
 import { Segments } from "../components/Segments.js";
 import { DOT, dotColour } from "../components/Providers.js";
 import { UI } from "../theme.js";
@@ -162,6 +162,26 @@ export function Status({
       )}
     />,
   );
+
+  // Where the opening end of hold came from, quoted from the deployment record rather than
+  // summarised. It was backfilled from a different series than the closing mark, and this is the
+  // page that exists to say where a number came from.
+  const shipSource = snapshot.legs.map((leg) => leg.config.shipped.markAtShipSource).find((said) => said != null);
+  if (shipSource != null) {
+    rows.push(<Text key="sp3"> </Text>);
+    rows.push(
+      <Text key="markhead" color={UI.heading} bold>
+        {trunc("the mark each leg was shipped against", width)}
+      </Text>,
+    );
+    for (const [i, line] of wrapLines(shipSource, width, 6).entries()) {
+      rows.push(
+        <Text key={`marksrc${i}`} color={UI.muted}>
+          {line}
+        </Text>,
+      );
+    }
+  }
 
   const polled = snapshot.takenAtSeconds;
   rows.push(<Text key="sp2"> </Text>);

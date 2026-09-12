@@ -44,8 +44,9 @@ const PAGES: [string, string][] = [
   ],
   [
     "pnl",
-    "Marked at the mainnet spot price. Trading is the fills' arithmetic; hold needs a mark from the " +
-      "same source at both ends, and generations shipped before that mark have none.",
+    "Marked at the mainnet spot price. Trading is the fills' arithmetic; hold is what the inventory " +
+      "the leg was shipped with is worth now against the mark it was shipped against — so tokens " +
+      "pushed to a leg after it shipped are not in it, and the book's hold understates by their move.",
   ],
   [
     "wallet",

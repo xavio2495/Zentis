@@ -110,10 +110,33 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
 
   // What the book is marked at, and why hold is unknown, are in help under this page's heading. What
   // stays is the one line that changes what "total" means: a total without hold is not a total.
-  if (legs.some((l) => l.pnl?.holdA == null)) {
+  // A leg with no pnl at all counts as unvalued too. Reading it as "hold is fine" put the
+  // provenance note over a table of dashes during an outage, which advertises the source of a
+  // number the page is not showing.
+  const unvalued = legs.find((l) => l.pnl == null || l.pnl.holdA == null);
+  if (unvalued != null) {
+    // The leg's own reason, not a guess at it. There are two ways hold goes unknown — no closing
+    // mark, and no opening one — and the page used to print the second whichever had happened,
+    // which told an operator with a dead mark service to go looking for a deployment record.
     rows.push(
       <Text key="hold" color={UI.caveat}>
-        {trunc("! hold unknown: no opening mark from this source, so total is trading only", width)}
+        {trunc(
+          `! hold unknown: ${unvalued.pnl?.caveat ?? "this leg has not been read"}, so total is trading only`,
+          width,
+        )}
+      </Text>,
+    );
+  } else if (legs.some((l) => l.config.shipped.markAtShipSource !== null)) {
+    // Hold is known and still worth a flag: its two ends come from different places. The opening
+    // mark was backfilled from the hourly series the book is measured on; the closing mark is 1inch
+    // spot. One line here, because that is all this page can spare — the record's own sentence, in
+    // full, is on the status page, where every number says where it came from.
+    rows.push(
+      <Text key="hold" color={UI.caveat}>
+        {trunc(
+          "! hold runs open to close across two sources: the opening mark was backfilled, the close is spot · d status quotes the record",
+          width,
+        )}
       </Text>,
     );
   }

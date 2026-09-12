@@ -196,11 +196,12 @@ export function fakeSnapshot(scenario: Scenario, now = SANDBOX_NOW): Snapshot {
       })(),
       finality: { head: 11_674_000n, finalized: 11_673_920n },
       // A mainnet mark near the real one, so the sandbox's book is a plausible size rather than a
-      // testnet pool's fantasy. The hold effect is deliberately unknown here: the legs this world
-      // stands in for were shipped before the mark was recorded, and a sandbox that quietly had a
-      // number the live console cannot have would hide the case the screen has to render.
+      // testnet pool's fantasy. The opening mark is the one in the deployment record, because every
+      // generation now carries it: this world used to pass null and render "hold unknown", which
+      // stopped being the case the live console shows the moment the records were backfilled. The
+      // outage scenario is where an unvaluable book is still drawn.
       mark: { mainnetChainId: 1, mid: MARK_MID, source: "1inch spot", readAtSeconds: now, error: null },
-      pnl: legPnl(entry.history, entry.leg.shipped, MARK_MID, null),
+      pnl: legPnl(entry.history, entry.leg.shipped, MARK_MID, entry.leg.shipped.markAtShip),
       // Every source answered in the fake world, except a venue that no longer exists to answer:
       // the outage scenario is the one that sets the others.
       sources: {

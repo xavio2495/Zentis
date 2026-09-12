@@ -70,16 +70,24 @@ test("the positions page says what each leg is: its hash, its generations and it
   expect(text).toMatch(/active|docked|unread/);
 }, 60_000);
 
-test("the pnl page counts the fills the fixtures hold and refuses a hold it cannot separate", async () => {
+test("the pnl page counts the fills the fixtures hold and separates hold from trading", async () => {
   const snapshot = fakeSnapshot("fresh");
   const withFills = snapshot.legs.find((l) => (l.pnl?.fills ?? 0) > 0)!;
-  expect(withFills.pnl!.holdA).toBeNull();
+  // Hold is a real number now: every generation carries the mark it was shipped against. What the
+  // page still owes the reader is that its two ends came from different sources.
+  expect(withFills.pnl!.holdA).not.toBeNull();
   const text = (await drive(190, 50, { keys: ["n"] })).lines.join("\n");
   expect(text).toContain(String(withFills.pnl!.fills));
-  // The reason, not a zero: hold is a price change over time and these generations have no opening
-  // mark from the same source.
   expect(text).toMatch(/hold/);
+  // Never a bare zero standing in for a number nobody has.
   expect(text).not.toMatch(/hold\s+0\b/);
+}, 60_000);
+
+test("a book with no closing mark refuses the hold it cannot separate, rather than printing one", async () => {
+  const dark = fakeSnapshot("outage");
+  const text = (await drive(190, 50, { keys: ["n"], scenario: "outage" })).lines.join("\n");
+  expect(dark.legs.every((l) => l.pnl == null || l.pnl.holdA === null)).toBe(true);
+  expect(text).toMatch(/hold unknown/);
 }, 60_000);
 
 test("the wallet page says what the signer is and what each chain holds, committed and free", async () => {

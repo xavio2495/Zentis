@@ -63,6 +63,8 @@ interface RawShipped {
   shippedBalanceB?: string | null;
   shippedAgainstRef?: { mid?: string | null; seq?: number | null } | null;
   markAtShip?: string | null;
+  markAtShipAt?: number | null;
+  markAtShipSource?: string | null;
   shipBlock?: number | null;
 }
 
@@ -71,6 +73,8 @@ const shippedOf = (raw: RawShipped): ShippedRecord => ({
   balanceB: raw.shippedBalanceB == null ? null : BigInt(raw.shippedBalanceB),
   mid: raw.shippedAgainstRef?.mid == null ? null : BigInt(raw.shippedAgainstRef.mid),
   markAtShip: raw.markAtShip == null ? null : BigInt(raw.markAtShip),
+  markAtShipAt: raw.markAtShipAt ?? null,
+  markAtShipSource: raw.markAtShipSource ?? null,
   seq: raw.shippedAgainstRef?.seq ?? null,
   block: raw.shipBlock ?? null,
 });
@@ -83,6 +87,16 @@ export interface ShippedRecord {
   readonly mid: bigint | null;
   /** the mainnet mark at ship, recorded from 2026-09-11; hold profit is null without it */
   readonly markAtShip: bigint | null;
+  /** when that mark was struck: the ship block's own timestamp */
+  readonly markAtShipAt: number | null;
+  /**
+   * Where the opening mark came from, in the record's words.
+   *
+   * It was backfilled rather than read at ship time, and from a different series than the closing
+   * mark the console uses. That is a fact about hold that no arithmetic can carry, so the record
+   * says it and every screen quotes this string instead of writing its own version of it.
+   */
+  readonly markAtShipSource: string | null;
   readonly seq: number | null;
   readonly block: number | null;
 }
