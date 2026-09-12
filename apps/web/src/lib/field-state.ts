@@ -221,8 +221,8 @@ export function fieldState({
   // that has stopped moving still has something to do.
   const markLife = 0.18 + 0.82 * easeOut(clamp((scrollY - viewportHeight * 0.75) / (viewportHeight * 0.85), 0, 1));
 
-  const positionZ = -34 + 34 * eased;
-  const scale = 0.32 + 0.68 * eased;
+  const positionZ = -22 + 22 * eased;
+  const scale = 0.5 + 0.5 * eased;
   const handoffFrom = viewportHeight * 1.65;
   const handoff = easeOut(clamp((scrollY - handoffFrom) / (proseFrom - handoffFrom), 0, 1));
 

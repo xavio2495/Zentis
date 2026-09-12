@@ -17,6 +17,7 @@ import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state"
 import { markPosition } from "@/lib/mark-position";
 import { scrollNow } from "@/lib/scroll";
 import { calmRect } from "@/lib/calm";
+import { cursorInMarkSpace } from "@/lib/cursor-space";
 import { dockRect } from "@/lib/dock";
 
 /**
@@ -714,11 +715,15 @@ export function mountMarkField(host: HTMLElement): () => void {
     disperse += (wants - disperse) * settle(wants > disperse ? 9 : 4);
 
     inverseRotation.makeRotationFromEuler(group.rotation).invert();
-    cursorLocal
-      .set(state.pointerWorldX, state.pointerWorldY, group.position.z)
-      .sub(group.position)
-      .divideScalar(Math.max(state.scale, 1e-4))
-      .applyMatrix4(inverseRotation);
+    const flat = cursorInMarkSpace(
+      state.pointerWorldX,
+      state.pointerWorldY,
+      state.depthRatio,
+      group.position.x,
+      group.position.y,
+      state.scale,
+    );
+    cursorLocal.set(flat.x, flat.y, 0).applyMatrix4(inverseRotation);
 
     markMaterial.uniforms.uStain.value.set(cursorLocal.x, cursorLocal.y, MARK_LIGHT, disperse);
     // the hollow the cursor clears is a sphere about that point, not a tube
