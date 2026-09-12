@@ -90,3 +90,27 @@ test("watch-only refuses a push with the reason, and runs nothing", async () => 
   expect(text).toMatch(/ZENTIS_ENV|watch-only/);
   expect(text).not.toContain("press y");
 }, 60_000);
+
+test("opening the row takes the keys' row and nothing else, so no gap opens under it", async () => {
+  // The command line used to be an extra row below the keys, so the screen paid for it by taking a
+  // row off the feed. It is not extra any more — it replaces the hints in the panel they share —
+  // and the subtraction stayed behind, leaving the right-hand column one row short of the frame:
+  // a strip of empty terminal under the command box that nothing accounts for.
+  const shut = await drive(120, 40, {});
+  const open = await drive(120, 40, { keys: [":"] });
+
+  // The bottom row of the frame closes both columns, whether the row is open or not.
+  const closes = (lines: string[]) => (lines.at(-1) ?? "").trimEnd().endsWith("╯");
+  expect(closes(shut.lines)).toBe(true);
+  expect(closes(open.lines)).toBe(true);
+
+  // And the panel above keeps its height: the row came from the keys, not from the feed.
+  const feedHeight = (lines: string[]) => {
+    const from = lines.findIndex((line) => line.includes("┌ feed"));
+    if (from === -1) return 0;
+    const after = lines.slice(from + 1).findIndex((line) => /│╰─+╯$/.test(line.trimEnd()));
+    return after === -1 ? 0 : after + 1;
+  };
+  expect(feedHeight(open.lines)).toBe(feedHeight(shut.lines));
+  expect(feedHeight(shut.lines)).toBeGreaterThan(0);
+}, 60_000);
