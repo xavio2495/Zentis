@@ -60,7 +60,6 @@
 
 html {
   background: var(--color-bg);
-  overflow-x: hidden;
 }
 
 body {
@@ -533,8 +532,13 @@ body.has-cursor [contenteditable] {
 }
 
 /* Smoothed scrolling moves this with a transform; the fixed layers sit outside
-   it and follow the eased position instead. */
+   it and follow the eased position instead. Nothing but the stacking order is
+   set here: the smoother owns this element's position, size and overflow, and
+   an overflow or position of our own silently shortens its travel. */
 #smooth-wrapper {
-  position: relative;
   z-index: 3;
+}
+
+#smooth-content {
+  overflow-x: hidden;
 }
