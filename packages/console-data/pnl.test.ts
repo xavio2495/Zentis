@@ -209,3 +209,91 @@ test("a leg holding exactly what it was shipped with, less its fills, has no gap
   expect(legPnl(history, shipped, mark, mark).unvaluedB).toBe(0n);
 });
 
+test("trading is this generation's, and the position's whole life is a separate figure", () => {
+  // One total, one question. Hold is already this generation's — it values what the leg was shipped
+  // with — so trading summed over the position's whole life made the total the sum of two different
+  // spans. The lifetime figure is not thrown away; it is reported beside it, labelled as what it is.
+  const mark = (10n ** 30n) / 2_467n;
+  const shipAt = 1_789_100_856;
+  const fill = (timestamp: bigint, amountIn: bigint, amountOut: bigint) => ({
+    transaction: `0x${timestamp}`,
+    timestamp,
+    isAToB: true,
+    amountIn,
+    amountOut,
+    hasReference: true,
+    refMid: mark,
+    refTiltBps: 0,
+    refSeq: 1,
+    refAgeSeconds: 0n,
+    chainId: 11155111,
+    kind: "fill",
+  });
+  const history = {
+    position: { balanceA: 15_450_000n, balanceB: 496_902_045_775_143n, active: true },
+    fills: [
+      fill(BigInt(shipAt) + 500n, 150_000n, 57_941_952_335_277n),
+      // Before the ship: a fill of the generation this one superseded.
+      fill(BigInt(shipAt) - 50_000n, 300_000n, 115_000_000_000_000n),
+    ],
+    references: [],
+    rejections: [],
+  } as never;
+  const shipped = {
+    balanceA: 15_000_000n,
+    balanceB: 496_902_045_775_143n,
+    mid: mark,
+    markAtShip: mark,
+    markAtShipAt: shipAt,
+    markAtShipSource: "x",
+    seq: 1,
+    block: 1,
+  };
+  const pnl = legPnl(history, shipped, mark, mark);
+
+  expect(pnl.fills).toBe(1);
+  expect(pnl.volumeA).toBe(150_000n);
+  expect(pnl.lifetime.fills).toBe(2);
+  expect(pnl.lifetime.volumeA).toBe(450_000n);
+  // The two spans genuinely differ, which is the whole reason for keeping them apart.
+  expect(pnl.lifetime.tradingA).not.toBe(pnl.tradingA);
+  // Every fill is still evidence and stays on the list, each saying which span it belongs to.
+  expect(pnl.perFill).toHaveLength(2);
+  expect(pnl.perFill.filter((f) => f.thisGeneration)).toHaveLength(1);
+});
+
+test("without a ship timestamp the generation's figures are unknown, not the position's lifetime", () => {
+  const mark = (10n ** 30n) / 2_467n;
+  const history = {
+    position: { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, active: true },
+    fills: [
+      {
+        transaction: "0x1",
+        timestamp: 1_789_000_000n,
+        isAToB: true,
+        amountIn: 150_000n,
+        amountOut: 57_941_952_335_277n,
+        hasReference: true,
+        refMid: mark,
+        refTiltBps: 0,
+        refSeq: 1,
+        refAgeSeconds: 0n,
+        chainId: 11155111,
+        kind: "fill",
+      },
+    ],
+    references: [],
+    rejections: [],
+  } as never;
+  const shipped = { balanceA: 15_000_000n, balanceB: 496_902_045_775_143n, mid: mark, markAtShip: mark, markAtShipAt: null, markAtShipSource: null, seq: 1, block: 1 };
+  const pnl = legPnl(history, shipped, mark, mark);
+
+  expect(pnl.tradingA).toBeNull();
+  expect(pnl.holdA).toBeNull();
+  expect(pnl.totalA).toBeNull();
+  expect(pnl.caveat).toMatch(/ship/i);
+  // The lifetime figures are still real, and still shown.
+  expect(pnl.lifetime.fills).toBe(1);
+  expect(pnl.lifetime.tradingA).not.toBeNull();
+});
+
