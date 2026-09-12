@@ -9,6 +9,12 @@
     ],
     "note": "recorded testnet reads; no value here is synthesised"
   },
+  "highlight": {
+    "seq": 1789134256,
+    "atSeconds": 1789135392,
+    "kind": "largest-shift",
+    "why": "the widest the book leaned in this recording: Sepolia at 647 bps of shift"
+  },
   "market": {
     "points": [
       {
@@ -4844,7 +4850,7 @@
         "cappedByRoom": true,
         "clampedByMaxTilt": false,
         "balancesMatchEnclave": true,
-        "referenceAgeSeconds": 1740,
+        "referenceAgeSeconds": 5213,
         "carried": false,
         "carriedFromSeq": null
       },
@@ -7822,7 +7828,7 @@
         "cappedByRoom": true,
         "clampedByMaxTilt": false,
         "balancesMatchEnclave": true,
-        "referenceAgeSeconds": 1740,
+        "referenceAgeSeconds": 5213,
         "carried": false,
         "carriedFromSeq": null
       },
@@ -10825,7 +10831,7 @@
         "cappedByRoom": true,
         "clampedByMaxTilt": false,
         "balancesMatchEnclave": true,
-        "referenceAgeSeconds": 1740,
+        "referenceAgeSeconds": 5213,
         "carried": false,
         "carriedFromSeq": null
       },

@@ -256,12 +256,70 @@ const legs = LEGS.map((leg) => {
   };
 });
 
+/**
+ * The one round worth jumping to, and why.
+ *
+ * The replay's jump chip is for a reader with thirty seconds, and it was dead: it jumped to the
+ * first round that hit the cap, and this recording has none — the reference cutover that produced
+ * them aged out of the window. A control that does nothing reads as a broken page rather than a
+ * quiet one, so the seed names the round itself rather than leaving the surface to hunt for one.
+ *
+ * In order: a round where the reference changed source, because it is the only round on the chart
+ * that is not a market move and the one most worth explaining; then a round where the boundary took
+ * some of a leg's concession, because that is the policy meeting its limit; then simply the largest
+ * shift the recording holds, which is the most the book ever leaned.
+ */
+type Highlight = { seq: number; atSeconds: number; kind: string; why: string } | null;
+
+const highlightOf = (): Highlight => {
+  const rounds = legs.flatMap((leg) =>
+    leg.rounds.map((round) => ({ ...round, leg: leg.label, capped: leg.decomposition?.cappedByRoom === true })),
+  );
+  if (rounds.length === 0) return null;
+
+  const changed = rounds.filter((round) => round.referenceChanged).sort((a, b) => a.seq - b.seq)[0];
+  if (changed !== undefined) {
+    return {
+      seq: changed.seq,
+      atSeconds: changed.atSeconds,
+      kind: "reference-change",
+      why: "the reference changed source here, so every leg's shift moved without the market moving: not a price event",
+    };
+  }
+
+  // A round where a leg sat on its own band edge. Read per round from what was published rather
+  // than from the leg's state now: "capped at the end" is not a moment anybody can jump to, and the
+  // playhead finishes there anyway.
+  const onTheCap = legs
+    .flatMap((leg) => leg.rounds.filter((round) => Math.abs(round.tiltBps) >= leg.maxTiltBps).map((round) => ({ ...round, leg: leg.label })))
+    .sort((a, b) => a.atSeconds - b.atSeconds)[0];
+  if (onTheCap !== undefined) {
+    return {
+      seq: onTheCap.seq,
+      atSeconds: onTheCap.atSeconds,
+      kind: "capped",
+      why: `${onTheCap.leg} is pinned against its own band edge here, with no room left to concede`,
+    };
+  }
+
+  const deepest = rounds.reduce((worst, round) => (Math.abs(round.tiltBps) > Math.abs(worst.tiltBps) ? round : worst));
+  return {
+    seq: deepest.seq,
+    atSeconds: deepest.atSeconds,
+    kind: "largest-shift",
+    why: `the widest the book leaned in this recording: ${deepest.leg} at ${deepest.tiltBps} bps of shift`,
+  };
+};
+
 const replay = {
   provenance: {
     recordedAtSeconds: recordedAt.seconds,
     sources: [...LEGS.map((l) => l.file), "packages/console-data/fixtures/recorded-at.json"],
     note: "recorded testnet reads; no value here is synthesised",
   },
+  // Where a reader with thirty seconds should be sent, named here rather than hunted for by the
+  // surface that draws the jump.
+  highlight: highlightOf(),
   // The one mainnet series every leg prices from, in both windows the service draws: a week hourly,
   // and the recent hours per swap.
   market: marketOf(moment.snapshot.market),
