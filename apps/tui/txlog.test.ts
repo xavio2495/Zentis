@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LEGS } from "@zentis/console-data";
 import { record, settle } from "./src/journal.js";
-import { appendTxLog, mergeRows, parseTxLog, readTxLog, rowsOf, txlogPath } from "./src/txlog.js";
+import { mergeRows, parseTxLog, rowsOf } from "./src/txlog.js";
+import { appendTxLog, readTxLog, txlogPath } from "./src/txlog-file.js";
 
 /**
  * The transaction log, which is a file and not a memory.
@@ -144,7 +145,7 @@ test("an action that sent nothing keeps its place, because asking is a thing don
 test("nothing in this module can shorten the file", () => {
   // The rule is worth a test rather than a comment: one `writeFileSync` here, added later by
   // somebody fixing something else, silently throws away every line another process wrote.
-  const source = readFileSync(new URL("./src/txlog.ts", import.meta.url), "utf8");
+  const source = readFileSync(new URL("./src/txlog-file.ts", import.meta.url), "utf8");
   expect(source).not.toContain("writeFileSync");
   expect(source).not.toContain("truncate");
   expect(source).toContain('flag: "a"');

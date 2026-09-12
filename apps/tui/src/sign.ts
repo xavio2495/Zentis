@@ -4,7 +4,8 @@ import { privateKeyToAccount } from "viem/accounts";
 import { LEGS, type LegConfig } from "@zentis/console-data";
 import { createWallet } from "./wallet-file.js";
 import { type Request, approveRequest, pushRequest, quoteRequest, swapRequest, tokenIn, wrapRequest } from "./intents.js";
-import { type TxLogLine, appendTxLog, txlogPath } from "./txlog.js";
+import type { TxLogLine } from "./txlog.js";
+import { appendTxLog, txlogPath } from "./txlog-file.js";
 
 /**
  * The one process in this console that holds a key.

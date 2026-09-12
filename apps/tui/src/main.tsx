@@ -8,7 +8,8 @@ import { fixedStore } from "../sandbox/state.js";
 import { fakeSnapshot } from "../sandbox/world.js";
 import { run, summarise } from "./runner.js";
 import type { Action } from "./action-types.js";
-import { appendTxLog, parseTxLog, readTxLog, txlogPath } from "./txlog.js";
+import { parseTxLog } from "./txlog.js";
+import { appendTxLog, readTxLog, txlogPath } from "./txlog-file.js";
 import { RECORDED_TXLOG } from "./txlog-fixture.js";
 
 /**

@@ -1,6 +1,3 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
 import { LEGS } from "@zentis/console-data";
 import { tokenAmount } from "./format.js";
 import type { LogEntry } from "./journal.js";
@@ -14,9 +11,9 @@ import type { LogEntry } from "./journal.js";
  * append-only file — `~/.zentis/txlog.jsonl`, or wherever `ZENTIS_TXLOG` says — with one JSON object
  * per line, newest last, in a shape agreed with the scripts.
  *
- * Append-only by everybody. Nothing here rewrites the file: a reader that rewrote it would race
- * every writer on the machine, and what it would race away is the only record of what was sent. That
- * rule is why this module opens with `flag: "a"` and has no other way to touch the file at all.
+ * Reading and writing that file is `txlog-file.ts`, and the split is not tidiness: the public
+ * console is a browser bundle with no filesystem behind it, and it draws this page from a recording.
+ * A `node:fs` import in the module that page imports is one the browser build cannot resolve.
  *
  * The console's own memory is still worth something beside it — an action that broadcast nothing,
  * or one still in flight, is a thing done that no chain will ever record — so `mergeRows` puts the
@@ -40,13 +37,6 @@ export interface TxLogLine {
   readonly tokenIn: string | null;
   readonly tokenOut: string | null;
   readonly note: string | null;
-}
-
-/** Where the file is. The environment moves it so a test never writes the operator's own log. */
-export function txlogPath(env: Record<string, string | undefined> = process.env): string {
-  const named = env.ZENTIS_TXLOG ?? "";
-  if (named !== "") return named;
-  return join(env.HOME ?? homedir(), ".zentis", "txlog.jsonl");
 }
 
 const str = (value: unknown): string | null => (typeof value === "string" && value !== "" ? value : null);
@@ -92,22 +82,6 @@ export function parseTxLog(text: string): TxLogLine[] {
   return out;
 }
 
-/** A log that does not exist yet is an empty log, not an error on the screen. */
-export function readTxLog(path: string): TxLogLine[] {
-  try {
-    return parseTxLog(readFileSync(path, "utf8"));
-  } catch {
-    return [];
-  }
-}
-
-/** One object, one line, on the end. The only way this module touches the file. */
-export function appendTxLog(path: string, line: TxLogLine): void {
-  const folder = dirname(path);
-  if (!existsSync(folder)) mkdirSync(folder, { recursive: true, mode: 0o700 });
-  appendFileSync(path, `${JSON.stringify(line)}\n`, { flag: "a", mode: 0o600 });
-}
-
 /** What a row of the log page says. One per line of the file, plus this console's own asking. */
 export interface LogRow {
   readonly atSeconds: number;
@@ -115,6 +89,14 @@ export interface LogRow {
   readonly kind: string;
   /** what moved, or what happened when nothing did */
   readonly flow: string | null;
+  /**
+   * The two sides on their own, so a narrow column can give up a size rather than cut one in half.
+   *
+   * "0.15 USDC → 0.0000579…" is not a smaller version of the fill, it is a different number. The
+   * page drops to naming the token instead, which says less and nothing untrue.
+   */
+  readonly from: string | null;
+  readonly to: string | null;
   readonly tx: string | null;
   readonly status: "ok" | "reverted" | "running" | "event" | "failed";
   readonly bad: boolean;
@@ -167,6 +149,8 @@ export function rowsOf(lines: readonly TxLogLine[]): LogRow[] {
       const status: LogRow["status"] = line.tx === null ? "event" : line.status === 0 ? "reverted" : "ok";
       return {
         atSeconds: Math.floor(Date.parse(line.at) / 1000) || 0,
+        from,
+        to,
         // Short, because the column is four cells wide at eighty and the prefix is what differs.
         chain: line.chain === null ? null : line.chain.split("-")[0]!,
         kind: line.kind,
@@ -199,6 +183,8 @@ export function mergeRows(rows: readonly LogRow[], log: readonly LogEntry[]): Lo
       const flow = entry.outcome === null ? asked : `${asked} · ${entry.outcome}`;
       return {
         atSeconds: entry.atSeconds,
+        from: null,
+        to: null,
         chain: named === undefined ? null : named.toLowerCase(),
         kind: kind ?? entry.action,
         flow: flow.trim() === "" ? entry.action : flow,

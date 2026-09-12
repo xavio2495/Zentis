@@ -36,8 +36,13 @@ interface RawHistory {
 
 const iso = (seconds: string) => new Date(Number(seconds) * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
 
-/** How many publishes per leg are kept: enough that the page is a page, not the whole recording. */
-const PUBLISHES = 4;
+/**
+ * How many publishes per leg are kept.
+ *
+ * Two, not more: every publish is newer than every fill in the recording, so a fourth one per leg
+ * pushed the fills off the visible page — and the fills are the thing worth seeing on a log.
+ */
+const PUBLISHES = 2;
 
 const lines = LEGS.flatMap((leg, index) => {
   const history = [historySepolia, historyArbitrum, historyBase][index] as unknown as RawHistory;

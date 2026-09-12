@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import { duration } from "../format.js";
+import { chooseFit, duration } from "../format.js";
 import { padRows, trunc } from "../layout.js";
 import { columns } from "../pages/table.js";
 import { Segments } from "./Segments.js";
@@ -36,6 +36,29 @@ const WORDS: Record<LogRow["status"], string> = {
 /** Folded to one line and cut to the room it was given: a revert arrives with the whole calldata
  * under it, and a column measured against that squeezes every other row on the screen. */
 const oneLine = (text: string, room: number): string => trunc(text.replace(/\s+/g, " ").trim(), room);
+
+/**
+ * What moved, at whatever length the column can hold.
+ *
+ * Whole variants, longest first, the way every row on this screen is built: a size cut in the
+ * middle — "0.0000579…" — is not a shorter way of saying the number, it is a different number. So
+ * the column gives up the closing size, then the opening one, before it gives up being true. A note
+ * is prose and may be cut, which is what the last variant is for.
+ */
+function movement(row: LogRow, room: number): string {
+  if (row.from === null && row.to === null) return row.flow === null ? "" : oneLine(row.flow, room);
+  const size = (side: string | null) => side ?? "?";
+  const unit = (side: string | null) => side?.split(" ").slice(1).join(" ") || "?";
+  return chooseFit(
+    [
+      `${size(row.from)} → ${size(row.to)}`,
+      `${size(row.from)} → ${unit(row.to)}`,
+      `${unit(row.from)} → ${unit(row.to)}`,
+      "",
+    ],
+    room,
+  );
+}
 
 /** What the gaps between six columns cost, which is room the middle one does not get. */
 const GAPS = 5 * 2;
@@ -85,9 +108,7 @@ export function Log({
         ? [
             {
               header: "in → out",
-              cells: drawn.map((row) => [
-                { text: row.flow === null ? "" : oneLine(row.flow, flowRoom), color: UI.muted },
-              ]),
+              cells: drawn.map((row) => [{ text: movement(row, flowRoom), color: UI.muted }]),
             },
           ]
         : []),
