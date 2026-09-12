@@ -13,10 +13,11 @@ import {
   WebGLRenderer,
 } from "three";
 import { BAR, sampleMark } from "@/lib/mark-geometry";
-import { CAMERA_Z, FOV_DEGREES, fieldState, gateShape } from "@/lib/field-state";
+import { CAMERA_Z, FOV_DEGREES, MARK_HALF_EXTENT, fieldState, gateShape } from "@/lib/field-state";
 import { markPosition } from "@/lib/mark-position";
 import { scrollNow } from "@/lib/scroll";
 import { calmRect } from "@/lib/calm";
+import { markSlot, nearestFigure } from "@/lib/figure-slot";
 import { cursorInMarkSpace } from "@/lib/cursor-space";
 import { dockRect } from "@/lib/dock";
 
@@ -602,6 +603,10 @@ export function mountMarkField(host: HTMLElement): () => void {
   const MARK_CLEARS = 0.78;
 
   let previous = start;
+  // Eased rather than snapped: the mark crosses to the other half as the next figure arrives, the
+  // way the reference's star drifts opposite each card.
+  let slotX = 0;
+  let slotY = 0;
   const frame = (now: number) => {
     const time = (now - start) / 1000;
     // Time-based rather than per-frame, so easing takes the same wall-clock
@@ -626,8 +631,29 @@ export function mountMarkField(host: HTMLElement): () => void {
     followX += (state.markOffsetX - followX) * lead;
     followY += (state.markOffsetY - followY) * lead;
 
-    group.position.x = state.positionX + followX;
-    group.position.y = followY;
+    // Which figure the reader is on, and therefore which half is free. The page's figures publish
+    // their own side; the mark takes the other one. See lib/figure-slot.
+    const perUnitNow = innerHeight / (2 * Math.tan((25 * Math.PI) / 180) * (16 - state.positionZ));
+    const halfExtentPx = MARK_HALF_EXTENT * state.scale * perUnitNow;
+    const figure = nearestFigure();
+    const slot = markSlot({
+      side: figure.side,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      halfExtentPx,
+      figureCentreY: figure.centreY,
+    });
+
+    // Off to the free half while a figure is on screen; otherwise the scroll choreography, which
+    // owns the hero, the traverse and the scatter at the end.
+    const wantX = slot.beside ? (slot.centreX - innerWidth / 2) / perUnitNow : state.positionX;
+    const wantY = slot.beside ? (innerHeight / 2 - slot.centreY) / perUnitNow : 0;
+    const toSlot = settle(3.2);
+    slotX += (wantX - slotX) * toSlot;
+    slotY += (wantY - slotY) * toSlot;
+
+    group.position.x = slotX + followX;
+    group.position.y = slotY + followY;
     group.position.z = state.positionZ;
     group.scale.setScalar(state.scale);
     group.rotation.y = state.rotationY + (reduced ? 0 : time * 0.06);
