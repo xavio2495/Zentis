@@ -39,6 +39,11 @@ export interface FieldState {
   rotationX: number;
   opacity: number;
   scatter: number;
+  /** The doorway the reader passes through, on the first screen only. */
+  doorOpacity: number;
+  doorScale: number;
+  /** The field of light the whole page happens in. */
+  starfieldOpacity: number;
   /** Scroll position where the traverse ends and the prose begins. */
   proseFrom: number;
   /** Scroll position where the prose ends and the scatter begins. */
@@ -103,6 +108,16 @@ export function fieldState({
   const yielded = 1 + (restingOpacity - 1) * handoff;
   const opacity = arrival * (yielded + (0.85 - yielded) * scatter);
 
+  // The doorway belongs to the first screen. It opens out as the reader comes
+  // through it and is gone well before any prose arrives.
+  const through = easeOut(clamp(scrollY / (viewportHeight * 1.2), 0, 1));
+  const doorOpacity = 1 - through;
+  const doorScale = 1 + through * 1.4;
+
+  // The far field is faint behind the closed door and opens up as it goes. It
+  // never leaves: it is the room the rest of the page happens in.
+  const starfieldOpacity = 0.12 + 0.43 * eased;
+
   return {
     positionX,
     positionZ,
@@ -111,6 +126,9 @@ export function fieldState({
     rotationX: past * 0.2,
     opacity,
     scatter,
+    doorOpacity,
+    doorScale,
+    starfieldOpacity,
     proseFrom,
     outroFrom,
   };
