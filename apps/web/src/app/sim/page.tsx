@@ -22,6 +22,7 @@ export default function SimPage() {
   return (
     <ReplayProvider>
       <Screen />
+      <div className="grain" />
     </ReplayProvider>
   );
 }

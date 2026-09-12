@@ -7,6 +7,7 @@ import { useLegAt, useReplay } from "@/lib/store";
 import { FillsPanel } from "./FillsPanel";
 import { ShiftPanel } from "./ShiftPanel";
 import { SimPanel, type SimSeed } from "./SimPanel";
+import { MarkGlyph } from "./MarkGlyph";
 import { Transport } from "./Transport";
 import { Chip, Panel, Stat } from "./ui";
 
@@ -38,7 +39,8 @@ export function Screen() {
   return (
     <div className="flex h-screen flex-col bg-bg text-ink">
       <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-stroke px-4">
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-center gap-3">
+          <MarkGlyph className="text-ink" />
           <span className="label text-ink">Zentis</span>
           <span className="label-sm text-ink-faint">replay · recorded testnet reads</span>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { TERMINAL_THEME } from "@/lib/terminal-theme";
 
 /**
  * The operator's console, in a browser.
@@ -39,12 +40,7 @@ export function Terminal() {
         scrollback: 0,
         fontSize: 13,
         fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-        theme: {
-          background: "#0a0a0a",
-          foreground: "#f5f5f5",
-          cursor: "#00ED64",
-          selectionBackground: "#00ED6433",
-        },
+        theme: { ...TERMINAL_THEME },
       });
       const fit = new FitAddon();
       term.loadAddon(fit);

@@ -358,6 +358,16 @@ body.ready .rise-4 {
 
 /* Tabular numerals, so no digit changes width as the playhead moves. A figure
    that shifts by a pixel every tick is a figure nobody can read. */
+/* The console's one transition. `transition-colors` on its own eases on the browser's
+   default curve, which is not the curve the landing uses anywhere else — and a screen
+   that eases two ways reads as two screens stitched together. */
+.tap {
+  transition:
+    color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    opacity 0.2s var(--ease-out);
+}
+
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;

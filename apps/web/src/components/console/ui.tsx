@@ -87,7 +87,7 @@ export function Chip({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className={`label-sm h-[18px] border px-2 leading-none transition-colors ${
+      className={`label-sm h-[18px] border px-2 leading-none tap ${
         active
           ? "border-em text-em"
           : "border-stroke text-ink-faint hover:border-line2 hover:text-ink-soft disabled:hover:border-stroke disabled:hover:text-ink-faint"
