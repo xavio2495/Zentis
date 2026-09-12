@@ -33,8 +33,11 @@ test("the simulation page shows the run, and what it claims is in help", async (
 test("the pnl and positions pages drop their footnotes, keeping the caveat that changes a number", async () => {
   const pnl = await pageText("n");
   expect(pnl).not.toContain("marked at 1inch spot");
-  // Hold being unknown changes what "total" means, so it stays — as one line, not a paragraph.
-  expect(pnl).toMatch(/hold unknown|no opening mark/);
+  // The one caveat that changes what a number means, as one line rather than a paragraph. Hold is
+  // no longer unknown — every leg carries the mark it was shipped against — so what the line says
+  // now is the thing that is still true of it: its two ends come from different sources.
+  expect(pnl).not.toMatch(/hold unknown/);
+  expect(pnl).toMatch(/backfilled|two sources|1inch spot/);
   expect(pnl.split("\n").filter((l) => l.includes("!")).length).toBeLessThanOrEqual(2);
 
   const positions = await pageText("p");
@@ -69,3 +72,13 @@ test("help scrolls rather than hiding what it could not fit", async () => {
   const returned = (await drive(120, 40, { keys: ["?", "DOWN", "DOWN", "UP", "UP", "UP"] })).lines.join("\n");
   expect(returned).toContain("what this is");
 }, 120_000);
+
+test("the status page carries the record's own sentence about the opening mark, in full", async () => {
+  // The pnl page has one line for it; this is the page that says where every number came from, so
+  // the sentence the deployment record carries is quoted here whole rather than summarised. A
+  // provenance note nobody can read in full is a provenance note.
+  const status = (await drive(190, 50, { keys: ["d"] })).lines.join(" ").replace(/[│┌┐╰╯─]/g, " ").replace(/\s+/g, " ");
+  expect(status).toContain("hourly close");
+  expect(status).toContain("not read at ship time");
+}, 60_000);
+
