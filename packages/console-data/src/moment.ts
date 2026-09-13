@@ -17,11 +17,30 @@
  */
 export interface RecordedLeg {
   readonly name: string;
-  readonly history: { position?: unknown; references?: { seq: number | string; tiltBps?: number }[] };
-  readonly ref: { seq: number | string; tiltBps?: number };
+  readonly history: {
+    position?: unknown;
+    references?: { seq: number | string; tiltBps?: number }[];
+  };
+  readonly ref: { seq: number | string; tiltBps?: number; refBalanceA?: string | bigint };
 }
 
-export function momentProblems(legs: RecordedLeg[], legCount: number): string[] {
+export interface MomentDemands {
+  /**
+   * Refuse a moment the enclave priced from balances other than these.
+   *
+   * Off by default, because a fill landing between the finalized block the enclave read and the head
+   * the subgraph answers at is ordinary — with a taker running it is the common state, and the
+   * screens have a branch that explains it. On by choice, when somebody has quietened the taker and
+   * is waiting for a round that can demonstrate the exact agreement the whole surface claims.
+   */
+  readonly agreeing?: boolean;
+}
+
+export function momentProblems(
+  legs: RecordedLeg[],
+  legCount: number,
+  demands: MomentDemands = {},
+): string[] {
   const problems: string[] = [];
   for (const leg of legs) {
     if (leg.history.position == null) problems.push(`history-${leg.name}: written without its position`);
@@ -41,6 +60,25 @@ export function momentProblems(legs: RecordedLeg[], legCount: number): string[] 
       );
     }
   }
+  if (demands.agreeing === true) {
+    for (const leg of legs) {
+      const position = leg.history.position as { balanceA?: string | bigint } | null | undefined;
+      const held = position?.balanceA;
+      const priced = leg.ref.refBalanceA;
+      if (held === undefined || priced === undefined) {
+        problems.push(`${leg.name}: nothing says which balances the enclave priced from, so agreement cannot be checked`);
+        continue;
+      }
+      if (BigInt(held) !== BigInt(priced)) {
+        problems.push(
+          `${leg.name}: the enclave priced from ${String(priced)} tokenA and the subgraph holds ${String(held)} — ` +
+            `a fill landed between the finalized block it read and the head, so the recomputation cannot reproduce ` +
+            `its shift; wait for a fast round carrying these balances`,
+        );
+      }
+    }
+  }
+
   // Carried on every leg, or it is not a carried round: the slow workflow republishes the whole
   // book, so one leg repeating a tilt by coincidence is a coincidence.
   const carries = legs.map((leg) => {

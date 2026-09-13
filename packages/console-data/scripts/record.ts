@@ -208,7 +208,7 @@ const recordService = async () => {
   recordPushes();
 };
 
-const wanted = process.argv.slice(2);
+const wanted = process.argv.slice(2).filter((argument) => !argument.startsWith("--"));
 // `wallet` alone records just the maker's wallet, which is RPC only. That matters when an indexer's
 // allowance is spent: the wallet can still be captured without asking a subgraph anything.
 const walletOnly = wanted.length === 1 && wanted[0] === "wallet";
@@ -330,7 +330,16 @@ const recorded = chosen.map((leg) => ({
   history: read(`history-${leg.name}`),
   ref: read(`ref-${leg.name}`),
 }));
-problems.push(...momentProblems(recorded, LEGS.length));
+/**
+ * `--agreeing` holds out for a round the console can reproduce exactly.
+ *
+ * The enclave prices from a finalized block and the subgraph answers at the head, so a fill landing
+ * between the two leaves the two numbers apart — ordinary with a taker running, and explained on
+ * screen. When somebody has quietened the taker to catch a clean round, this refuses anything less
+ * rather than stamping a moment that cannot show the claim the whole surface makes.
+ */
+const agreeing = process.argv.slice(2).includes("--agreeing");
+problems.push(...momentProblems(recorded, LEGS.length, { agreeing }));
 const seqs = new Set(recorded.map((leg) => Number(leg.ref.seq)));
 
 if (problems.length > 0) {
