@@ -1,4 +1,4 @@
-import { INSTALL_COMMAND, INTEGRATIONS, REPO_LABEL, ROUTES } from "./copy";
+import { COPY, INSTALL_COMMAND, INTEGRATIONS, REPO_LABEL, ROUTES } from "./copy";
 
 /**
  * The deck, as data.
@@ -20,6 +20,11 @@ export interface Slide {
   title: string;
   body: string;
   points?: readonly string[];
+  /**
+   * The places the argument is running, as doors. Only the close has them, and it takes them from
+   * the same list the landing's close does, so the two pages cannot end on different invitations.
+   */
+  doors?: readonly { href: string; label: string; blurb: string }[];
 }
 
 export const SLIDES: readonly Slide[] = [
@@ -93,10 +98,12 @@ export const SLIDES: readonly Slide[] = [
   {
     id: "ask",
     kicker: "The ask",
-    title: "Read it for yourself.",
+    // The landing's own invitation, so the deck and the page end on the same words.
+    title: COPY.tryItOut,
     body:
-      "The position is live on three testnets and the console that drives it installs in one line. Everything on the previous slide is written down in the repository, next to the thing it describes.",
+      "The position is live on three testnets, and the console that drives it installs in one line. Run it, or open the two places it is already running. Everything on the previous slide is written down in the repository, next to the thing it describes.",
     points: [INSTALL_COMMAND, REPO_LABEL],
+    doors: ROUTES.filter((route) => route.atClose),
   },
 ];
 
@@ -124,7 +131,12 @@ export function deckProse(): string[] {
  * is the argument, so it has to survive all three.
  */
 export const DECK_NOSCRIPT: string = SLIDES.map((slide) =>
-  [`${slide.kicker}: ${slide.title}`, slide.body, ...(slide.points ?? []).map((p) => `— ${p}`)].join(" "),
+  [
+    `${slide.kicker}: ${slide.title}`,
+    slide.body,
+    ...(slide.points ?? []).map((p) => `— ${p}`),
+    ...(slide.doors ?? []).map((door) => `— ${door.label}: ${door.blurb}`),
+  ].join(" "),
 ).join("\n\n");
 
 export const DECK_META = {

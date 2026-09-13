@@ -52,6 +52,15 @@ export default function DeckPage() {
                   ))}
                 </ul>
               ) : null}
+              {slide.doors ? (
+                <p className="mt-4 flex gap-6">
+                  {slide.doors.map((door) => (
+                    <a key={door.href} href={door.href} className="text-fs-0 text-ink">
+                      {door.label}
+                    </a>
+                  ))}
+                </p>
+              ) : null}
             </section>
           ))}
           <p className="mt-12 font-mono text-fs-0 text-ink">{INSTALL_COMMAND}</p>

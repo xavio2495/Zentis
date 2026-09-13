@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BrandMark } from "@/components/BrandMark";
 import { CopyCommand } from "@/components/CopyCommand";
 import { Field } from "@/components/Field";
 import { Reveal } from "@/components/Reveal";
@@ -99,8 +101,19 @@ export function DeckStage() {
       <Field />
       <div className="grain" />
 
-      {/* The rail is the only chrome: where the deck is, and how much is left. Buttons rather than
-          marks, because a presenter who has lost their place wants to jump, not to arrow back. */}
+      {/* The way home. The deck has no nav, and a reader who was handed this URL in a chat has no
+          other way back to the page that makes the argument at reading pace. The mark, not the
+          word, for the same reason the landing's nav uses it: it is what the field is drawing. */}
+      <Link
+        href="/"
+        aria-label="Zentis, back to the landing"
+        className="fixed right-6 top-6 z-60 no-underline md:right-8 md:top-8"
+      >
+        <BrandMark className="h-5 w-5" />
+      </Link>
+
+      {/* The rail: where the deck is, and how much is left. Buttons rather than marks, because a
+          presenter who has lost their place wants to jump, not to arrow back. */}
       <nav aria-label="Slides" className="fixed right-6 top-1/2 z-60 hidden -translate-y-1/2 flex-col gap-3 md:flex">
         {SLIDES.map((slide, at) => (
           <button
@@ -156,6 +169,17 @@ export function DeckStage() {
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {slide.doors ? (
+                // The same two doors the landing's close opens: the tool the maker runs, and the
+                // same moment as one screen. Links, so the stage's click-to-advance leaves them be.
+                <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+                  {slide.doors.map((door) => (
+                    <a key={door.href} href={door.href} title={door.blurb} className="cta">
+                      {door.label}
+                    </a>
+                  ))}
+                </div>
               ) : null}
             </Reveal>
           </section>
