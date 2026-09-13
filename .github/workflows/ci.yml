@@ -144,6 +144,35 @@ jobs:
         working-directory: apps/tui
         run: bun test
 
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      # Deliberately installs ONLY apps/web, because that is all Vercel installs and the difference
+      # is what broke the deployment on 2026-09-13: the production typecheck follows relative
+      # imports in `tests/` and `scripts/` into `packages/console-data/src`, whose own imports of
+      # viem and @zentis/strategy-sdk then have to resolve from THAT directory. Installing the
+      # siblings here would hide the very failure this job exists to catch; the build script
+      # installs what it needs, so if that ever stops being true this goes red instead of the
+      # deployment.
+      - name: Install the site, as the deployment does
+        working-directory: apps/web
+        run: bun install --frozen-lockfile
+
+      # `next build` runs TypeScript over the same tsconfig, so this is the check that failed in
+      # production. It runs before the suite because a broken build is the more serious answer.
+      - name: Build the site, as the deployment does
+        working-directory: apps/web
+        run: bun run build
+
+      - name: Test the site
+        working-directory: apps/web
+        run: bun test
+
   model-and-scripts:
     runs-on: ubuntu-latest
     steps:
