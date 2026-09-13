@@ -4,58 +4,58 @@
     {
       "chainId": 11155111,
       "chain": "Sepolia",
-      "gas": "1975753844310464328",
+      "gas": "1974697203985423356",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "48208539",
-        "committed": "45450000",
-        "allowance": "45000000"
+        "held": "48217246",
+        "committed": "45458707",
+        "allowance": "44558621"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "17588353579808447",
-        "committed": "17588353579808447",
-        "allowance": "17588353579808447"
+        "held": "17589169738256963",
+        "committed": "17589169738256963",
+        "allowance": "17413286202458879"
       }
     },
     {
       "chainId": 421614,
       "chain": "Arbitrum Sepolia",
-      "gas": "1793191095980425581",
+      "gas": "1792912233351243581",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "48760765",
-        "committed": "45450000",
-        "allowance": "45000000"
+        "held": "48774887",
+        "committed": "45464122",
+        "allowance": "44563983"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "17598014040927221",
-        "committed": "17598014040927221",
-        "allowance": "17598014040927221"
+        "held": "17602372263596344",
+        "committed": "17602372263596344",
+        "allowance": "17426392123187072"
       }
     },
     {
       "chainId": 84532,
       "chain": "Base Sepolia",
-      "gas": "1921174212980719243",
+      "gas": "1921167969589336882",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "49436014",
-        "committed": "45450000",
-        "allowance": "45000000"
+        "held": "49441270",
+        "committed": "45455256",
+        "allowance": "44555204"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "17590952171820082",
-        "committed": "17590952171820082",
-        "allowance": "17590952171820082"
+        "held": "17591820221407725",
+        "committed": "17591820221407725",
+        "allowance": "17415910699689525"
       }
     }
   ]

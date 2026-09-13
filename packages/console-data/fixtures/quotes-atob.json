@@ -6,25 +6,25 @@
     {
       "chainId": 84532,
       "chain": "base-sepolia",
-      "rank": 1,
+      "rank": 2,
       "tokenIn": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
       "tokenOut": "0x4200000000000000000000000000000000000006",
       "amountIn": "150000",
-      "amountOut": "57905427302623",
-      "reason": "the leg is over-weight tokenA at 11 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
-      "seq": 1789264416,
-      "tiltBps": 11,
-      "refMid": "394170811955556953007413485",
-      "refAgeSeconds": 1225,
+      "amountOut": "58373826875018",
+      "reason": "the leg is over-weight tokenB at 141 bps of tilt and wants takers to put tokenA into it, so this side is discounted",
+      "seq": 1789267790,
+      "tiltBps": -141,
+      "refMid": "394794766881052004754362983",
+      "refAgeSeconds": 1228,
       "caveats": [
-        "the reference is 1225s old and the quoted spread has widened with its age"
+        "the reference is 1228s old and the quoted spread has widened with its age"
       ],
       "refusal": null,
       "_meta": {
         "block": {
-          "number": 46748635,
-          "hash": "0xd6341a8587e3d845d186252100530ac5bf35f358e75f2968c23384442fa3f161",
-          "timestamp": 1789265558
+          "number": 46750362,
+          "hash": "0xc480bc89b52778d47c171f8cd3870f0cec7084d913954bca63c2553f6978c142",
+          "timestamp": 1789269012
         },
         "hasIndexingErrors": false
       }
@@ -36,21 +36,21 @@
       "tokenIn": "0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d",
       "tokenOut": "0x980b62da83eff3d4576c647993b0c1d7faf17c73",
       "amountIn": "150000",
-      "amountOut": "56772334299874",
-      "reason": "the leg is over-weight tokenA at 11 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
-      "seq": 1789264416,
-      "tiltBps": 11,
-      "refMid": "394170811955556953007413485",
-      "refAgeSeconds": 1225,
+      "amountOut": "57226058408728",
+      "reason": "the leg is over-weight tokenB at 140 bps of tilt and wants takers to put tokenA into it, so this side is discounted",
+      "seq": 1789267790,
+      "tiltBps": -140,
+      "refMid": "394794766881052004754362983",
+      "refAgeSeconds": 1228,
       "caveats": [
-        "the reference is 1225s old and the quoted spread has widened with its age"
+        "the reference is 1228s old and the quoted spread has widened with its age"
       ],
       "refusal": null,
       "_meta": {
         "block": {
-          "number": 308307148,
-          "hash": "0xa92644b56e5d428a898683958a8d6071bf8ee21a9c29a8c820ea03b34a439c20",
-          "timestamp": 1789265561
+          "number": 308320973,
+          "hash": "0xb39fd77ccce4ace7a5a47d193fe4d1dc56facf9a3fb14fef8246712b7f8d7126",
+          "timestamp": 1789269013
         },
         "hasIndexingErrors": false
       }
@@ -58,25 +58,25 @@
     {
       "chainId": 11155111,
       "chain": "sepolia",
-      "rank": 2,
+      "rank": 1,
       "tokenIn": "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
       "tokenOut": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
       "amountIn": "150000",
-      "amountOut": "57896873326730",
-      "reason": "the leg is over-weight tokenA at 11 bps of tilt and wants takers to take tokenA out of it, so this side pays a premium",
-      "seq": 1789264416,
-      "tiltBps": 11,
-      "refMid": "394170811955556953007413485",
-      "refAgeSeconds": 1225,
+      "amountOut": "58425323469329",
+      "reason": "the leg is over-weight tokenB at 152 bps of tilt and wants takers to put tokenA into it, so this side is discounted",
+      "seq": 1789267790,
+      "tiltBps": -152,
+      "refMid": "394794766881052004754362983",
+      "refAgeSeconds": 1228,
       "caveats": [
-        "the reference is 1225s old and the quoted spread has widened with its age"
+        "the reference is 1228s old and the quoted spread has widened with its age"
       ],
       "refusal": null,
       "_meta": {
         "block": {
-          "number": 11692916,
-          "hash": "0x8a95619ca2fcb023ba73459f7de0fb2d51722e272ffb30819ecf1f1618cc7e87",
-          "timestamp": 1789265556
+          "number": 11693193,
+          "hash": "0x4b82ce298ab405ea829dd2cf03457a07a0eade4c175ed14326509332b56ea83f",
+          "timestamp": 1789269012
         },
         "hasIndexingErrors": false
       }

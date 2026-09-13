@@ -2,20 +2,44 @@
   "position": {
     "strategyHash": "0x6c034027e9e42b1c0aa9a1d3aa21e5dc08cf94e0322ea539ea78e5ea707f18db",
     "active": true,
-    "balanceA": "45450000",
-    "balanceB": "17590952171820082",
+    "balanceA": "45455256",
+    "balanceB": "17591820221407725",
     "maxTiltBps": 5000,
     "maxStalenessSeconds": 3600,
     "widenBpsPerMinute": 2,
     "maxWidenBps": 200,
-    "fillCount": 15,
+    "fillCount": 17,
     "hasReference": true,
-    "refMid": "394170811955556953007413485",
-    "refTiltBps": 11,
-    "refSeq": 1789264416,
-    "refUpdatedAt": "1789264416"
+    "refMid": "394794766881052004754362983",
+    "refTiltBps": -141,
+    "refSeq": 1789267790,
+    "refUpdatedAt": "1789267790"
   },
   "fills": [
+    {
+      "timestamp": "1789267554",
+      "transaction": "0x642d1fd42ff262ce8c3a01b9a9e9f23665cc5c329ec3986a050daa987cf08cd6",
+      "amountIn": "450052",
+      "amountOut": "175041472130557",
+      "isAToB": true,
+      "hasReference": true,
+      "refMid": "394843511137707008320939268",
+      "refTiltBps": -1,
+      "refSeq": 1789266390,
+      "refAgeSeconds": "1164"
+    },
+    {
+      "timestamp": "1789266292",
+      "transaction": "0x8b954c216132a74f13afdefbe2ed9286a3bd7369caf796f1406e67ef5a5217d1",
+      "amountIn": "175909521718200",
+      "amountOut": "444796",
+      "isAToB": false,
+      "hasReference": true,
+      "refMid": "394406954449902004052397528",
+      "refTiltBps": 15,
+      "refSeq": 1789264781,
+      "refAgeSeconds": "1512"
+    },
     {
       "timestamp": "1789265048",
       "transaction": "0xfd0f84fdbac8069534dea15102d968476bfe17be8e9c4357cabb5966971af2dd",
@@ -198,6 +222,94 @@
     }
   ],
   "references": [
+    {
+      "timestamp": "1789268924",
+      "transaction": "0x7dd65c36512e7fda8f31ea351db51bf8377a21b532614ce6133f604624b72994",
+      "mid": "394794766881052004754362983",
+      "tiltBps": -141,
+      "seq": 1789267790,
+      "updatedAt": "1789267790"
+    },
+    {
+      "timestamp": "1789268644",
+      "transaction": "0xc510fbab728088ce1861d8c6c43169791aa7daa797daccaef934a47396c3155c",
+      "mid": "394829174786755016901769853",
+      "tiltBps": 15,
+      "seq": 1789267509,
+      "updatedAt": "1789267508"
+    },
+    {
+      "timestamp": "1789268594",
+      "transaction": "0xb41466ec8fad3e1dfeef5788662f7eecbfa254a73762cf8860456558442cd8ef",
+      "mid": "394829174786755016901769853",
+      "tiltBps": 15,
+      "seq": 1789267508,
+      "updatedAt": "1789267508"
+    },
+    {
+      "timestamp": "1789268284",
+      "transaction": "0xe3b8674db5ce2835e00165ef4a64f56254c7bb577bbad052527d8558f2ef2a33",
+      "mid": "394796348132070994211311819",
+      "tiltBps": 0,
+      "seq": 1789267226,
+      "updatedAt": "1789267226"
+    },
+    {
+      "timestamp": "1789267684",
+      "transaction": "0x1b4f8fb073fef9430e9c66fe7dd76a5efa5fb81798c92a22d89fa73c7851c8b4",
+      "mid": "394658179515726013083478731",
+      "tiltBps": 2,
+      "seq": 1789266391,
+      "updatedAt": "1789266390"
+    },
+    {
+      "timestamp": "1789267374",
+      "transaction": "0x84c56519888d22ca6624303b22aada890181cf57d71c2acf1168e38236ed44fd",
+      "mid": "394843511137707008320939268",
+      "tiltBps": -1,
+      "seq": 1789266390,
+      "updatedAt": "1789266390"
+    },
+    {
+      "timestamp": "1789267054",
+      "transaction": "0x773ee67a31fc55d529dd6b686ba9aeb6c087fe1acbcfcd33e4323e5e6970bf19",
+      "mid": "394812681822666044308229269",
+      "tiltBps": -140,
+      "seq": 1789266060,
+      "updatedAt": "1789266060"
+    },
+    {
+      "timestamp": "1789266864",
+      "transaction": "0x71595c55a6a4d712c9c11e715497f0cf9242ccc4ac5d8c71c42c663b4a264b6a",
+      "mid": "394742589197581019138670117",
+      "tiltBps": -139,
+      "seq": 1789265704,
+      "updatedAt": "1789265704"
+    },
+    {
+      "timestamp": "1789266544",
+      "transaction": "0xfc9bbcbce7ace2070c6dbcbd4293c84bff9a8cd07303afd771c0af2fd643c7f7",
+      "mid": "394571297534925966941324561",
+      "tiltBps": -134,
+      "seq": 1789265102,
+      "updatedAt": "1789265102"
+    },
+    {
+      "timestamp": "1789266164",
+      "transaction": "0x2ac04b314c6798bfdb43b1ea8143dea39e646d80affd0786eedbcf4b16410d75",
+      "mid": "394406954449902004052397528",
+      "tiltBps": 15,
+      "seq": 1789264781,
+      "updatedAt": "1789264780"
+    },
+    {
+      "timestamp": "1789265884",
+      "transaction": "0x0c774efd4e3580c4bd1eeb76573132f5da68a9fd8c9fb7e48c4d0dc3963b5840",
+      "mid": "396276926684160942410237306",
+      "tiltBps": -23,
+      "seq": 1789264780,
+      "updatedAt": "1789264780"
+    },
     {
       "timestamp": "1789265534",
       "transaction": "0xad5bc4576496cbdfc1be2b2fe77ee1839ce09132e0aefaf1404e3a776cf107f4",
@@ -3309,94 +3421,6 @@
       "tiltBps": 263,
       "seq": 1789155446,
       "updatedAt": "1789155446"
-    },
-    {
-      "timestamp": "1789156104",
-      "transaction": "0xfbd43db10a8c2a43441145f608a2146930f251024057542d97031c71ea438690",
-      "mid": "392318815643777953317792486",
-      "tiltBps": 261,
-      "seq": 1789155099,
-      "updatedAt": "1789155099"
-    },
-    {
-      "timestamp": "1789155884",
-      "transaction": "0x3d04f459ecce86e30f1e3bda5a085278b2e6080b092972446cd73fb17b6e6ed9",
-      "mid": "392235282308475007686906343",
-      "tiltBps": 263,
-      "seq": 1789154721,
-      "updatedAt": "1789154721"
-    },
-    {
-      "timestamp": "1789155484",
-      "transaction": "0xced82e66a1b2a1d4c0a6e6db37c1016f674d369dda8d761dc318fe98c4628f68",
-      "mid": "392186836053891027440940091",
-      "tiltBps": 265,
-      "seq": 1789154125,
-      "updatedAt": "1789154124"
-    },
-    {
-      "timestamp": "1789155224",
-      "transaction": "0x78d72cc1a5c26584728cc08f3ce1d407f2f08900a5896261013c46fb2b6b314c",
-      "mid": "392124037270348014463363414",
-      "tiltBps": 266,
-      "seq": 1789154124,
-      "updatedAt": "1789154124"
-    },
-    {
-      "timestamp": "1789154934",
-      "transaction": "0xe382f1d8b4304e401ecdf18b8ad284b944570df4326fc1a3c014813ea585b615",
-      "mid": "391993119897249949836051232",
-      "tiltBps": 270,
-      "seq": 1789153848,
-      "updatedAt": "1789153848"
-    },
-    {
-      "timestamp": "1789154624",
-      "transaction": "0xc62a2a2ad323765ad6cd3fda39f66bfa481451a546c42d0e9f6cd603fac201c9",
-      "mid": "393541859624597996162157417",
-      "tiltBps": 229,
-      "seq": 1789153586,
-      "updatedAt": "1789153586"
-    },
-    {
-      "timestamp": "1789154324",
-      "transaction": "0xce0551e0ac158356d2b8f057b311e40cd3ba6e48bfa403b12997daf25e4634a1",
-      "mid": "391560217694039962865830643",
-      "tiltBps": 281,
-      "seq": 1789153048,
-      "updatedAt": "1789153048"
-    },
-    {
-      "timestamp": "1789153974",
-      "transaction": "0x3cc60e83d23a9c4206f430ec7772b146ff4b20b278411bd9559a32c001ecadf6",
-      "mid": "391300728991567060683998010",
-      "tiltBps": 288,
-      "seq": 1789152753,
-      "updatedAt": "1789152752"
-    },
-    {
-      "timestamp": "1789153694",
-      "transaction": "0x692c6734b7aaef581ed9f46d18e0ca071becbe00eb79c916c1d310488b0da670",
-      "mid": "391301744810989968344749194",
-      "tiltBps": 288,
-      "seq": 1789152752,
-      "updatedAt": "1789152752"
-    },
-    {
-      "timestamp": "1789153494",
-      "transaction": "0x7400b014cece1cf32ae35d0bcee534cc0e094f9c31173337294295f86d6ca8c3",
-      "mid": "391372603010268973030529675",
-      "tiltBps": 286,
-      "seq": 1789152410,
-      "updatedAt": "1789152410"
-    },
-    {
-      "timestamp": "1789153104",
-      "transaction": "0x7deac42559d2f6ccdbfa9ad0481ab492ce589e99d9f59e19889610d02a7657db",
-      "mid": "391461776848032007851029050",
-      "tiltBps": 284,
-      "seq": 1789151906,
-      "updatedAt": "1789151906"
     }
   ],
   "rejections": [
