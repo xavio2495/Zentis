@@ -11,14 +11,13 @@ import { DECK_NOSCRIPT, SLIDES, deckProse, nextIndex } from "../src/lib/deck";
  */
 
 describe("the deck's shape", () => {
-  test("seven slides, in the order the argument is made", () => {
+  test("six slides, in the order the argument is made", () => {
     expect(SLIDES.map((s) => s.id)).toEqual([
       "claim",
       "problem",
       "mechanism",
       "integrations",
       "live",
-      "unbuilt",
       "ask",
     ]);
   });

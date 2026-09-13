@@ -5,9 +5,8 @@ import { COPY, INSTALL_COMMAND, INTEGRATIONS, REPO_LABEL, ROUTES } from "./copy"
  *
  * Presented live from a laptop to people who can open the repository while it is on screen, so
  * every sentence here traces to something already written down and reviewed: the claim and the
- * mechanism to `claude-docs/DIRECTION.md` sections one and two, what is running to
- * `claude-docs/CAVEATS.md` section F, and what is deliberately unbuilt to the decisions that
- * settled each one. Nothing is composed for the slide.
+ * mechanism to `claude-docs/DIRECTION.md` sections one and two, and what is running to
+ * `claude-docs/CAVEATS.md` section F. Nothing is composed for the slide.
  *
  * The landing's no-figure rule applies here too and is enforced by test. A slide is the worst
  * place to hand-type a number, because it is the one place a reader cannot click through to check
@@ -84,24 +83,12 @@ export const SLIDES: readonly Slide[] = [
     ],
   },
   {
-    id: "unbuilt",
-    kicker: "Deliberately not built",
-    title: "Three things left undone, on purpose.",
-    body:
-      "Each of these was decided rather than missed, and the reason is recorded next to the decision. Saying so is cheaper than being asked.",
-    points: [
-      "The oracle band is ready and deferred: the feed address is immutable, so switching it on means new registries, new strategy hashes and a re-ship.",
-      "The agent tooling stays unbuilt unless it can be real control over the book rather than a thin query wrapper for a track's sake.",
-      "The simulation carries no headline figure, because the harness behind it is uncalibrated and this project does not print a number it cannot source.",
-    ],
-  },
-  {
     id: "ask",
     kicker: "The ask",
     // The landing's own invitation, so the deck and the page end on the same words.
     title: COPY.tryItOut,
     body:
-      "The position is live on three testnets, and the console that drives it installs in one line. Run it, or open the two places it is already running. Everything on the previous slide is written down in the repository, next to the thing it describes.",
+      "The position is live on three testnets, and the console that drives it installs in one line. Run it, or open the two places it is already running. Everything on the previous slides is written down in the repository, next to the thing it describes.",
     points: [INSTALL_COMMAND, REPO_LABEL],
     doors: ROUTES.filter((route) => route.atClose),
   },
@@ -142,7 +129,7 @@ export const DECK_NOSCRIPT: string = SLIDES.map((slide) =>
 export const DECK_META = {
   title: "Zentis — the deck",
   description:
-    "Seven slides: one market-making position quoting the same mainnet mid on three chains from one confidential policy, what it is built on, what is running, and what is deliberately not built.",
+    "Six slides: one market-making position quoting the same mainnet mid on three chains from one confidential policy, what it is built on, and what is running.",
 } as const;
 
 const FORWARD = new Set(["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"]);

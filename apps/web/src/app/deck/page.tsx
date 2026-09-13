@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * The pitch, as seven slides.
+ * The pitch, as six slides.
  *
  * A server component wrapping one client component, so the whole argument is in the HTML before any
  * script arrives. The `<noscript>` below is not a fallback notice: it is the deck, in order, as

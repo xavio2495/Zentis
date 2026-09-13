@@ -54,7 +54,7 @@ export const ROUTES = [
   {
     href: "/deck",
     label: "Deck",
-    blurb: "the argument as seven slides, for a room",
+    blurb: "the argument as six slides, for a room",
     // The close asks the reader to try the thing. A deck is for a room with a presenter in it, so
     // it belongs in the nav and not among the two doors at the foot of the page.
     atClose: false,
