@@ -103,11 +103,12 @@ export function DeckStage() {
 
       {/* The way home. The deck has no nav, and a reader who was handed this URL in a chat has no
           other way back to the page that makes the argument at reading pace. The mark, not the
-          word, for the same reason the landing's nav uses it: it is what the field is drawing. */}
+          word, and in the corner the landing's nav keeps it, so it is the same thing in the same
+          place on both pages. */}
       <Link
         href="/"
         aria-label="Zentis, back to the landing"
-        className="fixed right-6 top-6 z-60 no-underline md:right-8 md:top-8"
+        className="nav-diff fixed left-8 top-6 z-60 no-underline md:left-12"
       >
         <BrandMark className="h-5 w-5" />
       </Link>
