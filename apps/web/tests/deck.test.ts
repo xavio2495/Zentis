@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { INTEGRATIONS, INSTALL_COMMAND } from "../src/lib/copy";
+import { COPY, INTEGRATIONS, INSTALL_COMMAND, ROUTES } from "../src/lib/copy";
 import { DECK_NOSCRIPT, SLIDES, deckProse, nextIndex } from "../src/lib/deck";
 
 /**
@@ -61,6 +61,18 @@ describe("the deck makes no claim it cannot source", () => {
     const ask = SLIDES[SLIDES.length - 1];
     expect(ask.points).toContain(INSTALL_COMMAND);
     expect(deckProse()).not.toContain(INSTALL_COMMAND);
+  });
+
+  test("the closing slide is the landing's close: one invitation, the command, and the two doors", () => {
+    // The landing's close was reworked to ask the reader to run the thing, with the two places it
+    // is already running beneath the command. A deck that still ends on the older close is two
+    // pages disagreeing about what the ask is, and the deck is the one read aloud.
+    const ask = SLIDES[SLIDES.length - 1];
+    expect(ask.title).toBe(COPY.tryItOut);
+    expect(ask.doors?.map((door) => door.href)).toEqual(
+      ROUTES.filter((route) => route.atClose).map((route) => route.href),
+    );
+    for (const door of ask.doors ?? []) expect(DECK_NOSCRIPT).toContain(door.label);
   });
 });
 
