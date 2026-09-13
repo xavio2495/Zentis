@@ -66,7 +66,10 @@ const argument = process.argv.slice(2)[0];
  * "dev" is more honest than inventing one.
  */
 if (argument === "--version" || argument === "-v") {
-  process.stdout.write(`${process.env["ZENTIS_VERSION"] ?? "dev"}\n`);
+  // Dot access on purpose: the release build inlines this with `bun build --define
+  // process.env.ZENTIS_VERSION=...`, and a define only matches a dotted identifier, never a
+  // string index. The first tagged release shipped reporting "dev" for exactly that reason.
+  process.stdout.write(`${process.env.ZENTIS_VERSION ?? "dev"}\n`);
   process.exit(0);
 }
 
