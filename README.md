@@ -16,7 +16,7 @@
 
 <br>
 
-**[Background](#the-background)** · **[What it does](#what-it-does)** · **[Install](#install)** · **[Architecture](#architecture)** · **[Flows](#flow--one-mid-three-legs-one-instant)** · **[Contracts](#deployed-contracts)** · **[Instructions](#the-three-instructions)** · **[Subgraphs](#subgraphs)** · **[Where it lives](#where-it-lives)** · **[Not built](#what-is-deliberately-not-built)** · **[Develop](#continuing-development)** · **[License](#license)**
+**[Background](#the-background)** · **[What it does](#what-it-does)** · **[Install](#install)** · **[Architecture](#architecture)** · **[Flows](#flow--one-mid-three-legs-one-instant)** · **[Contracts](#deployed-contracts)** · **[Instructions](#the-three-instructions)** · **[Subgraphs](#subgraphs)** · **[Where it lives](#where-it-lives)** · **[Develop](#continuing-development)** · **[License](#license)**
 
 <br><br><br>
 </div>
