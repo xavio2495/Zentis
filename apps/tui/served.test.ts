@@ -66,6 +66,18 @@ test("checking fails loudly on a copy from an older recording, naming both stamp
   expect(said).toMatch(/publish-console|rebuild|bun run/i);
 });
 
+test("the committed bundle was built from this source, not only from this recording", async () => {
+  // The stamp catches what the recorded-at cannot. The fixtures do not move when the console's own
+  // code does, so a change to the screen — the first-run page becoming three buttons, say — left the
+  // served bundle stale with every check still passing: same moment, older console. What the site
+  // serves has to be built from what the repository holds, and that is a question about the source.
+  const { inputsHash, readStamp } = await import("./scripts/publish-console.js");
+  const stamp = readStamp();
+  expect(stamp).not.toBeNull();
+  expect(stamp!.inputs).toBe(inputsHash());
+  expect(stamp!.recordedAt).toBe(recordedAt.seconds);
+});
+
 test("publishing the console is one command, so the copy cannot be forgotten", () => {
   const script = join(import.meta.dir, "scripts", "publish-console.ts");
   expect(existsSync(script)).toBe(true);
@@ -73,6 +85,9 @@ test("publishing the console is one command, so the copy cannot be forgotten", (
   // It builds and then copies, in that order: copying first is the mistake this exists to remove,
   // and it is the one that already happened once — the page hung on a bundle from the run before.
   expect(source.indexOf("build-browser")).toBeLessThan(source.indexOf("copyFileSync("));
+  // Unchanged input, no copy: rebuilding writes the same bytes, and a build step that rewrote the
+  // artifact on every run would put a diff in front of whoever ran it and teach them to ignore one.
+  expect(source).toContain("inputsHash");
   // And the site's build runs it, so a deploy cannot ship a bundle from an older recording.
   const web = JSON.parse(readFileSync(join(import.meta.dir, "..", "web", "package.json"), "utf8")) as {
     scripts: Record<string, string>;
