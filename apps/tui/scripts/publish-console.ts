@@ -1,5 +1,6 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 
 /**
  * Build the public console and put it where the site serves it, in that order.
@@ -25,6 +26,55 @@ const here = import.meta.dir;
 const built = join(here, "..", "dist", "browser", "console.js");
 const served = join(here, "..", "..", "web", "public", "console", "console.js");
 const fixtures = join(here, "..", "..", "..", "packages", "console-data", "fixtures", "recorded-at.json");
+const stampFile = join(here, "..", "..", "web", "public", "console", "console.stamp.json");
+const root = join(here, "..", "..", "..");
+
+/**
+ * Everything the bundle is made of.
+ *
+ * The recorded-at stamp catches a moved recording and nothing else — and the console's own code
+ * moves far more often than its fixtures do. The first-run page became three buttons and the served
+ * bundle stayed as it was: same moment, older console, every check passing. So what is stamped is
+ * the source as well: this console's own tree, the data package it reads, the recording it embeds,
+ * and the script that builds it.
+ */
+const INPUTS = [
+  join(here, "..", "src"),
+  join(here, "..", "sandbox"),
+  join(here, "build-browser.ts"),
+  join(here, "..", "..", "..", "packages", "console-data", "src"),
+  join(here, "..", "..", "..", "packages", "console-data", "fixtures"),
+];
+
+const filesUnder = (path: string): string[] => {
+  if (!existsSync(path)) return [];
+  if (!statSync(path).isDirectory()) return [path];
+  return readdirSync(path).flatMap((entry) => filesUnder(join(path, entry)));
+};
+
+/** One hash over those files, path and content, in a stable order. */
+export function inputsHash(): string {
+  const digest = createHash("sha256");
+  for (const file of INPUTS.flatMap(filesUnder).sort()) {
+    digest.update(relative(root, file));
+    digest.update(readFileSync(file));
+  }
+  return digest.digest("hex").slice(0, 16);
+}
+
+export interface Stamp {
+  readonly recordedAt: number;
+  readonly inputs: string;
+}
+
+/** What the committed bundle says it was built from, or null when nothing says. */
+export function readStamp(): Stamp | null {
+  try {
+    return JSON.parse(readFileSync(stampFile, "utf8")) as Stamp;
+  } catch {
+    return null;
+  }
+}
 
 /** Which half to run: building needs this package's own dependencies to be installed. */
 export function decide(env: Record<string, string | undefined>, installed: boolean): "build" | "check" {
@@ -58,6 +108,12 @@ if (import.meta.main) {
   if (mode === "check") {
     verify(readFileSync(served, "utf8"), stamp);
     process.stdout.write(`the committed console bundle is this recording's (${stamp}); not rebuilding here\n`);
+  } else if (readStamp()?.inputs === inputsHash() && readStamp()?.recordedAt === stamp) {
+    // Nothing it is made of has moved, so rebuilding would write the same bytes over the same file
+    // and put a diff in front of whoever ran the build. A build step that dirties the tree every
+    // time teaches the person reading `git status` to ignore it, which is how a real change to this
+    // artifact goes out unlooked at.
+    process.stdout.write(`the committed console bundle is already this source and this recording (${stamp}); nothing to do\n`);
   } else {
     const build = Bun.spawnSync({
       cmd: ["bun", "run", join(here, "build-browser.ts")],
@@ -73,6 +129,7 @@ if (import.meta.main) {
 
     mkdirSync(dirname(served), { recursive: true });
     copyFileSync(built, served);
+    writeFileSync(stampFile, `${JSON.stringify({ recordedAt: stamp, inputs: inputsHash() }, null, 2)}\n`);
     // Said out loud, because this runs inside a longer build and its whole job is to be current: the
     // stamp is the recording's own, and seeing it is how somebody notices it is not today's.
     process.stdout.write(
