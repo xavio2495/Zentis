@@ -33,6 +33,31 @@ const terminal = () => {
 const ANSI = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[a-zA-Z]", "g");
 const strip = (text: string) => text.replace(ANSI, "");
 
+/**
+ * Wait for the screen to say something, rather than for a stopwatch to run out.
+ *
+ * These tests used to sleep three or four hundred milliseconds and then read. That is generous on a
+ * warm machine — the bundle is already in memory, React mounts in tens of milliseconds — and not
+ * generous at all on a shared CI runner, where the same work can take seconds. What came back there
+ * was an empty string, which reads as a console that drew nothing rather than one that had not
+ * started, and cost an afternoon of looking at the wrong thing.
+ */
+const until = async (
+  handle: { written: string[] },
+  matches: (screen: string) => boolean,
+  within = 15_000,
+): Promise<string> => {
+  const deadline = Date.now() + within;
+  for (;;) {
+    const screen = strip(handle.written.join(""));
+    if (matches(screen)) return screen;
+    if (Date.now() > deadline) {
+      throw new Error(`nothing matching appeared within ${within}ms; the screen was ${JSON.stringify(screen.slice(0, 300))}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+};
+
 test("the public console draws the recorded moment without reaching for a single endpoint", async () => {
   // Any read at all fails loudly here: if this build still made a live store, the screen would come
   // up as an outage rather than as a book.
@@ -45,8 +70,7 @@ test("the public console draws the recorded moment without reaching for a single
 
   const handle = terminal();
   const app = mount(handle);
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  const screen = strip(handle.written.join(""));
+  const screen = await until(handle, (drawn) => drawn.includes("Sepolia"));
   app.unmount();
   globalThis.fetch = original;
 
@@ -64,12 +88,13 @@ test("a visitor's keystrokes reach the console, because a console nobody can pre
   // The screen still drew, which is why this went unnoticed: only pressing something finds it.
   const handle = terminal();
   const app = mount(handle);
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  // The first screen first: typing at a console that has not mounted is typing at nothing, which is
+  // the failure this test exists to catch and not a failure it should produce.
+  await until(handle, (drawn) => drawn.includes("Sepolia"));
 
   handle.written.length = 0;
   handle.type("p");
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const screen = strip(handle.written.join(""));
+  const screen = await until(handle, (drawn) => /positions/.test(drawn));
   app.unmount();
 
   // `p` is the positions page, which names things the live view never does.
@@ -91,10 +116,9 @@ test("pressing x says why there is nothing to quit, rather than reaching for a t
 
   const handle = terminal();
   const app = mount(handle);
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await until(handle, (drawn) => drawn.includes("Sepolia"));
   handle.type("x");
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  const screen = strip(handle.written.join(""));
+  const screen = await until(handle, (drawn) => /lives in the page/i.test(drawn));
 
   process.off("uncaughtException", onError as never);
   process.off("unhandledRejection", onError as never);

@@ -33,8 +33,16 @@ export interface RunOptions {
    * what the console offers *after* its first poll has to wait for that poll.
    */
   readonly waitSeconds?: number;
-  /** how long the console is allowed to live, including its own shutdown; derived when not given */
+  /**
+   * How long the console is allowed to live *once it has drawn*, including its own shutdown.
+   *
+   * Measured from the first frame rather than from the process start: a cold machine spends its
+   * first seconds paging in a hundred megabytes of binary, and a budget that included those seconds
+   * killed the console before it had rendered anything at all.
+   */
   readonly seconds?: number;
+  /** how long to wait for that first frame before giving up on one and typing anyway */
+  readonly frameSeconds?: number;
   /** arguments after the binary, e.g. `watch` */
   readonly args?: string[];
   readonly cwd?: string;
@@ -54,11 +62,35 @@ const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[a-zA-Z]`, "g");
 
 export function runBinary(binary: string, options: RunOptions = {}): Run {
   const { keys = "", waitSeconds = 2, args = [], cwd, env = {}, cols = 120, rows = 44 } = options;
-  // The deadline has to outlast the keystrokes it is there to backstop, or every run reports the
-  // timeout's own exit code and no test can tell a hung console from a slow one.
-  const feed = `(sleep ${waitSeconds}; printf %s ${JSON.stringify(keys)}; sleep 2; printf x; sleep 2)`;
+  const frameSeconds = options.frameSeconds ?? 30;
   const seconds = options.seconds ?? waitSeconds + 10;
-  const tty = `script -qec ${JSON.stringify(`stty cols ${cols} rows ${rows}; ${[binary, ...args].join(" ")}`)} /dev/null`;
+
+  /**
+   * The typescript, written to a file so that the feeder can watch for the screen.
+   *
+   * `script` has always been handed `/dev/null` here, because the run was read from its stdout. It
+   * takes a path, and a path is what turns "wait two seconds and hope" into "wait until it has
+   * drawn". The file is the same bytes the test reads back; nothing else uses it.
+   */
+  const log = `${binary}.typescript`;
+
+  /**
+   * Type when the screen exists, not when a stopwatch says so.
+   *
+   * The proof is that the console has written something past entering the alternate screen — a
+   * dozen bytes of prologue go out the instant the process starts, and everything after them is
+   * Ink. Deliberately not a box corner: the first frame of a console whose sources have not
+   * answered yet is the mark and a line of text, with no panel in it, and waiting for a border
+   * there would wait through a screen that was already up.
+   *
+   * The wait is bounded. A console that never draws is a failure for the test to report in its own
+   * words, not a suite that hangs.
+   */
+  const untilDrawn =
+    `i=0; while [ $i -lt ${Math.max(1, Math.round(frameSeconds * 10))} ]; do ` +
+    `[ "$(wc -c < ${JSON.stringify(log)} 2>/dev/null || echo 0)" -gt 64 ] && break; sleep 0.1; i=$((i+1)); done`;
+  const feed = `(${untilDrawn}; sleep ${waitSeconds}; printf %s ${JSON.stringify(keys)}; sleep 2; printf x; sleep 2)`;
+  const tty = `script -qec ${JSON.stringify(`stty cols ${cols} rows ${rows}; ${[binary, ...args].join(" ")}`)} ${JSON.stringify(log)}`;
   const run = Bun.spawnSync({
     // No `timeout` in the pipeline: wrapping `script` in one stops the keystrokes reaching the pty,
     // so every run ended at the deadline and no test could tell a hung console from a quitting one.
@@ -77,7 +109,9 @@ export function runBinary(binary: string, options: RunOptions = {}): Run {
       TERM: "xterm-256color",
       ...env,
     },
-    timeout: (seconds + 6) * 1000,
+    // The frame wait is added rather than included: `seconds` is the window the caller wants *with*
+    // a console on screen, and on a cold runner reaching that point is most of the wall clock.
+    timeout: (frameSeconds + seconds + 6) * 1000,
   });
 
   // Whatever survived the window, by the binary's own path, which is unique to this test's temp dir.

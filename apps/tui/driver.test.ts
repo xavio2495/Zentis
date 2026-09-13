@@ -60,7 +60,7 @@ test("a console that never draws ends the run rather than hanging on it", () => 
   writeFileSync(path, "#!/bin/sh\nprintf '\\033[?1049h'\nsleep 30\n");
   chmodSync(path, 0o755);
   const started = Date.now();
-  runBinary(path, { keys: "p", waitSeconds: 0, seconds: 8 });
+  runBinary(path, { keys: "p", waitSeconds: 0, seconds: 8, frameSeconds: 3 });
   // It gives up on the frame and finishes; the number is loose because what matters is that it
   // returns at all, and well inside the deadline the test itself would hit.
   expect(Date.now() - started).toBeLessThan(45_000);

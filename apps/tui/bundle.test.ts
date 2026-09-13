@@ -46,7 +46,10 @@ test("the node bundle runs the console under node and draws its first frame", ()
     timeout: 30_000,
   });
   const screen = new TextDecoder().decode(run.stdout);
-  expect(screen).toContain("reading the chains");
+  // A frame of Ink's own: the first screen, which is the mark and a line saying what is being
+  // waited for, or the book once something has answered. Which one a run catches depends on how
+  // fast the endpoints refuse, and this test is about the bundle running at all.
+  expect(screen).toMatch(/reading the chains|┌ zentis|┌ 1 Sepolia/);
   expect(screen).not.toContain("Raw mode is not supported");
   expect(run.exitCode).toBe(0);
 }, 90_000);
