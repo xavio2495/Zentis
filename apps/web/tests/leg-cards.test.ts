@@ -67,7 +67,16 @@ describe("the shift is correction plus what survived the boundary", () => {
   });
 
   test("a genuine disagreement on a fast round is a dispute", () => {
-    const stack = shiftStack({ ...legs[0]!.decomposition, agrees: false, carried: false, carriedFromSeq: null });
+    // Same balances as the enclave priced from, a recomputed round, and two different answers:
+    // that is the only state worth drawing in red. A leg the enclave priced before a fill landed is
+    // a different thing and has its own line.
+    const stack = shiftStack({
+      ...legs[0]!.decomposition,
+      agrees: false,
+      carried: false,
+      carriedFromSeq: null,
+      balancesMatchEnclave: true,
+    });
     expect(stack.disputed).toBe(true);
   });
 

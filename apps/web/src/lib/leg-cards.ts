@@ -37,6 +37,15 @@ export interface ShiftStack {
   readonly cappedByRoom: boolean;
   readonly clampedByMaxTilt: boolean;
   readonly carriedFromSeq: number | null;
+  /**
+   * Whether the enclave priced from the balances the console is recomputing from.
+   *
+   * It prices at a finalized block and the subgraph answers at the head, so a fill landing between
+   * the two is enough to move the recomputation — on a forty-five USDC leg, one 0.45 USDC fill
+   * moves it about two hundred basis points, because the anchor is that steep. That is not the two
+   * models disagreeing, and the screen must not say it is.
+   */
+  readonly balancesMatchEnclave: boolean;
   /** a disagreement the carry does not explain: the only case worth alarming about */
   readonly disputed: boolean;
   readonly domainBps: number;
@@ -75,9 +84,13 @@ export function shiftStack(decomposition: Decomposition): ShiftStack {
     cappedByRoom: decomposition.cappedByRoom,
     clampedByMaxTilt: decomposition.clampedByMaxTilt,
     carriedFromSeq: carried ? (decomposition.carriedFromSeq ?? null) : null,
+    balancesMatchEnclave: decomposition.balancesMatchEnclave !== false,
     // A carry explains a gap; anything else does not, and only the unexplained kind is worth a
     // colour that says something is wrong.
-    disputed: !decomposition.agrees && !carried,
+    // A dispute is what is left when neither a carry nor a fill explains the difference: the same
+    // balances, a recomputed round, and two different answers. That is the only state the screen
+    // should draw in red, because it is the only one that says the model is wrong.
+    disputed: !decomposition.agrees && !carried && decomposition.balancesMatchEnclave !== false,
     domainBps,
     zeroAt: at(0),
     publishedAt: at(decomposition.published),

@@ -42,12 +42,22 @@ test("the recomputed shift reproduces the enclave's published shift, except wher
   // different one. Recomputing against the recovered room then caps the concession differently and
   // lands a few basis points away, in the tilt's own direction, on every leg at once.
   //
-  // So a carried round is named rather than tolerated: no threshold is widened, and a leg that is
-  // not carried must still reproduce the published number exactly.
+  // There is a second, and it is the ordinary one: the enclave prices from balances at a finalized
+  // block and the subgraph answers at the head, so a fill landing in between leaves the console
+  // recomputing from a different position than the one that was priced. With a taker filling every
+  // leg on a timer that is a common state rather than a rare one.
+  //
+  // So both are named rather than tolerated: no threshold is widened anywhere, and a leg that was
+  // neither carried nor repriced under must still reproduce the published number exactly.
   const book = decomposeBook(inputs, ASSUMED_GAINS, BOOK.maxTiltBps);
   for (const leg of book.legs) {
     if (leg.carried) {
       expect(leg.carriedFromSeq).toBe(inputs[0]!.ref.seq - 1);
+      continue;
+    }
+    if (!leg.balancesMatchEnclave) {
+      // Named, and the screen says which: "a fill has landed since the enclave priced this leg".
+      expect(leg.agrees).toBe(false);
       continue;
     }
     expect({ leg: leg.label, tilt: leg.tiltBps, agrees: leg.agrees }).toEqual({
@@ -150,12 +160,18 @@ test("the book weight is the book's, not any one leg's", () => {
 });
 
 test("a leg the enclave priced from different balances is flagged, not silently redrawn", () => {
-  const stale = inputs.map((i, index) =>
-    index === 0 ? { ...i, ref: { ...i.ref, refBalanceA: i.ref.refBalanceA + 1n } } : i,
+  // Both states built here rather than taken from the recording: whether a leg happens to match on
+  // the day the fixtures were taken is a fact about when the taker last filled, and this is a test
+  // about what the flag means. So the same leg is asked twice, one wei of tokenA apart.
+  const priced = inputs[0]!.history.position!.balanceA;
+  const asPriced = inputs.map((input, index) =>
+    index === 0 ? { ...input, ref: { ...input.ref, refBalanceA: priced } } : input,
   );
-  const book = decomposeBook(stale, ASSUMED_GAINS, BOOK.maxTiltBps);
-  expect(book.legs[0]!.balancesMatchEnclave).toBe(false);
-  expect(book.legs[1]!.balancesMatchEnclave).toBe(true);
+  const aWeiOff = inputs.map((input, index) =>
+    index === 0 ? { ...input, ref: { ...input.ref, refBalanceA: priced + 1n } } : input,
+  );
+  expect(decomposeBook(asPriced, ASSUMED_GAINS, BOOK.maxTiltBps).legs[0]!.balancesMatchEnclave).toBe(true);
+  expect(decomposeBook(aWeiOff, ASSUMED_GAINS, BOOK.maxTiltBps).legs[0]!.balancesMatchEnclave).toBe(false);
 });
 
 test("a leg whose shift sits at the signed cap reports its room as unknown, not as zero", () => {

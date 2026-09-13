@@ -88,7 +88,7 @@ test("the pnl page names the inventory hold does not cover, in the leg's own uni
   // carries a mark from the moment of the push — but leaving it unsaid is the one option that makes
   // the total look complete when it is not.
   const pnl = await pageText("n");
-  expect(pnl).toMatch(/pushed after|not in hold|hold covers/i);
+  expect(pnl).toMatch(/no recorded price|does not speak for it/i);
   expect(pnl).toMatch(/WETH/);
 }, 60_000);
 

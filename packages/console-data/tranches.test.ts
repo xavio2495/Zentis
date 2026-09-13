@@ -14,9 +14,14 @@ import { type Tranche, legPnl, markAt } from "./src/pnl.js";
  * the price of the day it entered, and that is how it has to be valued — the shipped one at the
  * ship's mark, each push at the mark when that push landed.
  */
-const ONE = 10n ** 18n;
-/** A mark is raw tokenB per 1e18 raw tokenA, so a price in USDC per WETH inverts into one. */
-const at = (usdcPerWeth: number) => (ONE * 10n ** 6n) / BigInt(Math.round(usdcPerWeth * 1e12));
+/**
+ * A mark, from a price anybody can read.
+ *
+ * The mark is raw tokenB per 1e18 raw tokenA: 1e18 raw USDC is a million million USDC, which at
+ * `usdcPerWeth` buys that many WETH, which in raw WETH is another eighteen zeros. So 1e30 over the
+ * price, which is the same arithmetic the recorded references carry.
+ */
+const at = (usdcPerWeth: number) => 10n ** 30n / BigInt(usdcPerWeth);
 
 const history = (heldB: bigint) =>
   ({ position: { balanceA: 45_000_000n, balanceB: heldB, active: true }, fills: [], references: [], rejections: [] }) as never;
@@ -89,6 +94,7 @@ test("with no tranches given, hold is the shipped side alone, as it always was",
   // has one tranche, and it is the ship.
   const shippedB = 6_000_000_000_000_000n;
   const pnl = legPnl(history(shippedB), shipped(shippedB, at(2_400)), at(2_600), at(2_400));
-  expect(Number(pnl.holdA) / 1e6).toBeCloseTo(0.6, 2);
+  // 0.006 WETH carried from 2,400 to 2,600 is 1.2 USDC, and the ship is the only parcel there is.
+  expect(Number(pnl.holdA) / 1e6).toBeCloseTo(1.2, 2);
   expect(pnl.unvaluedB).toBe(0n);
 });

@@ -92,8 +92,11 @@ test("the mark goes on the three pages that are the wallet's, and on no other", 
   // Wallet, simulation and status end well short of their panel and are the pages a reader lingers
   // on. Positions and pnl are tables to be read against each other; the mark under one of them is
   // decoration where a number was expected.
+  // At a height that leaves the room. The mark is the part that can be spared — it says whose
+  // console this is and the reader is already looking at it — so on a short screen, or a page whose
+  // own content has grown, it yields. What it must never do is appear where a number was expected.
   for (const key of ["w", "m"]) {
-    const frame = await drive(120, 40, { keys: [key] });
+    const frame = await drive(150, 50, { keys: [key] });
     expect(marked(frame.lines)).toBeGreaterThan(3);
     expect(frame.overflows).toBe(false);
   }

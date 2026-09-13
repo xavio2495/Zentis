@@ -6,6 +6,7 @@ import { swapsQuery } from "../src/pool.js";
 import { momentProblems } from "../src/moment.js";
 import { fetchRef } from "../src/registry.js";
 import { fetchWallet } from "../src/wallet.js";
+import { homedir } from "node:os";
 import { QUOTE_API_URL } from "../src/quotes.js";
 import { markHistoryUrl } from "../src/market.js";
 
@@ -140,6 +141,52 @@ const get = async (url: string): Promise<unknown> => {
  *
  * No indexer allowance is spent: this is the maker's own service.
  */
+/**
+ * The pushes this machine made, copied out of its own transaction log.
+ *
+ * Hold is the price move on the inventory a leg holds, and inventory arrives in parcels: the side
+ * it was shipped with, and every push since. Valuing a push needs the mark on the day it landed, so
+ * the recording has to carry when each one happened and how much it moved — the chain has the
+ * transaction, but not in any form a fixture can read without an archive node.
+ *
+ * The file is the operator's, at `~/.zentis/txlog.jsonl` or wherever `ZENTIS_TXLOG` says, and it is
+ * the same file the console's log page draws. Only the pushes are copied, and only their public
+ * facts. Nothing is written when the file is absent: a recording made on a machine that never
+ * pushed simply has no parcels to add, and hold then says so for itself.
+ */
+const recordPushes = () => {
+  const path = process.env["ZENTIS_TXLOG"] ?? join(homedir(), ".zentis", "txlog.jsonl");
+  let lines: string[];
+  try {
+    lines = readFileSync(path, "utf8").split("\n");
+  } catch {
+    console.log(`  no transaction log at ${path}; recording no pushes`);
+    return;
+  }
+  const pushes = lines
+    .flatMap((line) => {
+      if (line.trim() === "") return [];
+      try {
+        return [JSON.parse(line) as Record<string, unknown>];
+      } catch {
+        return [];
+      }
+    })
+    .filter((row) => row["kind"] === "push" && row["status"] !== 0)
+    .map((row) => ({
+      at: String(row["at"] ?? ""),
+      atSeconds: Math.floor(Date.parse(String(row["at"] ?? "")) / 1000) || null,
+      chain: String(row["chain"] ?? ""),
+      chainId: typeof row["chainId"] === "number" ? row["chainId"] : null,
+      token: String(row["tokenIn"] ?? ""),
+      amount: String(row["amountIn"] ?? ""),
+      tx: String(row["tx"] ?? ""),
+      note: row["note"] === undefined || row["note"] === null ? null : String(row["note"]),
+    }))
+    .filter((push) => push.atSeconds !== null && push.amount !== "" && push.token !== "");
+  write("pushes", { source: path.replace(homedir(), "~"), pushes });
+};
+
 const recordService = async () => {
   const mark = (await get(`${QUOTE_API_URL}/mark`)) as { marks: { chainId: number; mid: string | null }[] };
   write("mark", mark);
@@ -158,6 +205,7 @@ const recordService = async () => {
   for (const hours of MARKET_WINDOWS) {
     write(`market-${hours}h`, await get(markHistoryUrl(hours)));
   }
+  recordPushes();
 };
 
 const wanted = process.argv.slice(2);

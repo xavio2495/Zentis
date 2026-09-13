@@ -88,7 +88,11 @@ test("trading and hold split the way the harness does, at the mark that is passe
   expect(pnl.holdA).toBe(-5_000_000n);
   expect(pnl.tradingA).toBe(0n);
   expect(pnl.totalA).toBe(-5_000_000n);
-  expect(pnl.caveat).toBeNull();
+  // The leg holds half a tenth of a milli-WETH less than it was shipped with and no fill moved it,
+  // so hold does not speak for all of this leg's tokenB — and says so, with the amount. Constructed
+  // that way here to keep the arithmetic above legible; on a real leg it is a push or a withdrawal.
+  expect(pnl.unvaluedB).toBe(-50_000_000_000_000n);
+  expect(pnl.caveat).toMatch(/does not speak for it/);
 });
 
 test("no mark or no recorded opening means no number, with the reason", () => {

@@ -63,7 +63,10 @@ describe("the boundary is what bounds the concession", () => {
     // The trap from the console's leg cards, and the same one here: own + book is the concession
     // *before* the boundary cuts it, so a bar built from those two sums to a shift never published.
     for (const leg of moment.legs) {
-      expect(leg.correctionBps + leg.concessionBps).toBe(leg.shiftBps);
+      // Against the recomputed shift, which is what these terms are the parts of. The published one
+      // is the enclave's, struck from balances at a finalized block: where a fill has landed since,
+      // the two differ by design and the screen says which.
+      expect(leg.correctionBps + leg.concessionBps).toBe(leg.recomputedBps);
       if (leg.ownBps + leg.bookBps !== leg.concessionBps) {
         expect(leg.cutByBoundaryBps).toBe(leg.ownBps + leg.bookBps - leg.concessionBps);
       }

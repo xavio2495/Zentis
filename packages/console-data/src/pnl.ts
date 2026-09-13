@@ -93,9 +93,56 @@ export interface LegPnl {
   readonly unvaluedB: bigint | null;
   /** why trading/hold are null, when they are */
   readonly caveat: string | null;
+  /**
+   * What hold was computed from: one entry per parcel of inventory, with the price it entered at.
+   *
+   * On screen this is the difference between "the book made 0.6 USDC holding" and a number nobody
+   * can check. Each entry says where its opening price came from, so the sum can be taken apart.
+   */
+  readonly holdFrom: Tranche[];
   /** every fill the position ever took, each saying which span it belongs to */
   readonly perFill: FillEconomics[];
   readonly lifetime: LifetimePnl;
+}
+
+/**
+ * A parcel of tokenB the leg holds, and the price it came in at.
+ *
+ * Inventory does not arrive all at once. A leg is shipped with a side, and then pushed to — and
+ * each parcel entered at whatever the market was that day. Hold is the price move since entry, so
+ * it is a sum over parcels rather than one subtraction: valuing a push at the ship's mark credits
+ * the leg with a move it was not there for.
+ */
+export interface Tranche {
+  /** tokenB raw units, signed: a withdrawal is a negative parcel */
+  readonly amountB: bigint;
+  /** the mark when it entered, raw B per 1e18 raw A; null when no record says */
+  readonly mark: bigint | null;
+  readonly source: "ship" | "push";
+  readonly atSeconds: number | null;
+}
+
+/**
+ * The mark struck at or before a moment, from a series of them.
+ *
+ * Never the nearest point in either direction: the next point is a price that had not happened yet
+ * when the parcel entered, and valuing an entry at it is valuing it at hindsight. Null before the
+ * series begins, which is a tranche that cannot be valued rather than one worth guessing at.
+ */
+export function markAt(
+  series: readonly { timestamp: bigint; mid: bigint }[],
+  atSeconds: number,
+): bigint | null {
+  let best: bigint | null = null;
+  let bestAt = -1n;
+  for (const point of series) {
+    if (point.timestamp > BigInt(atSeconds)) continue;
+    if (point.timestamp > bestAt) {
+      bestAt = point.timestamp;
+      best = point.mid;
+    }
+  }
+  return best;
 }
 
 /** tokenB raw units valued in tokenA raw units at a mid (raw B per 1e18 raw A). */
@@ -159,6 +206,14 @@ export function legPnl(
   openingMark: bigint | null,
   /** how many generations this position has had, from the deployment record; null when unknown */
   generations: number | null = null,
+  /**
+   * The parcels pushed into this leg since it was shipped, each with the mark when it landed.
+   *
+   * Empty when nothing has been pushed, or when nothing recorded what the marks were: inventory
+   * with no entry price is left out of hold and named in `unvaluedB` instead, because valuing it at
+   * today's mark would report a gain of exactly zero on it, and that is a claim rather than a gap.
+   */
+  pushes: readonly Tranche[] = [],
 ): LegPnl {
   // `?? null` and not a bare read: a record written before this field existed has it undefined, and
   // `Number(timestamp) >= undefined` is false for every fill — which silently emptied the span
@@ -218,11 +273,17 @@ export function legPnl(
       totalA: null,
       unvaluedB: null,
       caveat,
+      holdFrom: [],
       perFill,
       lifetime,
     };
   }
   const shippedB = shipped.balanceB as bigint;
+  // The ship is a tranche like any other; a leg nobody has pushed to simply has one of them.
+  const tranches: Tranche[] = [
+    { amountB: shippedB, mark: shipped.markAtShip ?? openingMark, source: "ship", atSeconds: shipAt },
+    ...pushes.filter((push) => shipAt === null || push.atSeconds === null || push.atSeconds >= shipAt),
+  ];
   // What the leg holds that hold does not speak for. Zero on a leg nobody has pushed to.
   //
   // Only this generation's fills count. The subgraph keeps every fill the position ever took, and a
@@ -231,11 +292,14 @@ export function legPnl(
   // there is no way to tell the two apart, so the answer is null rather than a number that looks
   // plausible.
   const heldB = history.position?.balanceB ?? null;
+  // What the leg holds that no tranche speaks for: its inventory, less every parcel that entered
+  // with a price on it, less what this generation's fills moved. Zero on a leg whose whole side is
+  // accounted for; on a leg pushed to before anything recorded the marks, it is that push.
   const unvaluedB =
     heldB === null || shipAt === null
       ? null
       : heldB -
-        shippedB -
+        tranches.reduce((sum, tranche) => sum + tranche.amountB, 0n) -
         history.fills
           .filter((fill) => Number(fill.timestamp) >= shipAt)
           .reduce((sum, fill) => sum + fillDelta(fill).deltaB, 0n);
@@ -253,11 +317,20 @@ export function legPnl(
       totalA: null,
       unvaluedB,
       caveat: "no mark was recorded from this source when the leg was shipped, so the hold effect cannot be separated from the trading",
+      holdFrom: [],
       perFill,
       lifetime,
     };
   }
-  const holdA = bInA(shippedB, mark) - bInA(shippedB, openingMark);
+
+  // A parcel with no entry price is left out rather than valued at the mark: the second reports a
+  // gain of zero on it, which reads as a fact and is a guess.
+  const valued = tranches.filter((tranche) => tranche.mark !== null && tranche.mark !== 0n);
+  const holdA = valued.reduce(
+    (sum, tranche) => sum + bInA(tranche.amountB, mark) - bInA(tranche.amountB, tranche.mark as bigint),
+    0n,
+  );
+  const strayB = (unvaluedB ?? 0n) + tranches.filter((t) => !valued.includes(t)).reduce((sum, t) => sum + t.amountB, 0n);
   return {
     fills,
     volumeA,
@@ -266,8 +339,14 @@ export function legPnl(
     tradingA,
     holdA,
     totalA: tradingA + holdA,
-    unvaluedB,
-    caveat: null,
+    unvaluedB: unvaluedB === null ? null : strayB,
+    // Said whenever some of the leg's own inventory is outside hold, with the amount, because a
+    // hold that covers part of a book and does not say so is the shape of a number that misleads.
+    caveat:
+      strayB === 0n
+        ? null
+        : "some of this leg's tokenB entered without a recorded price, so hold does not speak for it",
+    holdFrom: valued,
     perFill,
     lifetime,
   };

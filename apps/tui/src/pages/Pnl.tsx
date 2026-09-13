@@ -162,11 +162,33 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
     );
   }
 
-  // The inventory hold is silent about, named in the leg's own units. Pushing tokenB into a leg
-  // after it shipped is an ordinary thing to do — it is how a leg is rebalanced without bridging —
-  // and hold values only what the leg was shipped with, so the book's hold understates by whatever
-  // that inventory has done since. The page cannot value it, and says so rather than letting the
-  // total read as complete.
+  // What hold was built from. Inventory arrives in parcels — the side a leg was shipped with, and
+  // every push since — and each is valued from the price on the day it entered, so the sum can be
+  // taken apart. Said out loud because the alternative is a number nobody can check: two thirds of
+  // each leg's tokenB arrived by push, and a hold that quietly covered only the shipped third would
+  // have read exactly like a hold that covered the book.
+  const parcels = legs.flatMap((leg) => leg.pnl?.holdFrom ?? []);
+  if (parcels.length > 0) {
+    const tokenB = legs[0]!.config.tokenB;
+    const shipped = parcels.filter((p) => p.source === "ship").reduce((sum, p) => sum + p.amountB, 0n);
+    const pushed = parcels.filter((p) => p.source === "push").reduce((sum, p) => sum + p.amountB, 0n);
+    const line =
+      pushed === 0n
+        ? `hold values each parcel from the price it entered at: ${tokenAmount(shipped, tokenB.decimals)} ${tokenB.symbol} shipped`
+        : `hold values each parcel from the price it entered at: ${tokenAmount(shipped, tokenB.decimals)} ${tokenB.symbol} ` +
+          `shipped, ${tokenAmount(pushed, tokenB.decimals)} pushed since`;
+    for (const [i, text] of wrapLines(line, width, 2).entries()) {
+      rows.push(
+        <Text key={`parcels${i}`} color={UI.muted}>
+          {text}
+        </Text>,
+      );
+    }
+  }
+
+  // And what no parcel speaks for: tokenB that entered before anything recorded the marks. Naming
+  // it is all the page can do — valuing it at today's mark would report a gain of exactly zero on
+  // it, which reads as a fact and is a guess.
   const pushed = legs
     .map((leg) => ({ leg, amount: leg.pnl?.unvaluedB ?? 0n }))
     .filter((entry) => entry.amount !== 0n);
@@ -177,8 +199,8 @@ export function Pnl({ snapshot, width, height }: { snapshot: Snapshot; width: nu
       .map((entry) => `${entry.leg.config.label.split(" ")[0]} ${tokenAmount(entry.amount, tokenB.decimals)}`)
       .join(", ");
     for (const [i, line] of wrapLines(
-      `! hold covers what each leg was shipped with; ${tokenAmount(total, tokenB.decimals)} ${tokenB.symbol} ` +
-        `pushed after that is not in it (${named})`,
+      `! ${tokenAmount(total, tokenB.decimals)} ${tokenB.symbol} entered with no recorded price, so hold ` +
+        `does not speak for it (${named})`,
       width,
       2,
     ).entries()) {

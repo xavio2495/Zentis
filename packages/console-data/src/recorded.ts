@@ -8,7 +8,7 @@ import { FEED_HISTORY, type Snapshot, type LegSnapshot } from "./snapshot.js";
 import { decomposeBook } from "./decompose.js";
 import { midOf, recomputeVolatility, spreadStack } from "./spread.js";
 import { parseSeries } from "./pool.js";
-import { legPnl } from "./pnl.js";
+import { type Tranche, legPnl, markAt } from "./pnl.js";
 import { loadSimReport } from "./sim.js";
 import { bookTotals } from "./book.js";
 import { parseWalletFixture } from "./wallet.js";
@@ -28,6 +28,7 @@ import market168 from "../fixtures/market-168h.json" with { type: "json" };
 import market6 from "../fixtures/market-6h.json" with { type: "json" };
 import recordedWallet from "../fixtures/wallet.json" with { type: "json" };
 import recordedAt from "../fixtures/recorded-at.json" with { type: "json" };
+import recordedPushes from "../fixtures/pushes.json" with { type: "json" };
 
 /**
  * The recorded moment, assembled by the same functions the live console assembles it with.
@@ -107,9 +108,42 @@ const quoteFor = (side: typeof quotesAToB, chainId: number): LegQuote | null => 
   return raw === undefined ? null : parseQuote(raw);
 };
 
+interface RawPush {
+  atSeconds: number | null;
+  chainId: number | null;
+  chain: string;
+  token: string;
+  amount: string;
+}
+
 export function recordedMoment(): RecordedMoment {
   const now = (recordedAt as { seconds: number }).seconds;
   const marked = marks();
+  // The market series the pushes are priced against: the same one the chart draws, which is the
+  // only series in this recording that goes back far enough to hold the day a push landed.
+  const series = parseMarkHistory(market168 as never)?.points ?? [];
+
+  /**
+   * The parcels pushed into a leg, each with the mark struck when it landed.
+   *
+   * Only the tokenB side: tokenA pushed into a leg is worth what it is worth, and hold is a
+   * statement about the side whose price moves. A push whose moment is outside the recorded series
+   * gets a null mark and is left out of hold rather than valued at today's price.
+   */
+  const pushesFor = (leg: LegConfig): Tranche[] =>
+    ((recordedPushes as { pushes: RawPush[] }).pushes ?? [])
+      .filter(
+        (push) =>
+          (push.chainId === leg.chainId || push.chain === leg.name) &&
+          push.token.toLowerCase() === leg.tokenB.address.toLowerCase() &&
+          push.atSeconds !== null,
+      )
+      .map((push) => ({
+        amountB: BigInt(push.amount),
+        mark: markAt(series, push.atSeconds!),
+        source: "push" as const,
+        atSeconds: push.atSeconds,
+      }));
 
   const parsed = LEGS.map((leg: LegConfig) => ({
     leg,
@@ -150,7 +184,14 @@ export function recordedMoment(): RecordedMoment {
       pnl:
         mark === null
           ? null
-          : legPnl(entry.history, entry.leg.shipped, mark.mid, entry.leg.shipped.markAtShip, entry.leg.generations),
+          : legPnl(
+              entry.history,
+              entry.leg.shipped,
+              mark.mid,
+              entry.leg.shipped.markAtShip,
+              entry.leg.generations,
+              pushesFor(entry.leg),
+            ),
       sources: {
         fills: null,
         registry: null,

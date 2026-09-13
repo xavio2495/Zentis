@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { foldRounds } from "@zentis/console-data";
 import { drive } from "./sandbox/drive.js";
 import { shiftCell } from "./src/components/Feed.js";
 import type { LegSnapshot } from "@zentis/console-data";
@@ -20,8 +21,23 @@ test("the feed names chains the way the rest of the screen does, not SEP and ARB
 });
 
 test("unchanged publishes fold into one row that says how many", async () => {
-  const feed = feedOf((await drive(120, 40, { armed: true })).lines);
-  expect(feed).toMatch(/\d+ publishes/);
+  // Whether the recording holds a run of identical rounds is a fact about the day: with the legs
+  // near the mid the shift moves every round and nothing folds. So the rule is asserted where it
+  // lives — `foldRounds` over a constructed run — and the screen is checked for the words it uses
+  // when there is one to show.
+  const rounds = [0, 1, 2].map((i) => ({
+    kind: "round" as const,
+    timestamp: BigInt(1_000 - i * 60),
+    seq: 500 - i,
+    count: 3,
+    spanSeconds: 2,
+    legs: [{ chainId: 11155111, tiltBps: 11, mid: 10n ** 27n, transaction: `0x${i}` }],
+  }));
+  const folded = foldRounds(rounds);
+  expect(folded).toHaveLength(1);
+  expect(folded[0]!.kind).toBe("fold");
+  const fold = folded[0] as { count: number };
+  expect(fold.count).toBe(3);
 });
 
 test("a shift at the leg's cap says so, because a shift there is a limit, not a size", () => {

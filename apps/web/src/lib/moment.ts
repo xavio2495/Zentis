@@ -21,10 +21,20 @@ export interface LegMoment {
   readonly shareA: number;
   /** the shift the enclave published, signed basis points */
   readonly shiftBps: number;
+  /**
+   * The same shift recomputed here from the same inputs, which is what the terms below add up to.
+   *
+   * Usually the published number to the basis point, and that agreement is the claim. Not always:
+   * the enclave prices from a finalized block and this is recomputed from the head, so a fill
+   * landing between the two moves it — on a forty-five USDC leg, one 0.45 USDC fill moves it about
+   * two hundred basis points. Adding the terms to the *published* number was an invariant that held
+   * only while the two agreed.
+   */
+  readonly recomputedBps: number;
   readonly correctionBps: number;
   readonly ownBps: number;
   readonly bookBps: number;
-  /** what survived the boundary; correction + this is the shift */
+  /** what survived the boundary; correction + this is the recomputed shift */
   readonly concessionBps: number;
   /** what the boundary removed, or null where it removed nothing */
   readonly cutByBoundaryBps: number | null;
@@ -71,6 +81,7 @@ export function readMoment(): Moment {
       balanceB: leg.balanceB,
       shareA: share(d.weightA),
       shiftBps: d.published,
+      recomputedBps: Number(d.tiltBps),
       correctionBps: Number(d.correction),
       ownBps: own,
       bookBps: book,

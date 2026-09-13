@@ -170,6 +170,15 @@ const pnlOf = (leg: LegSnapshot) =>
         totalA: big(leg.pnl.totalA),
         unvaluedB: big(leg.pnl.unvaluedB),
         caveat: leg.pnl.caveat,
+        // What hold was built from: one entry per parcel of inventory, with the price it entered
+        // at. Hold is a sum over parcels now — most of each leg's tokenB arrived by push — and a
+        // surface that cannot take the sum apart cannot show anybody why it is what it is.
+        holdFrom: leg.pnl.holdFrom.map((tranche) => ({
+          amountB: String(tranche.amountB),
+          mark: big(tranche.mark),
+          source: tranche.source,
+          atSeconds: tranche.atSeconds,
+        })),
         // The position's whole life, said separately and labelled as the other span: this
         // generation's hold and a lifetime's trading added together is the sum of two questions.
         lifetime: {

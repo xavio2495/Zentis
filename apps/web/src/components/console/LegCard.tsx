@@ -106,9 +106,14 @@ function Shift({ shift }: { shift: ReturnType<typeof shiftStack> }) {
           carried from seq {shift.carriedFromSeq} — a slow round republishes the last tilt against a re-budgeted
           boundary, so the recomputation lands short rather than disagreeing
         </p>
+      ) : !shift.balancesMatchEnclave ? (
+        <p className="m-0 text-[10px] text-warn">
+          a fill has landed since the enclave priced this leg — it read a finalized block, this reads the
+          head, and on a leg this size one fill moves the shift by about two hundred basis points
+        </p>
       ) : (
         <p className="m-0 text-[10px] text-bad">
-          the console and the enclave do not agree here, and no carry explains it
+          the console and the enclave do not agree here, and neither a carry nor a fill explains it
         </p>
       )}
     </section>

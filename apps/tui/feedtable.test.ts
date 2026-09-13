@@ -112,5 +112,8 @@ test("a fill says what went in as well as what came out wherever the row has roo
   const [, ...body] = feedOf((await drive(120, 40, {})).lines);
   const fill = body.find((r) => /\bfill\b/.test(r))!;
   expect(fill).toBeDefined();
-  expect(fill).toMatch(/0\.15 USDC → /);
+  // Not a size: the taker fills one per cent of a leg, so what a fill is worth moves with the book
+  // and a number pinned here fails on the next recording for no reason worth anybody's morning.
+  // What the row must always carry is both sides of it.
+  expect(fill).toMatch(/[\d.]+ USDC → [\d.]+ WETH|[\d.]+ WETH → [\d.]+ USDC/);
 }, 60_000);

@@ -40,12 +40,12 @@ const decomposition = (over: Record<string, unknown>) => ({
 });
 
 test("a leg repriced under is not a leg that disagrees", () => {
-  const repriced = shiftStack(decomposition({ balancesMatchEnclave: false }) as never, 5_000);
+  const repriced = shiftStack(decomposition({ balancesMatchEnclave: false }) as never);
   expect(repriced.disputed).toBe(false);
   expect(repriced.balancesMatchEnclave).toBe(false);
 
   // With the same balances and no carry, a difference is exactly what it looks like.
-  const real = shiftStack(decomposition({}) as never, 5_000);
+  const real = shiftStack(decomposition({}) as never);
   expect(real.disputed).toBe(true);
 });
 
