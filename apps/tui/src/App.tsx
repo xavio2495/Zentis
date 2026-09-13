@@ -263,13 +263,27 @@ export function App({
     store.setMarketHours(marketHours);
   }, [store, marketHours]);
 
-  // The mark animates at about twelve frames a second, and only while a screen that shows it is up:
-  // the live view repaints when its data changes, and a spinner is no reason to redraw a book.
   const showingLogo = onboarding && !onboarded;
+  /**
+   * Twelve frames a second, and only while something on screen is actually moving.
+   *
+   * This is what the comment here always claimed and the code never did: the interval was created
+   * whatever was on screen, so the live view — three cards, a chart and a feed, five kilobytes of
+   * frame — was rebuilt and written twelve and a half times a second for as long as the console was
+   * open. Nothing on it had changed between those frames; the book moves when a poll lands, and the
+   * poll lands every twenty seconds.
+   *
+   * It is not a cost you notice in a test or a screenshot. Over half an hour it is a quarter of a
+   * million frames of transient strings, and the process the user had open reached 3.4 GB carrying
+   * them. The animation is kept exactly where somebody is watching something turn: the mark on the
+   * first screen, the spinner before the first read lands, and the one while an action runs.
+   */
+  const animating = showingLogo || state.snapshot === null || running !== null || choosing;
   useEffect(() => {
+    if (!animating) return undefined;
     const timer = setInterval(() => setTick((t) => t + 1), 80);
     return () => clearInterval(timer);
-  }, [showingLogo]);
+  }, [animating]);
 
   useEffect(() => {
     store.start();

@@ -15,10 +15,12 @@ import { drive } from "./sandbox/drive.js";
  * has changed.
  */
 test("the live view is still when the book is still", async () => {
-  // A second and a half of quiet. The one-second tick keeps ages counting, so one or two repaints
-  // are expected and a dozen are the bug.
-  const frame = await drive(120, 40, { watchMs: 1_500 });
-  expect(frame.repaints).toBeLessThanOrEqual(4);
+  // Four seconds of quiet, measured over a window rather than an instant: mounting settles over the
+  // first second, and what matters is the rate afterwards. The age on screen counts up once a
+  // second and that is the whole of it — about one repaint a second, against the twelve and a half
+  // this used to do. The old behaviour would put fifty frames in this window.
+  const frame = await drive(120, 40, { watchMs: 4_000 });
+  expect(frame.repaints).toBeLessThanOrEqual(8);
 }, 60_000);
 
 test("the mark still animates where it is the thing being watched", async () => {
