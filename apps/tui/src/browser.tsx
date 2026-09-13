@@ -145,6 +145,12 @@ export function mount(terminal: TerminalHandle) {
       // protect from stray logging anyway.
       patchConsole: false,
       exitOnCtrlC: false,
+      // Said rather than inferred. Ink decides interactivity from `!isInCi && isTTY`, and neither
+      // half means anything here: a browser tab is not a terminal and is certainly not a build.
+      // Inferred, it went non-interactive wherever the surrounding process had CI set — which is
+      // every test runner on a CI — and the console then drew one frame at unmount and ignored
+      // every keystroke. In a page it is always interactive; there is nothing else it could be.
+      interactive: true,
     },
   );
 }

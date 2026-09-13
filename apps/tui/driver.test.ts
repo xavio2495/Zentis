@@ -74,7 +74,8 @@ test("the console is handed an environment that is not a CI, whatever the parent
   // The screen came back looking like a pty that had failed, which is where two sessions went
   // looking.
   //
-  // Empty string does not clear it: present-but-empty counts as set. Only "0" or "false" do.
+  // And chalk checks the same variable for presence alone, so "0" satisfies Ink and still costs the
+  // colour. Both markers are removed rather than neutralised, which answers both libraries.
   const console = join(dir, "reports-env.sh");
   writeFileSync(
     console,
@@ -88,6 +89,6 @@ test("the console is handed an environment that is not a CI, whatever the parent
   chmodSync(console, 0o755);
 
   const { screen } = runBinary(console, { keys: "", waitSeconds: 0, seconds: 10, frameSeconds: 5 });
-  expect(screen).toContain("CI=[0]");
-  expect(screen).toContain("CONTINUOUS_INTEGRATION=[0]");
+  expect(screen).toContain("CI=[]");
+  expect(screen).toContain("CONTINUOUS_INTEGRATION=[]");
 }, 60_000);

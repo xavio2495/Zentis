@@ -60,6 +60,27 @@ export interface Run {
 
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[a-zA-Z]`, "g");
 
+/**
+ * The console is not told it is in a CI, because two libraries change behaviour when it is.
+ *
+ * Ink decides whether to be interactive before it looks at the terminal — `interactive ?? (!isInCi
+ * && isTTY)` — and `is-in-ci` is `'CI' in env && env.CI !== '0' && env.CI !== 'false'`. A GitHub
+ * runner sets CI=true for everything, so Ink ran non-interactive inside a perfectly good pty: no
+ * raw mode, no cursor hiding, no repaints, one frame at unmount, every keystroke ignored. What came
+ * back looked exactly like a broken pty, and two sessions went looking there.
+ *
+ * Chalk's colour detection checks the same variable and only for *presence* — `'CI' in env` — so
+ * setting it to "0", which satisfies Ink, still drops colour to nothing unless the runner happens
+ * to also set GITHUB_ACTIONS. Removing both markers is the one form that answers both, and it is
+ * also the honest statement: what these tests drive is an operator at a terminal, not a build.
+ */
+const withoutCiMarkers = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+  const copy = { ...env };
+  delete copy["CI"];
+  delete copy["CONTINUOUS_INTEGRATION"];
+  return copy;
+};
+
 export function runBinary(binary: string, options: RunOptions = {}): Run {
   const { keys = "", waitSeconds = 2, args = [], cwd, env = {}, cols = 120, rows = 44 } = options;
   const frameSeconds = options.frameSeconds ?? 30;
@@ -77,18 +98,17 @@ export function runBinary(binary: string, options: RunOptions = {}): Run {
   /**
    * Type when the screen exists, not when a stopwatch says so.
    *
-   * The proof is that the console has written something past entering the alternate screen — a
-   * dozen bytes of prologue go out the instant the process starts, and everything after them is
-   * Ink. Deliberately not a box corner: the first frame of a console whose sources have not
-   * answered yet is the mark and a line of text, with no panel in it, and waiting for a border
-   * there would wait through a screen that was already up.
+   * The proof is a frame, not a byte count: either a panel's corner, or the line the console shows
+   * while it is still waiting for its first read. Both are Ink having rendered. A size threshold was
+   * the first attempt and it is too loose — a prologue plus a cursor escape is twenty bytes on one
+   * machine and sixty on another, and the window then opens before anything has been drawn.
    *
    * The wait is bounded. A console that never draws is a failure for the test to report in its own
    * words, not a suite that hangs.
    */
   const untilDrawn =
     `i=0; while [ $i -lt ${Math.max(1, Math.round(frameSeconds * 10))} ]; do ` +
-    `[ "$(wc -c < ${JSON.stringify(log)} 2>/dev/null || echo 0)" -gt 64 ] && break; sleep 0.1; i=$((i+1)); done`;
+    `grep -qE '┌|reading the chains' ${JSON.stringify(log)} 2>/dev/null && break; sleep 0.1; i=$((i+1)); done`;
   const feed = `(${untilDrawn}; sleep ${waitSeconds}; printf %s ${JSON.stringify(keys)}; sleep 2; printf x; sleep 2)`;
   const tty = `script -qec ${JSON.stringify(`stty cols ${cols} rows ${rows}; ${[binary, ...args].join(" ")}`)} ${JSON.stringify(log)}`;
   const run = Bun.spawnSync({
@@ -100,7 +120,7 @@ export function runBinary(binary: string, options: RunOptions = {}): Run {
     stdout: "pipe",
     stderr: "pipe",
     env: {
-      ...process.env,
+      ...withoutCiMarkers(process.env),
       ...OFFLINE_ENV,
       // Stated rather than inherited: the same binary emits 24-bit codes under a truecolour terminal
       // and 256-colour codes without COLORTERM, which made a colour assertion pass on one machine

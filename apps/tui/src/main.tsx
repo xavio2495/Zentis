@@ -237,6 +237,15 @@ const arm = () => {
   };
 };
 
+/**
+ * A terminal is a terminal, whatever the surrounding environment calls itself.
+ *
+ * Ink infers interactivity from `!isInCi && isTTY`. The tty half is right and the CI half is not:
+ * an operator who happens to have CI set in their shell — or who runs the console from a job that
+ * does — would get a console that draws once and ignores the keyboard, with nothing on screen
+ * saying why. This program already refuses to start without a terminal, so the terminal is the
+ * whole question.
+ */
 const app = render(
   <App
     // Only the world behind the screen is recorded. What the console may do is still decided by
@@ -255,6 +264,7 @@ const app = render(
     readTxLog={readLog}
     txlogPath={txlogLabel}
   />,
+  { interactive: process.stdout.isTTY === true },
 );
 void app.waitUntilExit().then(() => {
   leaveAlternate();
