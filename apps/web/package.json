@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "bun run ../tui/scripts/publish-console.ts && next build",
+    "build": "(cd ../../packages/strategy-sdk && bun install) && (cd ../../packages/console-data && bun install) && bun run ../tui/scripts/publish-console.ts && next build",
     "start": "bun run scripts/serve.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
