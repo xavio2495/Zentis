@@ -1,0 +1,65 @@
+{
+  "source": "~/.zentis/txlog.jsonl",
+  "pushes": [
+    {
+      "at": "2026-09-13T01:44:51+00:00",
+      "atSeconds": 1789263891,
+      "chain": "sepolia",
+      "chainId": 11155111,
+      "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "amount": "29541461",
+      "tx": "0x4f721c80b7064cbdd0e693d90acb6e4be7e11f8e006449f1f13b6d2963a5bdd6",
+      "note": "scale leg to 45 USDC on the mid"
+    },
+    {
+      "at": "2026-09-13T01:45:02+00:00",
+      "atSeconds": 1789263902,
+      "chain": "sepolia",
+      "chainId": 11155111,
+      "token": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+      "amount": "11868647974217272",
+      "tx": "0x7490034a441b44aa0539edb3a7d154e1b0a493c1f028fb035238afbc48a93291",
+      "note": "scale leg to 45 USDC on the mid"
+    },
+    {
+      "at": "2026-09-13T01:45:23+00:00",
+      "atSeconds": 1789263923,
+      "chain": "arbitrum-sepolia",
+      "chainId": 421614,
+      "token": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+      "amount": "29839235",
+      "tx": "0xaab705a6c1bf49a9cf001edc6f5e76f8d1f725ced8e3fa19b11aefc8cfd99c4c",
+      "note": "scale leg to 45 USDC on the mid"
+    },
+    {
+      "at": "2026-09-13T01:45:26+00:00",
+      "atSeconds": 1789263926,
+      "chain": "arbitrum-sepolia",
+      "chainId": 421614,
+      "token": "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73",
+      "amount": "11745821935281738",
+      "tx": "0x805d67c2c74c37e97f39cf4c0ddd3ea7b27652493a9fd548cbe6d6d85aed0def",
+      "note": "scale leg to 45 USDC on the mid"
+    },
+    {
+      "at": "2026-09-13T01:45:43+00:00",
+      "atSeconds": 1789263943,
+      "chain": "base-sepolia",
+      "chainId": 84532,
+      "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "amount": "29851556",
+      "tx": "0xb4718f16e14bc4593c6b58571f3beb5eab9212b3cbdc345ee75d538f0ee85965",
+      "note": "scale leg to 45 USDC on the mid"
+    },
+    {
+      "at": "2026-09-13T01:45:45+00:00",
+      "atSeconds": 1789263945,
+      "chain": "base-sepolia",
+      "chainId": 84532,
+      "token": "0x4200000000000000000000000000000000000006",
+      "amount": "11752369179793905",
+      "tx": "0x565226e53f55fab6da601ba2f6eab5bec8f017797413b78d2f4934b57b3d4632",
+      "note": "scale leg to 45 USDC on the mid"
+    }
+  ]
+}

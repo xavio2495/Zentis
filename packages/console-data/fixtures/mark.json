@@ -4,27 +4,27 @@
       "chainId": 84532,
       "chain": "base-sepolia",
       "mainnetChainId": 8453,
-      "mid": "396621117893507008296781565",
+      "mid": "396678025231325001090484325",
       "source": "1inch spot",
-      "readAtSeconds": 1789241890,
+      "readAtSeconds": 1789265641,
       "error": null
     },
     {
       "chainId": 421614,
       "chain": "arbitrum-sepolia",
       "mainnetChainId": 42161,
-      "mid": "396909003160020985826597099",
+      "mid": "396301931934601025116892054",
       "source": "1inch spot",
-      "readAtSeconds": 1789241890,
+      "readAtSeconds": 1789265641,
       "error": null
     },
     {
       "chainId": 11155111,
       "chain": "sepolia",
       "mainnetChainId": 1,
-      "mid": "394677930618174969020629389",
+      "mid": "394147762418694003503199718",
       "source": "1inch spot",
-      "readAtSeconds": 1789241890,
+      "readAtSeconds": 1789265641,
       "error": null
     }
   ]

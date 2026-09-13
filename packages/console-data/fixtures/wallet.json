@@ -4,58 +4,58 @@
     {
       "chainId": 11155111,
       "chain": "Sepolia",
-      "gas": "1146059683708735677",
+      "gas": "1975753844310464328",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "37750000",
-        "committed": "15450000",
-        "allowance": "15450000"
+        "held": "48208539",
+        "committed": "45450000",
+        "allowance": "45000000"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "5899422880110771",
-        "committed": "5899422880110771",
-        "allowance": "5899422880110771"
+        "held": "17588353579808447",
+        "committed": "17588353579808447",
+        "allowance": "17588353579808447"
       }
     },
     {
       "chainId": 421614,
       "chain": "Arbitrum Sepolia",
-      "gas": "955697839668222477",
+      "gas": "1793191095980425581",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "38150000",
-        "committed": "15000000",
-        "allowance": "15000000"
+        "held": "48760765",
+        "committed": "45450000",
+        "allowance": "45000000"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "7595559667116501",
-        "committed": "6071769099591659",
-        "allowance": "6071769099591659"
+        "held": "17598014040927221",
+        "committed": "17598014040927221",
+        "allowance": "17598014040927221"
       }
     },
     {
       "chainId": 84532,
       "chain": "Base Sepolia",
-      "gas": "1082977518972767056",
+      "gas": "1921174212980719243",
       "tokenA": {
         "symbol": "USDC",
         "decimals": 6,
-        "held": "38837570",
-        "committed": "15000000",
-        "allowance": "15000000"
+        "held": "49436014",
+        "committed": "45450000",
+        "allowance": "45000000"
       },
       "tokenB": {
         "symbol": "WETH",
         "decimals": 18,
-        "held": "6071769099591659",
-        "committed": "6071109788088660",
-        "allowance": "6071109788088660"
+        "held": "17590952171820082",
+        "committed": "17590952171820082",
+        "allowance": "17590952171820082"
       }
     }
   ]
