@@ -65,3 +65,29 @@ test("a console that never draws ends the run rather than hanging on it", () => 
   // returns at all, and well inside the deadline the test itself would hit.
   expect(Date.now() - started).toBeLessThan(45_000);
 }, 90_000);
+
+test("the console is handed an environment that is not a CI, whatever the parent's is", () => {
+  // Ink decides whether to be interactive before it looks at the tty: `interactive ?? (!isInCi &&
+  // isTTY)`, and `is-in-ci` is `'CI' in env && env.CI !== '0' && env.CI !== 'false'`. On a GitHub
+  // runner CI=true is set for everything, so Ink ran non-interactive inside a perfectly good pty:
+  // no raw mode, no cursor hiding, no repaints — one frame at unmount and every keystroke ignored.
+  // The screen came back looking like a pty that had failed, which is where two sessions went
+  // looking.
+  //
+  // Empty string does not clear it: present-but-empty counts as set. Only "0" or "false" do.
+  const console = join(dir, "reports-env.sh");
+  writeFileSync(
+    console,
+    [
+      "#!/bin/sh",
+      "printf '┌ zentis ─────────┐\\n'",
+      'printf "CI=[%s] CONTINUOUS_INTEGRATION=[%s]\\n" "$CI" "$CONTINUOUS_INTEGRATION"',
+      "",
+    ].join("\n"),
+  );
+  chmodSync(console, 0o755);
+
+  const { screen } = runBinary(console, { keys: "", waitSeconds: 0, seconds: 10, frameSeconds: 5 });
+  expect(screen).toContain("CI=[0]");
+  expect(screen).toContain("CONTINUOUS_INTEGRATION=[0]");
+}, 60_000);
