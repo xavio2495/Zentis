@@ -47,6 +47,15 @@ export interface Frame {
   readonly width: number;
   /** true when the frame is as tall as the terminal, which is where Ink starts clearing it */
   readonly overflows: boolean;
+  /**
+   * How many times the screen was written while the driver watched.
+   *
+   * A console that repaints when nothing has changed costs nothing on a fast machine and everything
+   * over an afternoon: at twelve frames a second the terminal saw a quarter of a million frames in
+   * half an hour, and the process grew to three gigabytes carrying them. Counting the writes is how
+   * that stays fixed.
+   */
+  readonly repaints: number;
 }
 
 export async function drive(
@@ -63,6 +72,8 @@ export async function drive(
     publisher?: "cloud" | "local" | "none";
     /** a stranger's first run: no wallet, no env file, nothing chosen yet */
     onboarding?: boolean;
+    /** how long to sit and watch after the keys, for a test about how often the screen repaints */
+    watchMs?: number;
     /**
      * The machine's transaction log, recorded. Handed in rather than read: a test that read the
      * real file would draw whatever this machine happens to have sent today, and one that wrote it
@@ -124,6 +135,12 @@ export async function drive(
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
   await new Promise((resolve) => setTimeout(resolve, 250));
+  // Sat through rather than sampled: what a repaint test needs is a window of quiet, and the only
+  // honest way to count what a still screen does is to leave it still and watch.
+  if (options.watchMs !== undefined) {
+    stdout.frames.length = 0;
+    await new Promise((resolve) => setTimeout(resolve, options.watchMs));
+  }
 
   const lines = strip(stdout.frames.at(-1) ?? "")
     .replace(/\n$/, "")
@@ -135,5 +152,6 @@ export async function drive(
     rows: lines.length,
     width: Math.max(0, ...lines.map((line) => [...line].length)),
     overflows: lines.length >= rows,
+    repaints: stdout.frames.length,
   };
 }
